@@ -63,18 +63,18 @@ const double kVictoryOvershootSeconds = 0.0019;
 /// must NOT rely on it — it must use [isVictory] from the spec contract.
 const double kVictoryToleranceSeconds = kVictoryOvershootSeconds;
 
-/// |delta| above which the result is no longer "CASI" but a long-miss
-/// ("UPS" branch). Set to 100 ms — the player can hear/feel a 100 ms
-/// discrepancy, so anything looser than that doesn't deserve the
-/// encouragement of "casi". Below this threshold and above
-/// [kVictoryOvershootSeconds] the screen shows CASI.
-const double kNearMissUpperBoundSeconds = 0.100;
+/// Threshold below which the player didn't even come close to
+/// the target — the result is "NI POR ASOMO!". Set to 9.0 s
+/// (1.0s short of the target) so anything in the last second of
+/// the countdown counts as a near-miss rather than a 'never had
+/// a chance' miss.
+const double kFarShortThresholdSeconds = 9.0;
 
-/// |delta| above which the miss is "big" (UPS-deep branch) instead of
-/// "small" (UPS-shallow branch). The screen picks a different
-/// message and a different background color tint depending on
-/// whether the overshoot was in the 100-300ms range or beyond 300ms.
-const double kBigMissUpperBoundSeconds = 0.300;
+/// Threshold above which the player overshot the target by more
+/// than half a second — the result is "¡TE PASASTE!". Set to
+/// 10.50 s, half a second past the target. Between 10.0019s and
+/// 10.50s the result is the "CASI CASI!" branch.
+const double kFarOvershootThresholdSeconds = 10.50;
 
 /// Exact zero-delta easter-egg threshold (raw microsecond comparison).
 const double kEasterEggToleranceSeconds = 0.000001;

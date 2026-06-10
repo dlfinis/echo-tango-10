@@ -272,47 +272,55 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 
   Widget _buildInvitationPanel(String message, String tagline) {
+    // Use SizedBox.expand + FittedBox(BoxFit.contain) so the text
+    // GROWS to fill the available space (down to the larger of
+    // width and height) and only shrinks if the content would
+    // overflow. Previously BoxFit.scaleDown only shrank, which
+    // left the text hugging its natural size on big screens.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            // Main message — centered vertically and horizontally.
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(kDefaultTextColorHex),
-                fontSize: 240,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                height: 1.0,
-                fontFamily: 'BungeeInline',
-                fontFamilyFallback: <String>['Bungee'],
-              ),
-            ),
-            const SizedBox(height: 24),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              child: Text(
-                tagline,
-                key: ValueKey<String>(tagline),
+      child: SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              // Main message — fills the available width and grows
+              // with the screen.
+              Text(
+                message,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: Color(kDefaultAccentColorHex),
-                  fontSize: 110,
+                  color: Color(kDefaultTextColorHex),
+                  fontSize: 240,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
+                  letterSpacing: 2,
+                  height: 1.0,
                   fontFamily: 'BungeeInline',
                   fontFamilyFallback: <String>['Bungee'],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 32),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: Text(
+                  tagline,
+                  key: ValueKey<String>(tagline),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(kDefaultAccentColorHex),
+                    fontSize: 110,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                    fontFamily: 'BungeeInline',
+                    fontFamilyFallback: <String>['Bungee'],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
