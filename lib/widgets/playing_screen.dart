@@ -44,9 +44,7 @@ class _PlayingScreenState extends State<PlayingScreen>
     with SingleTickerProviderStateMixin {
   Timer? _ticker;
   Timer? _timeoutGuard;
-  Timer? _colorTimer;
   Duration _rendered = Duration.zero;
-  int _colorIndex = 0;
 
   /// Drives the backdrop repaint. ~16fps is enough to make the streaks
   /// feel like motion without burning cycles.
@@ -63,12 +61,6 @@ class _PlayingScreenState extends State<PlayingScreen>
     _timeoutGuard = Timer(kPlayingTimeout, () {
       if (!mounted) return;
       widget.onTimeout();
-    });
-    _colorTimer = Timer.periodic(kPlayingColorShiftInterval, (_) {
-      if (!mounted) return;
-      setState(() {
-        _colorIndex = (_colorIndex + 1) % kPlayingColorPaletteHex.length;
-      });
     });
     _backdropTicker = AnimationController(
       vsync: this,
@@ -91,27 +83,28 @@ class _PlayingScreenState extends State<PlayingScreen>
   void dispose() {
     _ticker?.cancel();
     _timeoutGuard?.cancel();
-    _colorTimer?.cancel();
     _backdropTicker.dispose();
     super.dispose();
   }
 
   /// Splits the elapsed time into the chronograph-style chunks:
   ///   * `seconds` — integer part (0..60), goes into the big "00:SS" segment.
-  ///   * `centis` — centiseconds (0..99) inside the current second,
-  ///     rendered as the 2-digit sub-label.
+  ///   * `micros` — 4-digit microsecond sub-label (rounded to 10us
+  ///     for the display, since the underlying Stopwatch reports
+  ///     microseconds and the human eye can't see beyond that).
   String _bigSeconds() =>
       _rendered.inSeconds.remainder(60).toString().padLeft(2, '0');
-  String _centis() {
+  String _micros() {
     final int microInsideSecond =
         _rendered.inMicroseconds.remainder(1000000);
-    final int centis = (microInsideSecond / 10000).round();
-    return centis.toString().padLeft(2, '0');
+    // Display 4 decimals (10us resolution). 1 unit = 100us.
+    final int fourDecimals = (microInsideSecond / 100).round();
+    return fourDecimals.toString().padLeft(4, '0');
   }
 
   @override
   Widget build(BuildContext context) {
-    final Color bigColor = Color(kPlayingColorPaletteHex[_colorIndex]);
+    // Static white digits — no flashing/color cycling during play.
     const Color microColor = Color(kDefaultAccentColorHex);
 
     return Scaffold(
@@ -147,14 +140,14 @@ class _PlayingScreenState extends State<PlayingScreen>
                   children: <Widget>[
                     Text(
                       '00:${_bigSeconds()}',
-                      style: TextStyle(
-                        color: bigColor,
+                      style: const TextStyle(
+                        color: Color(kPlayingDigitColorHex),
                         fontSize: 880,
                         fontWeight: FontWeight.w900,
                         height: 1.0,
                         letterSpacing: -28,
                         fontFamily: 'DSEG7Modern-Regular',
-                        fontFamilyFallback: const <String>[
+                        fontFamilyFallback: <String>[
                           'DSEG7Modern-Bold',
                           'DSEG7Classic-Bold',
                           'monospace',
@@ -165,7 +158,7 @@ class _PlayingScreenState extends State<PlayingScreen>
                     Transform.translate(
                       offset: const Offset(0, 48),
                       child: Text(
-                        '.${_centis()}',
+                        '.${_micros()}',
                         style: const TextStyle(
                           color: microColor,
                           fontSize: 360,

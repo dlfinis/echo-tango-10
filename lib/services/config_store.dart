@@ -29,6 +29,18 @@ const List<String> kDefaultInvitationMessages = <String>[
   '¡El que pega en 10.000s gana!',
 ];
 
+/// Default sub-tagline shown under the main invitation message, rotated
+/// every [kSubTaglineRotationSeconds] seconds. These are the "call to
+/// action" lines designed to be read while the player is on the
+/// waiting screen.
+const List<String> kDefaultSubTaglines = <String>[
+  '¡JUGÁ Y GANÁ EL PREMIO!',
+  '¿PODÉS ROMPER EL RÉCORD?',
+  '¿TENÉS HABILIDAD?',
+  '¿SOS CAPAZ DEL RÉCORD?',
+  '¡APUNTÁ AL 10 EXACTO!',
+];
+
 /// Typed wrapper around [SharedPreferences].
 ///
 /// Instantiate once at app start (e.g. in `AppRoot.initState` via
@@ -49,7 +61,10 @@ class ConfigStore {
   // Keys — keep all string literals here, never inline them at call sites.
   // ---------------------------------------------------------------------------
   static const String kKeyInvitationMessages = 'invitation_messages';
+  static const String kKeySubTaglines = 'sub_taglines';
   static const String kKeyMessageRotationSeconds = 'message_rotation_seconds';
+  static const String kKeySubTaglineRotationSeconds =
+      'sub_tagline_rotation_seconds';
   static const String kKeyLeaderboardRotationSeconds =
       'leaderboard_rotation_seconds';
   static const String kKeyBgColorArgb = 'bg_color_argb';
@@ -94,6 +109,50 @@ class ConfigStore {
       jsonEncode(cleaned.isEmpty ? kDefaultInvitationMessages : cleaned),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Sub-tagline (call to action, shown under the main invitation message)
+  // ---------------------------------------------------------------------------
+
+  /// Returns the configured sub-tagline list, falling back to
+  /// [kDefaultSubTaglines] when the pref is missing or corrupted.
+  List<String> subTaglines() {
+    final String? raw = _prefs.getString(kKeySubTaglines);
+    if (raw == null || raw.isEmpty) {
+      return List<String>.unmodifiable(kDefaultSubTaglines);
+    }
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is List) {
+        final List<String> out = decoded
+            .whereType<String>()
+            .map((String s) => s.trim())
+            .where((String s) => s.isNotEmpty)
+            .toList();
+        if (out.isNotEmpty) return List<String>.unmodifiable(out);
+      }
+    } on FormatException {
+      // fall through
+    }
+    return List<String>.unmodifiable(kDefaultSubTaglines);
+  }
+
+  Future<void> setSubTaglines(List<String> taglines) async {
+    final List<String> cleaned = taglines
+        .map((String s) => s.trim())
+        .where((String s) => s.isNotEmpty)
+        .toList();
+    await _prefs.setString(
+      kKeySubTaglines,
+      jsonEncode(cleaned.isEmpty ? kDefaultSubTaglines : cleaned),
+    );
+  }
+
+  int subTaglineRotationSeconds() =>
+      _prefs.getInt(kKeySubTaglineRotationSeconds) ?? 6;
+
+  Future<void> setSubTaglineRotationSeconds(int seconds) =>
+      _prefs.setInt(kKeySubTaglineRotationSeconds, seconds);
 
   // ---------------------------------------------------------------------------
   // Rotation intervals (seconds)

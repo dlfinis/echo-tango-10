@@ -87,15 +87,19 @@ const int kMaxLeaderboardEntries = 20;
 // ---------------------------------------------------------------------------
 
 /// How often the playing-screen timer color cycles through the palette.
+/// Color rotation is disabled (we now use a single static color), but
+/// the constant is kept for backwards compatibility with code that
+/// still references the palette length.
 const Duration kPlayingColorShiftInterval = Duration(seconds: 3);
 
-/// Color rotation for the live stopwatch digits. White is the start and
-/// end of the loop so the timer is always readable on the dark background.
+/// Color rotation for the live stopwatch digits. Diego asked for the
+/// digits to be a single static color during PLAYING (no flashing),
+/// so the screen reads as 'calm and focused' instead of 'busy'.
 const List<int> kPlayingColorPaletteHex = <int>[
-  0xFFFFFFFF, // white
-  0xFF00E5FF, // cyan
-  0xFF00FF66, // mint green
-  0xFFFFD400, // amber
-  0xFFFF4DD2, // magenta
-  0xFFFFFFFF, // white
+  0xFFFFFFFF, // white — only color used during PLAYING
 ];
+
+/// Static digit color for the live stopwatch. Same as the first
+/// entry in [kPlayingColorPaletteHex], kept as its own constant for
+/// readability at the call site.
+const int kPlayingDigitColorHex = 0xFFFFFFFF;

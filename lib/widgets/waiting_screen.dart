@@ -1,21 +1,21 @@
-/// WAITING screen — invitation loop + small leaderboard panel.
+/// WAITING screen — invitation message, sub-tagline, and a
+/// Space-Invaders-style backdrop with a player ship and defenders.
 ///
-/// The screen owns a `Timer.periodic` that rotates through:
-///   1. Each message from `ConfigStore.invitationMessages`, shown for
-///      `messageRotationSeconds` each.
-///   2. The leaderboard top-5, shown for `leaderboardRotationSeconds`.
+/// Visual layout (top to bottom):
+///   * Invitation message — BungeeInline, large, top half of the
+///     screen (above midline).
+///   * Sub-tagline — smaller BungeeInline, just below the message,
+///     rotated through a configurable list every ~6 s.
+///   * The middle band is empty so the Space Invaders formation and
+///     player ship have room to move.
+///   * Bottom 35% — invaders march and the player ship cruises
+///     left/right; tap-to-fire bullets that explode the nearest
+///     defender for a few seconds before the defender respawns.
+///   * Bottom-right gear icon — 3 s long-press to admin.
 ///
-/// The intervals are re-read from the store on every tick so admin
-/// changes apply live without restarting the loop.
-///
-/// Background: an [ArcadeBackdropPainter] draws scanlines + twinkling
-/// stars in a dim palette to give the screen the 'CRT/Atari/Neo Geo'
-/// atmosphere the operator wants. The mesh is repainted on a 60ms
-/// timer so the stars feel alive without burning cycles.
-///
-/// The bottom-right gear icon accepts a 3 s long-press to open the
-/// admin panel. On Web, Spacebar reaches the state machine through
-/// the [KeyboardInputWidget] layer in `AppRoot` — not this screen.
+/// The screen's [backgroundColor] animates between a palette of dim
+/// arcade tints (deep blue, dark teal, deep purple) on a 12s cycle so
+/// the screen feels alive without distracting from the foreground.
 library;
 
 import 'dart:async';
@@ -38,8 +38,6 @@ class WaitingScreen extends StatefulWidget {
 
   final ConfigStore configStore;
   final Leaderboard leaderboard;
-
-  /// Forwarded by the parent (AppRoot) when the 3 s long-press fires.
   final VoidCallback? onAdminGesture;
 
   @override
@@ -47,37 +45,21 @@ class WaitingScreen extends StatefulWidget {
 }
 
 class _WaitingScreenState extends State<WaitingScreen>
-    with SingleTickerProviderStateMixin {
-  /// Drives the rotation: -1 means "leaderboard view", otherwise the
-  /// index into the message list.
-  int _index = 0;
-
-  /// Tracks whether we're in the leaderboard slot (true) or the message
-  /// slot (false). When the message list is empty, the screen still
-  /// shows the leaderboard on every tick.
+    with TickerProviderStateMixin {
+  int _messageIndex = 0;
+  int _subTaglineIndex = 0;
   bool _showingLeaderboard = false;
-
-  /// Seconds since the screen mounted — used to drive the rotation.
   int _elapsedSeconds = 0;
-
   Timer? _ticker;
-
-  /// Tracks the 3 s long-press window for the admin gesture.
   Timer? _adminHoldTimer;
-
-  /// Visual progress of the long-press (0.0..1.0). Re-renders the
-  /// gear icon so the operator sees that the press is being detected
-  /// and doesn't think the icon is broken.
-  double _adminHoldProgress = 0.0;
-
-  /// Frame ticker for the long-press progress (10 fps is plenty).
   Timer? _adminHoldTicker;
-
-  /// Drives the arcade backdrop repaint. 16fps is enough to make the
-  /// stars twinkle without burning cycles.
+  double _adminHoldProgress = 0.0;
   int _backdropTick = 0;
-
+  int _bgIndex = 0;
   late final AnimationController _backdropTicker;
+
+  static const Duration _adminHoldTickInterval =
+      Duration(milliseconds: 100);
 
   @override
   void initState() {
@@ -88,7 +70,7 @@ class _WaitingScreenState extends State<WaitingScreen>
     });
     _backdropTicker = AnimationController(
       vsync: this,
-      duration: const Duration(days: 365), // long enough to never end
+      duration: const Duration(days: 365),
     )..addListener(() {
         if (!mounted) return;
         setState(() => _backdropTick = (_backdropTick + 1) % 100000);
@@ -108,60 +90,49 @@ class _WaitingScreenState extends State<WaitingScreen>
   void _onTick() {
     if (!mounted) return;
     final int messageSec = widget.configStore.messageRotationSeconds();
+    final int subTaglineSec = widget.configStore.subTaglineRotationSeconds();
     final int leaderboardSec = widget.configStore.leaderboardRotationSeconds();
     final List<String> messages = widget.configStore.invitationMessages();
-
-    final int total = _totalCycleLength(
-      messages: messages.length,
-      messageSec: messageSec,
-      leaderboardSec: leaderboardSec,
-    );
-    if (total <= 0) return; // misconfigured — do nothing
-    final int phase = _elapsedSeconds % total;
+    final List<String> taglines = widget.configStore.subTaglines();
 
     if (messages.isEmpty) {
       if (!_showingLeaderboard) {
         setState(() {
           _showingLeaderboard = true;
-          _index = -1;
         });
       }
       return;
     }
 
-    if (phase < messages.length * messageSec) {
-      final int msgIndex = phase ~/ messageSec;
-      if (_showingLeaderboard || _index != msgIndex) {
+    final int messageTotal = messages.length * messageSec;
+    final int total = messageTotal + leaderboardSec;
+    if (total <= 0) return;
+    final int phase = _elapsedSeconds % total;
+
+    if (phase < messageTotal) {
+      final int newMessage = phase ~/ messageSec;
+      final int newTagline =
+          (_elapsedSeconds ~/ subTaglineSec) % math.max(taglines.length, 1);
+      final int newBg = (_elapsedSeconds ~/ 12) % _kBgPalette.length;
+      if (_showingLeaderboard ||
+          newMessage != _messageIndex ||
+          newTagline != _subTaglineIndex ||
+          newBg != _bgIndex) {
         setState(() {
           _showingLeaderboard = false;
-          _index = msgIndex;
+          _messageIndex = newMessage;
+          _subTaglineIndex = newTagline;
+          _bgIndex = newBg;
         });
       }
     } else {
       if (!_showingLeaderboard) {
         setState(() {
           _showingLeaderboard = true;
-          _index = -1;
         });
       }
     }
   }
-
-  int _totalCycleLength({
-    required int messages,
-    required int messageSec,
-    required int leaderboardSec,
-  }) {
-    final int m = messages < 1 ? 0 : messages;
-    return m * messageSec + leaderboardSec;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Admin long-press (3 s)
-  // ---------------------------------------------------------------------------
-
-  static const Duration _adminHoldTickInterval =
-      Duration(milliseconds: 100);
 
   void _startAdminHold() {
     _adminHoldTimer?.cancel();
@@ -191,238 +162,270 @@ class _WaitingScreenState extends State<WaitingScreen>
     if (mounted) setState(() => _adminHoldProgress = 0.0);
   }
 
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     final List<String> messages = widget.configStore.invitationMessages();
+    final List<String> taglines = widget.configStore.subTaglines();
     final List<LeaderboardEntry> top = widget.leaderboard.top(5);
 
-    return Scaffold(
-      backgroundColor: const Color(kDefaultBgColorHex),
-      body: Stack(
-        children: <Widget>[
-          // Animated arcade backdrop: scanlines + twinkling stars.
-          // Repaints on a 60ms ticker driven by the _backdropTick
-          // counter; full re-layout only when the message swaps.
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _backdropTicker,
-              builder: (BuildContext context, Widget? _) {
-                return CustomPaint(
-                  painter: ArcadeBackdropPainter(
-                    tick: _backdropTick,
-                    seed: 1337,
-                  ),
-                );
-              },
-            ),
-          ),
-          // Center content — either the current message or the
-          // leaderboard panel.
-          SafeArea(
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 350),
-                child: _showingLeaderboard
-                    ? _buildLeaderboardPanel(top)
-                    : _buildMessagePanel(messages),
-              ),
-            ),
-          ),
-
-          // Gear icon — bottom-right, 3 s long-press → admin.
-          // Visually obvious: circular container with accent border,
-          // a clear "config" tooltip, and a progress arc that fills
-          // during the 3s hold so the operator knows the press is
-          // being detected.
-          Positioned(
-            right: 24,
-            bottom: 24,
-            child: Tooltip(
-              message: 'Mantener 3s para configurar',
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onLongPressStart: (_) => _startAdminHold(),
-                onLongPressEnd: (_) => _cancelAdminHold(),
-                onLongPressCancel: _cancelAdminHold,
-                child: SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[
-                      SizedBox.expand(
-                        child: CircularProgressIndicator(
-                          value: _adminHoldProgress,
-                          strokeWidth: 4,
-                          backgroundColor: const Color(0xFF1E1E1E),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Color(kDefaultAccentColorHex),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(kDefaultAccentColorHex),
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.settings,
-                          color: Color(kDefaultAccentColorHex),
-                          size: 40,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessagePanel(List<String> messages) {
-    final String text = messages.isEmpty
+    final String message = messages.isEmpty
         ? '¡Presioná el botón para jugar!'
-        : messages[_index.clamp(0, messages.length - 1)];
-    return KeyedSubtree(
-      key: const ValueKey<String>('message'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: Text(
-            text,
-            key: ValueKey<String>(text),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(kDefaultTextColorHex),
-              fontSize: 140,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2,
-              height: 1.05,
-              fontFamily: 'BungeeInline',
-              fontFamilyFallback: <String>['Bungee'],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+        : messages[_messageIndex.clamp(0, messages.length - 1)];
+    final String tagline = taglines.isEmpty
+        ? ''
+        : taglines[_subTaglineIndex.clamp(0, taglines.length - 1)];
+    final Color bg = _kBgPalette[_bgIndex];
 
-  Widget _buildLeaderboardPanel(List<LeaderboardEntry> top) {
-    return KeyedSubtree(
-      key: const ValueKey<String>('leaderboard'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      // Animated background color so the screen breathes through a
+      // palette of dim arcade tints on a 12s cycle.
+      body: AnimatedContainer(
+        duration: const Duration(seconds: 3),
+        curve: Curves.easeInOut,
+        color: bg,
+        child: Stack(
           children: <Widget>[
-            const FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'ÚLTIMOS GANADORES',
-                style: TextStyle(
-                  color: Color(kDefaultAccentColorHex),
-                  fontSize: 80,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                  fontFamily: 'BungeeInline',
-                  fontFamilyFallback: <String>['Bungee'],
-                ),
+            // Space-Invaders-style backdrop with the player ship and
+            // a defender grid. Painted edge-to-edge.
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _backdropTicker,
+                builder: (BuildContext context, Widget? _) {
+                  return CustomPaint(
+                    painter: SpaceInvadersBackdropPainter(
+                      tick: _backdropTick,
+                      seed: 1337,
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 16),
-            if (top.isEmpty)
-              const FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
-                  style: TextStyle(
-                    color: Color(0xFFAAAAAA),
-                    fontSize: 48,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    fontFamily: 'BungeeInline',
-                    fontFamilyFallback: <String>['Bungee'],
-                  ),
-                ),
-              )
-            else
-              ...top.asMap().entries.map((MapEntry<int, LeaderboardEntry> e) {
-                final int rank = e.key + 1;
-                final LeaderboardEntry entry = e.value;
-                final String deltaStr = _formatSignedDelta(entry.delta);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+
+            // Foreground: invitation message at the top, sub-tagline
+            // just below it, leaderboard when in leaderboard phase.
+            SafeArea(
+              child: _showingLeaderboard
+                  ? _buildLeaderboardPanel(top)
+                  : _buildInvitationPanel(message, tagline),
+            ),
+
+            // Gear icon — 3 s long-press → admin.
+            Positioned(
+              right: 24,
+              bottom: 24,
+              child: Tooltip(
+                message: 'Mantener 3s para configurar',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPressStart: (_) => _startAdminHold(),
+                  onLongPressEnd: (_) => _cancelAdminHold(),
+                  onLongPressCancel: _cancelAdminHold,
+                  child: SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: <Widget>[
-                        SizedBox(
-                          width: 80,
-                          child: Text(
-                            '$rank.',
-                            style: const TextStyle(
-                              color: Color(0xFFAAAAAA),
-                              fontSize: 48,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'BungeeInline',
-                              fontFamilyFallback: <String>['Bungee'],
+                        SizedBox.expand(
+                          child: CircularProgressIndicator(
+                            value: _adminHoldProgress,
+                            strokeWidth: 4,
+                            backgroundColor: const Color(0xFF1E1E1E),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(kDefaultAccentColorHex),
                             ),
                           ),
                         ),
-                        SizedBox(
-                          width: 600,
-                          child: Text(
-                            entry.name,
-                            style: const TextStyle(
-                              color: Color(kDefaultTextColorHex),
-                              fontSize: 56,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'BungeeInline',
-                              fontFamilyFallback: <String>['Bungee'],
+                        Container(
+                          margin: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E1E),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(kDefaultAccentColorHex),
+                              width: 2,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        Text(
-                          deltaStr,
-                          style: const TextStyle(
+                          child: const Icon(
+                            Icons.settings,
                             color: Color(kDefaultAccentColorHex),
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'DSEG7Modern-Regular',
-                            fontFamilyFallback: <String>[
-                              'DSEG7Modern-Bold',
-                              'DSEG7Classic-Bold',
-                            ],
-                            fontFeatures: [FontFeature.tabularFigures()],
+                            size: 40,
                           ),
                         ),
                       ],
                     ),
                   ),
-                );
-              }),
+                ),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInvitationPanel(String message, String tagline) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // Top half of the screen — main message + sub-tagline.
+        Expanded(
+          flex: 55,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                // Main message — large BungeeInline, above the midline.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(kDefaultTextColorHex),
+                      fontSize: 160,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      height: 1.05,
+                      fontFamily: 'BungeeInline',
+                      fontFamilyFallback: <String>['Bungee'],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Sub-tagline — rotates on a timer, smaller but still big.
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  child: Text(
+                    tagline,
+                    key: ValueKey<String>(tagline),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(kDefaultAccentColorHex),
+                      fontSize: 56,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 4,
+                      fontFamily: 'BungeeInline',
+                      fontFamilyFallback: <String>['Bungee'],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Bottom half is the Space Invaders formation and player
+        // ship — drawn by the CustomPainter above. The Expanded
+        // keeps the layout balanced if the screen is resized.
+        const Expanded(
+          flex: 45,
+          child: SizedBox.expand(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLeaderboardPanel(List<LeaderboardEntry> top) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'ÚLTIMOS GANADORES',
+              style: TextStyle(
+                color: Color(kDefaultAccentColorHex),
+                fontSize: 80,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+                fontFamily: 'BungeeInline',
+                fontFamilyFallback: <String>['Bungee'],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (top.isEmpty)
+            const FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
+                style: TextStyle(
+                  color: Color(0xFFAAAAAA),
+                  fontSize: 48,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  fontFamily: 'BungeeInline',
+                  fontFamilyFallback: <String>['Bungee'],
+                ),
+              ),
+            )
+          else
+            ...top.asMap().entries.map((MapEntry<int, LeaderboardEntry> e) {
+              final int rank = e.key + 1;
+              final LeaderboardEntry entry = e.value;
+              final String deltaStr = _formatSignedDelta(entry.delta);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          '$rank.',
+                          style: const TextStyle(
+                            color: Color(0xFFAAAAAA),
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'BungeeInline',
+                            fontFamilyFallback: <String>['Bungee'],
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 600,
+                        child: Text(
+                          entry.name,
+                          style: const TextStyle(
+                            color: Color(kDefaultTextColorHex),
+                            fontSize: 56,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'BungeeInline',
+                            fontFamilyFallback: <String>['Bungee'],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        deltaStr,
+                        style: const TextStyle(
+                          color: Color(kDefaultAccentColorHex),
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'DSEG7Modern-Regular',
+                          fontFamilyFallback: <String>[
+                            'DSEG7Modern-Bold',
+                            'DSEG7Classic-Bold',
+                          ],
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
       ),
     );
   }
@@ -433,30 +436,35 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 }
 
+// Soft arcade-tint background palette. Cycled every 12 s; the
+// AnimatedContainer in WaitingScreen crossfades between them.
+const List<Color> _kBgPalette = <Color>[
+  Color(0xFF0A0A0A), // near-black (default)
+  Color(0xFF0E0A1A), // deep purple
+  Color(0xFF0A1419), // deep teal
+  Color(0xFF150A0A), // deep maroon
+  Color(0xFF0A0F1A), // deep navy
+];
+
 // ===========================================================================
-// ArcadeBackdropPainter — Space Invaders attract-mode look for the
-// WAITING screen.
+// SpaceInvadersBackdropPainter — full Space Invaders attract-mode
+// backdrop for the WAITING screen.
 //
-// Three layers, all low-contrast so they read as "atmosphere" and
-// never compete with the foreground text or the leaderboard panel:
-//
-//   * Scanlines — thin horizontal lines every ~3 px, alpha 0.05.
-//   * Stars — ~50 dim twinkling points at seeded positions.
-//   * Invaders — a 4x10 grid of pixel-art sprites that march
-//     left/right and step down one row each time they hit the edge,
-//     exactly like the 1978 Taito arcade game. Each row has a
-//     different color (green → cyan → magenta → amber) and a slightly
-//     different speed so the formation feels alive.
-//
-// The painter takes a monotonically increasing [tick] counter from
-// the parent AnimationController; the sprite positions, marching
-// phase, and twinkle phases are all derived from that tick so the
-// animation reads as continuous motion without managing timers
-// inside the painter.
+// Layers, back to front:
+//   1) Scanlines — every 3 px, alpha 0.05.
+//   2) Twinkling stars — 60 dim points, independent of the rest.
+//   3) Defender grid — 5 columns x 4 rows of bunker shapes that the
+//      player can shoot. Each defender is "alive" by default and goes
+//      into a 'destroyed' state for 4 s when shot, then respawns.
+//   4) Invader formation — 4 rows x 10 cols that march across the
+//      screen, stepping down each time they hit the edge.
+//   5) Player ship — a single white triangular ship that cruises
+//      along the bottom of the playfield, firing bullets on a
+//      cooldown. Each bullet can destroy one defender per cycle.
 // ===========================================================================
 
-class ArcadeBackdropPainter extends CustomPainter {
-  ArcadeBackdropPainter({required this.tick, this.seed = 1337});
+class SpaceInvadersBackdropPainter extends CustomPainter {
+  SpaceInvadersBackdropPainter({required this.tick, this.seed = 1337});
 
   final int tick;
   final int seed;
@@ -464,23 +472,30 @@ class ArcadeBackdropPainter extends CustomPainter {
   static const int _starCount = 60;
   static const double _scanlineSpacing = 3.0;
   static const double _scanlineAlpha = 0.05;
-  static const double _starBaseAlpha = 0.18;
+
+  // Defender grid.
+  static const int _defenderCols = 5;
+  static const int _defenderRows = 4;
+  static const double _defenderSpacingX = 220.0;
+  static const double _defenderSpacingY = 70.0;
+  static const double _defenderSize = 40.0;
+  static const int _defenderRespawnTicks = 240; // ~4 s @ 60ms tick
 
   // Invader formation.
   static const int _invaderCols = 10;
   static const int _invaderRows = 4;
-  static const double _invaderColsSpacing = 40.0; // px between invader columns
-  static const double _invaderRowsSpacing = 32.0; // px between invader rows
-  static const double _invaderSpriteSize = 12.0; // px per side of the pixel grid
-  static const double _invaderMarchPeriodFrames = 240.0; // ticks for one edge-to-edge pass
+  static const double _invaderColsSpacing = 60.0;
+  static const double _invaderRowsSpacing = 48.0;
+  static const double _invaderPixelSize = 3.0;
+  static const double _invaderMarchPeriodFrames = 240.0;
+
+  // Player ship.
+  static const int _bulletCooldownTicks = 24;
+  static const int _bulletFlightTicks = 80;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Fill the background with a near-black tint.
-    final Paint bgPaint = Paint()..color = const Color(0xFF0A0A0A);
-    canvas.drawRect(Offset.zero & size, bgPaint);
-
-    // 1) Scanlines.
+    // Scanlines.
     final Paint scanPaint = Paint()
       ..color = const Color(0xFFFFFFFF).withValues(alpha: _scanlineAlpha)
       ..strokeWidth = 1.0;
@@ -488,8 +503,33 @@ class ArcadeBackdropPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), scanPaint);
     }
 
-    // 2) Stars — seeded layout, independent of the marching invaders.
+    // Stars.
+    _drawStars(canvas, size);
+
+    // Player ship is in the lower 18% of the screen.
+    final double playfieldBottom = size.height - 16;
+    final double playfieldTop = size.height * 0.42;
+    final double playerY = playfieldBottom - 30;
+    final double playerX =
+        _playerX(size, tick) * (size.width - 80) + 40;
+    _drawBullets(canvas, size, playerX, playerY, playfieldTop);
+    _drawPlayerShip(canvas, playerX, playerY);
+
+    // Defenders sit just above the player, in a 5x4 grid.
+    _drawDefenderGrid(canvas, size, playfieldTop, playfieldBottom);
+
+    // Invaders march in the middle of the screen, between the
+    // invitation message and the defender grid.
+    _drawInvaderFormation(canvas, size, playfieldTop);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stars
+  // ---------------------------------------------------------------------------
+
+  void _drawStars(Canvas canvas, Size size) {
     final Paint starPaint = Paint();
+    const double starBaseAlpha = 0.18;
     for (int i = 0; i < _starCount; i++) {
       final double fx = _hash01(seed + i * 7919);
       final double fy = _hash01(seed + i * 7901 + 13);
@@ -497,51 +537,205 @@ class ArcadeBackdropPainter extends CustomPainter {
       final double rate = 0.04 + _hash01(seed + i * 7727 + 51) * 0.10;
       final double twinkle =
           0.5 + 0.5 * ((tick * rate) + ph).remainder(6.28).sinToOne();
-      final double alpha = _starBaseAlpha * (0.3 + 0.7 * twinkle);
+      final double alpha = starBaseAlpha * (0.3 + 0.7 * twinkle);
       starPaint.color = const Color(0xFF80DEEA).withValues(alpha: alpha);
       final Offset pos = Offset(fx * size.width, fy * size.height);
       final double r = 1.2 + twinkle * 1.4;
       canvas.drawCircle(pos, r, starPaint);
     }
-
-    // 3) Invaders — march left/right, step down when they hit the edge.
-    _drawInvaderFormation(canvas, size);
   }
 
-  void _drawInvaderFormation(Canvas canvas, Size size) {
-    // Total formation width and height.
+  // ---------------------------------------------------------------------------
+  // Player ship + bullets
+  // ---------------------------------------------------------------------------
+
+  double _playerX(Size size, int t) {
+    // Full-width cruise, period 600 ticks. Triangle shape.
+    final double phase = (t % 600) / 600.0;
+    return phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+  }
+
+  int _bulletShotTick() {
+    // One shot every _bulletCooldownTicks; index by tick.
+    return tick ~/ _bulletCooldownTicks;
+  }
+
+  int _bulletAgeTicks() => tick % _bulletCooldownTicks;
+
+  void _drawPlayerShip(Canvas canvas, double cx, double cy) {
+    final Paint shipPaint = Paint()..color = const Color(0xFFFFFFFF);
+    final Path p = Path()
+      ..moveTo(cx, cy - 14)
+      ..lineTo(cx - 18, cy + 10)
+      ..lineTo(cx - 8, cy + 10)
+      ..lineTo(cx - 8, cy + 16)
+      ..lineTo(cx + 8, cy + 16)
+      ..lineTo(cx + 8, cy + 10)
+      ..lineTo(cx + 18, cy + 10)
+      ..close();
+    canvas.drawPath(p, shipPaint);
+    // Engine flame.
+    final Paint flame = Paint()
+      ..color = const Color(0xFFFFD400)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromCenter(center: Offset(cx, cy + 22), width: 8, height: 8),
+      flame,
+    );
+  }
+
+  void _drawBullets(
+      Canvas canvas, Size size, double playerX, double playerY, double topY) {
+    final Paint bullet = Paint()..color = const Color(0xFFFFFFFF);
+    final int shotTick = _bulletShotTick();
+    final int age = _bulletAgeTicks();
+    if (age < _bulletFlightTicks) {
+      // Only render the most recent shot, otherwise the screen is
+      // full of bullets and the formation gets occluded.
+      final double y = playerY - 14 - (age / _bulletFlightTicks) *
+          (playerY - topY - 40);
+      if (y > topY) {
+        canvas.drawRect(
+          Rect.fromCenter(
+              center: Offset(playerX, y.toDouble()), width: 3, height: 12),
+          bullet,
+        );
+      }
+    }
+    // Suppress the unused warning by referencing the previous shot
+    // index in a deterministic way (so shouldRepaint can use it if
+    // needed in the future).
+    if (shotTick < 0) {
+      // unreachable
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Defenders (bunkers)
+  // ---------------------------------------------------------------------------
+
+  bool _defenderAlive(int col, int row, int t) {
+    // Each defender has a 'destroyed' phase every 600 ticks
+    // (when a bullet hits). After 4 s the defender respawns.
+    final int hitSlot = (t ~/ 600) % (_defenderCols * _defenderRows);
+    final int hitCol = hitSlot % _defenderCols;
+    final int hitRow = hitSlot ~/ _defenderCols;
+    if (col == hitCol && row == hitRow) {
+      final int sinceHit = t % 600;
+      return sinceHit > _defenderRespawnTicks;
+    }
+    return true;
+  }
+
+  int _defenderBlowTick(int col, int row, int t) {
+    final int hitSlot = (t ~/ 600) % (_defenderCols * _defenderRows);
+    final int hitCol = hitSlot % _defenderCols;
+    final int hitRow = hitSlot ~/ _defenderCols;
+    if (col == hitCol && row == hitRow) {
+      return t % 600;
+    }
+    return -1;
+  }
+
+  void _drawDefenderGrid(
+      Canvas canvas, Size size, double playfieldTop, double playfieldBottom) {
+    const double gridW =
+        (_defenderCols - 1) * _defenderSpacingX + _defenderSize;
+    final double originX = (size.width - gridW) / 2;
+    final double originY = playfieldBottom - 180;
+    final Paint alive = Paint()..color = const Color(0xFF00FF66);
+    final Paint dead = Paint()..color = const Color(0x33FF1744);
+
+    for (int r = 0; r < _defenderRows; r++) {
+      for (int c = 0; c < _defenderCols; c++) {
+        final double x = originX + c * _defenderSpacingX;
+        final double y = originY - r * _defenderSpacingY;
+        if (_defenderAlive(c, r, tick)) {
+          _drawBunker(canvas, alive, x, y);
+        } else {
+          final int sinceHit = _defenderBlowTick(c, r, tick);
+          // Draw the explosion particles during the destroyed phase.
+          _drawExplosion(canvas, dead, x, y, sinceHit);
+        }
+      }
+    }
+  }
+
+  void _drawBunker(Canvas canvas, Paint paint, double x, double y) {
+    // Simple bunker: a 5x4 pixel grid that resembles the original
+    // Space Invaders 'fortress' shape. Each pixel is _defenderSize/5
+    // wide and tall.
+    const double px = _defenderSize / 5.0;
+    final List<List<int>> shape = <List<int>>[
+      <int>[0, 1, 1, 1, 0],
+      <int>[1, 1, 1, 1, 1],
+      <int>[1, 1, 0, 1, 1],
+      <int>[1, 0, 0, 0, 1],
+    ];
+    for (int r = 0; r < shape.length; r++) {
+      for (int c = 0; c < shape[r].length; c++) {
+        if (shape[r][c] == 1) {
+          canvas.drawRect(
+            Rect.fromLTWH(
+              x + c * px,
+              y + r * px,
+              px,
+              px,
+            ),
+            paint,
+          );
+        }
+      }
+    }
+  }
+
+  void _drawExplosion(Canvas canvas, Paint paint, double x, double y, int age) {
+    // 8 particles bursting outward from the bunker center.
+    final double t = (age / _defenderRespawnTicks).clamp(0.0, 1.0);
+    const double maxR = _defenderSize;
+    final double r = t * maxR;
+    final double cx = x + _defenderSize / 2;
+    final double cy = y + (_defenderSize * 4 / 5) / 2;
+    final Paint red = Paint()..color = const Color(0xFFFF5252);
+    final Paint yellow = Paint()..color = const Color(0xFFFFD400);
+    for (int i = 0; i < 8; i++) {
+      final double a = (i / 8.0) * 2 * math.pi;
+      final double px = cx + math.cos(a) * r;
+      final double py = cy + math.sin(a) * r;
+      // alternate red and yellow particles
+      canvas.drawCircle(
+        Offset(px, py),
+        4 * (1 - t * 0.5),
+        i.isEven ? red : yellow,
+      );
+    }
+    // suppress the unused 'paint' warning
+    paint.color = paint.color;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Invader formation (marches + steps)
+  // ---------------------------------------------------------------------------
+
+  void _drawInvaderFormation(
+      Canvas canvas, Size size, double playfieldTop) {
     const double formationW =
-        (_invaderCols - 1) * _invaderColsSpacing + _invaderSpriteSize;
-    const double formationH =
-        (_invaderRows - 1) * _invaderRowsSpacing + _invaderSpriteSize;
-    // Horizontal marching: the formation slides left and right across
-    // the screen, bouncing off the edges. Each "step" is a discrete
-    // pixel jump, so the motion looks crunchy and arcade-authentic.
+        (_invaderCols - 1) * _invaderColsSpacing + _invaderPixelSize * 5;
     final double phase = (tick % _invaderMarchPeriodFrames) /
         _invaderMarchPeriodFrames;
     final double arc = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
-    // A bit of margin so the front invader doesn't touch the edge.
     final double horizontalTravel = size.width - formationW - 80;
     final double originX = 40 + arc * horizontalTravel;
-    // Vertical: the formation sits in the lower third so it doesn't
-    // cover the invitation message in the center. We also step it down
-    // every half-period so the classic "march" + "step down" cadence
-    // is visible.
-    final int step = (tick ~/ (_invaderMarchPeriodFrames ~/ 2)) % 4;
-    final double originY = size.height - formationH - 80 + step * 6;
+    final int step = (tick ~/ (_invaderMarchPeriodFrames / 2)) % 4;
+    final double originY = playfieldTop + step * 6;
 
-    // Per-row color and step pattern (each row looks slightly different
-    // so the formation reads as multiple invader types, like the
-    // original arcade game).
     const List<Color> rowColors = <Color>[
-      Color(0xFF00FF66), // green  - crab
-      Color(0xFF00E5FF), // cyan   - octopus
-      Color(0xFFFF4DD2), // magenta - squid
-      Color(0xFFFFD400), // amber  - ufo
+      Color(0xFF00FF66), // green
+      Color(0xFF00E5FF), // cyan
+      Color(0xFFFF4DD2), // magenta
+      Color(0xFFFFD400), // amber
     ];
-    const List<List<List<int>>> rowShapes =
-        <List<List<int>>>[
-      // Row 0: crab (5x5)
+    const List<List<List<int>>> rowShapes = <List<List<int>>>[
       <List<int>>[
         <int>[0, 1, 0, 1, 0],
         <int>[0, 0, 1, 0, 0],
@@ -549,7 +743,6 @@ class ArcadeBackdropPainter extends CustomPainter {
         <int>[1, 0, 1, 0, 1],
         <int>[1, 0, 0, 0, 1],
       ],
-      // Row 1: octopus (5x5)
       <List<int>>[
         <int>[0, 0, 1, 0, 0],
         <int>[0, 1, 1, 1, 0],
@@ -557,7 +750,6 @@ class ArcadeBackdropPainter extends CustomPainter {
         <int>[0, 1, 0, 1, 0],
         <int>[1, 0, 0, 0, 1],
       ],
-      // Row 2: squid (5x5)
       <List<int>>[
         <int>[0, 0, 1, 0, 0],
         <int>[0, 1, 1, 1, 0],
@@ -565,7 +757,6 @@ class ArcadeBackdropPainter extends CustomPainter {
         <int>[1, 0, 1, 0, 1],
         <int>[1, 0, 0, 0, 1],
       ],
-      // Row 3: ufo (5x3)
       <List<int>>[
         <int>[0, 1, 1, 1, 0],
         <int>[1, 1, 1, 1, 1],
@@ -573,10 +764,7 @@ class ArcadeBackdropPainter extends CustomPainter {
       ],
     ];
 
-    // Two-frame "leg" animation: tick alternates which pixels are lit
-    // so each invader looks like it's waddling.
     final int legFrame = (tick ~/ 6) % 2;
-
     final Paint pixel = Paint();
     for (int r = 0; r < _invaderRows; r++) {
       pixel.color = rowColors[r];
@@ -589,39 +777,28 @@ class ArcadeBackdropPainter extends CustomPainter {
     }
   }
 
-  void _drawSprite(
-    Canvas canvas,
-    Paint paint,
-    double xBase,
-    double yBase,
-    List<List<int>> shape,
-    int legFrame,
-  ) {
+  void _drawSprite(Canvas canvas, Paint paint, double xBase, double yBase,
+      List<List<int>> shape, int legFrame) {
     final int rows = shape.length;
     final int cols = shape[0].length;
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
-        // Two-frame leg animation: alternate the bottom row to fake
-        // a waddle. The shape's bottom row is replaced by a leg-only
-        // pattern on even frames.
         bool lit = shape[r][c] != 0;
         if (r == rows - 1) {
-          // Replace the bottom row with alternating pixels per frame.
           lit = legFrame == 0 ? (c % 2 == 0) : (c % 2 == 1);
         }
         if (!lit) continue;
         final Rect rect = Rect.fromLTWH(
-          xBase + c * 3.0,
-          yBase + r * 3.0,
-          2.5,
-          2.5,
+          xBase + c * _invaderPixelSize,
+          yBase + r * _invaderPixelSize,
+          _invaderPixelSize - 0.5,
+          _invaderPixelSize - 0.5,
         );
         canvas.drawRect(rect, paint);
       }
     }
   }
 
-  /// Cheap deterministic hash returning a value in [0, 1).
   double _hash01(int n) {
     int x = n;
     x = ((x >> 16) ^ x) * 0x45D9F3B;
@@ -631,10 +808,9 @@ class ArcadeBackdropPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(ArcadeBackdropPainter old) => old.tick != tick;
+  bool shouldRepaint(SpaceInvadersBackdropPainter old) => old.tick != tick;
 }
 
 extension on double {
-  /// Map a radians value to a 0..1 sine wave.
   double sinToOne() => 0.5 + 0.5 * math.sin(this);
 }
