@@ -63,13 +63,18 @@ const double kVictoryOvershootSeconds = 0.0019;
 /// must NOT rely on it — it must use [isVictory] from the spec contract.
 const double kVictoryToleranceSeconds = kVictoryOvershootSeconds;
 
-/// |delta| above which the result is no longer "CASI" but "UPS"
-/// (the player was so far off that it's clearly a miss, not a
-/// near-miss). Set to 100 ms — the player can hear/feel a 100 ms
+/// |delta| above which the result is no longer "CASI" but a long-miss
+/// ("UPS" branch). Set to 100 ms — the player can hear/feel a 100 ms
 /// discrepancy, so anything looser than that doesn't deserve the
 /// encouragement of "casi". Below this threshold and above
 /// [kVictoryOvershootSeconds] the screen shows CASI.
 const double kNearMissUpperBoundSeconds = 0.100;
+
+/// |delta| above which the miss is "big" (UPS-deep branch) instead of
+/// "small" (UPS-shallow branch). The screen picks a different
+/// message and a different background color tint depending on
+/// whether the overshoot was in the 100-300ms range or beyond 300ms.
+const double kBigMissUpperBoundSeconds = 0.300;
 
 /// Exact zero-delta easter-egg threshold (raw microsecond comparison).
 const double kEasterEggToleranceSeconds = 0.000001;
@@ -89,19 +94,28 @@ const int kMaxLeaderboardEntries = 20;
 // ---------------------------------------------------------------------------
 
 /// How often the playing-screen timer color cycles through the palette.
-/// Color rotation is disabled (we now use a single static color), but
-/// the constant is kept for backwards compatibility with code that
-/// still references the palette length.
 const Duration kPlayingColorShiftInterval = Duration(seconds: 3);
 
-/// Color rotation for the live stopwatch digits. Diego asked for the
-/// digits to be a single static color during PLAYING (no flashing),
-/// so the screen reads as 'calm and focused' instead of 'busy'.
+/// Color rotation for the live stopwatch digits. The screen has a
+/// WHITE background; the digits start in BLACK and cycle through
+/// the palette every [kPlayingColorShiftInterval] seconds. The
+/// rotation creates a slow chromatic drift so the player can see
+/// the chronograph without being distracted by rapid flashing.
 const List<int> kPlayingColorPaletteHex = <int>[
-  0xFFFFFFFF, // white — only color used during PLAYING
+  0xFF000000, // black — initial color (high contrast on white)
+  0xFF00B0FF, // sky blue
+  0xFF00C853, // mint green
+  0xFFFF6D00, // amber
+  0xFFD500F9, // magenta
+  0xFF000000, // back to black — loop point
 ];
 
-/// Static digit color for the live stopwatch. Same as the first
-/// entry in [kPlayingColorPaletteHex], kept as its own constant for
-/// readability at the call site.
-const int kPlayingDigitColorHex = 0xFFFFFFFF;
+/// Starting digit color for the live stopwatch. The rotation begins
+/// at black (per Diego's request) so the white-background, black-digit
+/// contrast reads as a clean LCD on first paint.
+const int kPlayingDigitColorHex = 0xFF000000;
+
+/// Background color for the PLAYING screen — pure white, like a
+/// printed paper stopwatch. Black digits on white have the highest
+/// possible contrast and are the most readable at a kiosk distance.
+const int kPlayingBackgroundColorHex = 0xFFFFFFFF;

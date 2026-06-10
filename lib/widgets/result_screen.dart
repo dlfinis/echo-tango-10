@@ -1,18 +1,22 @@
 /// RESULT screen — chronograph-style final time + signed delta vs 10s
-/// with a 3-branch verdict:
+/// with a 4-branch verdict:
 ///
 ///   * VICTORIA — `delta < kVictoryOvershootSeconds` (1.9 ms).
-///     Digits go green, no glitch.
-///   * CASI     — `kVictoryOvershootSeconds <= delta < kNearMissUpperBoundSeconds`
-///     (1.9 ms to 100 ms). Retro CRT glitch: shake + color flicker +
-///     red border for 1.2 s, then settle.
-///   * UPS      — `delta >= kNearMissUpperBoundSeconds` (>100 ms).
-///     Digits stay white, no animation. The message says "¡UPS!" to
-///     acknowledge the player was way off without being mean.
+///     Digits go green, no glitch, label "¡GANASTE!".
+///   * CASI     — 1.9 ms to 100 ms (kNearMissUpperBoundSeconds).
+///     Retro CRT glitch: shake + color flicker + red border for 1.2 s.
+///     Label "¡POR POCO!" or "¡CASI CASI!".
+///   * UPS-SHALLOW — 100 ms to 300 ms. Background tints a soft red,
+///     no glitch, label "¡POR UN PELITO!" / "¡CERCA PERO NO!" /
+///     "¡CASI, CASI!" picked at random per visit.
+///   * UPS-DEEP — > 300 ms OR elapsed < 10 s (came in short).
+///     Background tints a deeper red, label "¡UPS!" / "¡A LA
+///     PRÓXIMA!" / "¡QUÉ MAL!" picked at random per visit.
 ///
-/// All three branches show the same chronograph (`00:SS.mmm` in this
-/// screen — we drop the microsecond segment here because reading 7
-/// digits is not the goal, reading the verdict is).
+/// The "UPS" branches were merged into one tier in iteration #9
+/// (just "UPS"). Diego asked for them to be split again with
+/// different copy and visual treatment so the player gets a more
+/// nuanced read of how off they were.
 library;
 
 import 'dart:math' as math;
@@ -21,7 +25,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/constants.dart';
 
-enum _Verdict { victory, casi, ups }
+enum _Verdict { victory, casi, upsShallow, upsDeep }
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
@@ -41,18 +45,40 @@ class _ResultScreenState extends State<ResultScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _glitchController;
   late final Animation<double> _glitchAnim;
+  late final String _shallowMessage;
+  late final String _deepMessage;
+  late final _Verdict _verdict;
 
-  _Verdict get _verdict {
-    if (widget.elapsedSeconds < kTargetSeconds) return _Verdict.ups;
-    final double delta = widget.elapsedSeconds - kTargetSeconds;
+  static const List<String> _shallowMessages = <String>[
+    '¡POR UN PELITO!',
+    '¡CERCA PERO NO!',
+    '¡CASI, CASI!',
+  ];
+
+  static const List<String> _deepMessages = <String>[
+    '¡UPS!',
+    '¡A LA PRÓXIMA!',
+    '¡QUÉ MAL!',
+  ];
+
+  _Verdict _classifyVerdict(double elapsed) {
+    if (elapsed < kTargetSeconds) return _Verdict.upsDeep;
+    final double delta = elapsed - kTargetSeconds;
     if (delta <= kVictoryOvershootSeconds) return _Verdict.victory;
     if (delta < kNearMissUpperBoundSeconds) return _Verdict.casi;
-    return _Verdict.ups;
+    if (delta < kBigMissUpperBoundSeconds) return _Verdict.upsShallow;
+    return _Verdict.upsDeep;
   }
 
   @override
   void initState() {
     super.initState();
+    _verdict = _classifyVerdict(widget.elapsedSeconds);
+    _shallowMessage = _shallowMessages[
+        math.Random().nextInt(_shallowMessages.length)];
+    _deepMessage =
+        _deepMessages[math.Random().nextInt(_deepMessages.length)];
+
     _glitchController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -64,7 +90,7 @@ class _ResultScreenState extends State<ResultScreen>
     if (_verdict == _Verdict.casi) {
       _glitchController.forward();
     } else {
-      _glitchController.value = 1.0; // settled
+      _glitchController.value = 1.0;
     }
   }
 
@@ -99,11 +125,29 @@ class _ResultScreenState extends State<ResultScreen>
   String get _verdictLabel {
     switch (_verdict) {
       case _Verdict.victory:
-        return '¡VICTORIA!';
+        return '¡GANASTE!';
       case _Verdict.casi:
-        return '¡CASI!';
-      case _Verdict.ups:
-        return '¡UPS!';
+        return '¡POR POCO!';
+      case _Verdict.upsShallow:
+        return _shallowMessage;
+      case _Verdict.upsDeep:
+        return _deepMessage;
+    }
+  }
+
+  /// Background color tinted by the verdict. VICTORIA = green tint,
+  /// CASI = amber tint (suggests 'caution, you almost had it'),
+  /// UPS-SHALLOW = soft red, UPS-DEEP = deeper red.
+  Color get _verdictBg {
+    switch (_verdict) {
+      case _Verdict.victory:
+        return const Color(0xFF003A0A);
+      case _Verdict.casi:
+        return const Color(0xFF3A1F00);
+      case _Verdict.upsShallow:
+        return const Color(0xFF2A0A0A);
+      case _Verdict.upsDeep:
+        return const Color(0xFF1A0505);
     }
   }
 
@@ -112,7 +156,10 @@ class _ResultScreenState extends State<ResultScreen>
       case _Verdict.victory:
         return const Color(kDefaultAccentColorHex);
       case _Verdict.casi:
-      case _Verdict.ups:
+        return const Color(0xFFFFC107);
+      case _Verdict.upsShallow:
+        return const Color(0xFFFF8A80);
+      case _Verdict.upsDeep:
         return const Color(kDefaultTextColorHex);
     }
   }
@@ -120,7 +167,7 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(kDefaultBgColorHex),
+      backgroundColor: _verdictBg,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onNext,
@@ -148,7 +195,7 @@ class _ResultScreenState extends State<ResultScreen>
         ? accent
         : (glitchActive
             ? Color.lerp(white, const Color(0xFFFF5252), glitchIntensity * 0.6)!
-            : white);
+            : _verdictColor);
     final Color borderColor = glitchActive
         ? const Color(0xFFFF5252).withValues(alpha: glitchIntensity * 0.4)
         : const Color(0x00000000);

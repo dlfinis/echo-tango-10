@@ -1,20 +1,20 @@
 /// PLAYING screen — chronograph-style stopwatch in three resolution
-/// segments (seconds, milliseconds, microseconds).
+/// segments (seconds, milliseconds, microseconds), printed on a
+/// pure-white background like a paper stopwatch.
 ///
 /// Layout (left-to-right, baseline-aligned):
-///   * `SS`     — biggest segment, e.g. "10". Pure seconds.
-///   * `.mmm`   — middle segment, e.g. ".234". Milliseconds inside
-///                the current second.
-///   * `.uuuu`  — smallest segment, e.g. ".5678". Microseconds inside
-///                the current millisecond.
+///   * `SS`     — biggest segment. Pure seconds.
+///   * `.mmm`   — middle segment. Milliseconds inside the current
+///                second.
+///   * `.uu`    — smallest segment. Microseconds inside the current
+///                millisecond, rounded to 2 digits (centimicros)
+///                so the segment can be visually larger.
 ///
-/// Three sizes give each segment its own visual weight so the player
-/// can read the second-tick from a distance and the microsecond tick
-/// up close.
-///
-/// The digits are a single static white — no flashing, no rotation —
-/// per Diego: "blanco para notar el juego". The screen has no other
-/// animations or distractions during play; only the chronograph.
+/// All digits start in BLACK and cycle through a 5-color palette
+/// (black → blue → green → amber → magenta → black) every 3s via a
+/// [Timer.periodic]. The color is applied to the whole row at once
+/// so the player reads 'the chronograph' as a single object whose
+/// color is drifting, not three independent color streams.
 library;
 
 import 'dart:async';
@@ -41,7 +41,9 @@ class PlayingScreen extends StatefulWidget {
 class _PlayingScreenState extends State<PlayingScreen> {
   Timer? _ticker;
   Timer? _timeoutGuard;
+  Timer? _colorTimer;
   Duration _rendered = Duration.zero;
+  int _colorIndex = 0;
 
   @override
   void initState() {
@@ -53,6 +55,13 @@ class _PlayingScreenState extends State<PlayingScreen> {
     _timeoutGuard = Timer(kPlayingTimeout, () {
       if (!mounted) return;
       widget.onTimeout();
+    });
+    _colorTimer = Timer.periodic(kPlayingColorShiftInterval, (_) {
+      if (!mounted) return;
+      setState(() {
+        _colorIndex =
+            (_colorIndex + 1) % kPlayingColorPaletteHex.length;
+      });
     });
   }
 
@@ -67,6 +76,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
   void dispose() {
     _ticker?.cancel();
     _timeoutGuard?.cancel();
+    _colorTimer?.cancel();
     super.dispose();
   }
 
@@ -81,20 +91,24 @@ class _PlayingScreenState extends State<PlayingScreen> {
     return (microInsideSecond ~/ 1000).toString().padLeft(3, '0');
   }
 
-  /// `uuuu` — microseconds inside the current millisecond. "000".."999".
-  String get _micros {
+  /// `uu` — 2-digit centimicros inside the current millisecond.
+  /// Microsecond resolution is overkill for a human-pressable button;
+  /// 2 digits gives a 10us resolution which is plenty for the
+  /// 1.9ms victory window. Shorter label -> the segment can be
+  /// visually larger.
+  String get _centimicros {
     final int microInsideSecond =
         _rendered.inMicroseconds.remainder(1000000);
-    return (microInsideSecond % 1000).toString().padLeft(3, '0');
+    final int centimicros = (microInsideSecond % 1000) ~/ 10;
+    return centimicros.toString().padLeft(2, '0');
   }
 
   @override
   Widget build(BuildContext context) {
+    final Color digitColor = Color(kPlayingColorPaletteHex[_colorIndex]);
+
     return Scaffold(
-      backgroundColor: const Color(kDefaultBgColorHex),
-      // The three segments share a single FittedBox so the whole row
-      // grows to fill the screen width and shrinks together if the
-      // longest segment won't fit.
+      backgroundColor: const Color(kPlayingBackgroundColorHex),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Center(
@@ -106,17 +120,17 @@ class _PlayingScreenState extends State<PlayingScreen> {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: <Widget>[
-                // SS — biggest. Static white, DSEG7 Modern.
+                // SS — biggest. Black-or-color digits on white.
                 Text(
                   _seconds,
-                  style: const TextStyle(
-                    color: Color(kPlayingDigitColorHex),
+                  style: TextStyle(
+                    color: digitColor,
                     fontSize: 880,
                     fontWeight: FontWeight.w900,
                     height: 1.0,
                     letterSpacing: -28,
                     fontFamily: 'DSEG7Modern-Regular',
-                    fontFamilyFallback: <String>[
+                    fontFamilyFallback: const <String>[
                       'DSEG7Modern-Bold',
                       'DSEG7Classic-Bold',
                       'monospace',
@@ -128,14 +142,14 @@ class _PlayingScreenState extends State<PlayingScreen> {
                   offset: const Offset(0, 36),
                   child: Text(
                     '.$_millis',
-                    style: const TextStyle(
-                      color: Color(kPlayingDigitColorHex),
-                      fontSize: 360,
+                    style: TextStyle(
+                      color: digitColor,
+                      fontSize: 420,
                       fontWeight: FontWeight.w900,
                       height: 1.0,
-                      letterSpacing: -10,
+                      letterSpacing: -12,
                       fontFamily: 'DSEG7Modern-Regular',
-                      fontFamilyFallback: <String>[
+                      fontFamilyFallback: const <String>[
                         'DSEG7Modern-Bold',
                         'DSEG7Classic-Bold',
                         'monospace',
@@ -143,20 +157,21 @@ class _PlayingScreenState extends State<PlayingScreen> {
                     ),
                   ),
                 ),
-                // .uuuu — smallest. Translates further down to sit
-                // on the baseline next to the medium segment.
+                // .uu — smallest but bigger than before (since the
+                // segment is now 2 digits instead of 3, we have more
+                // room).
                 Transform.translate(
                   offset: const Offset(0, 64),
                   child: Text(
-                    '.$_micros',
-                    style: const TextStyle(
-                      color: Color(kPlayingDigitColorHex),
-                      fontSize: 180,
+                    '.$_centimicros',
+                    style: TextStyle(
+                      color: digitColor,
+                      fontSize: 240,
                       fontWeight: FontWeight.w900,
                       height: 1.0,
-                      letterSpacing: -4,
+                      letterSpacing: -6,
                       fontFamily: 'DSEG7Modern-Regular',
-                      fontFamilyFallback: <String>[
+                      fontFamilyFallback: const <String>[
                         'DSEG7Modern-Bold',
                         'DSEG7Classic-Bold',
                         'monospace',

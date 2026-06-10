@@ -272,55 +272,49 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 
   Widget _buildInvitationPanel(String message, String tagline) {
-    return Stack(
-      children: <Widget>[
-        // Main message — top portion of the screen, anchored to the
-        // top with a Padding so it always sits above the midline.
-        Positioned(
-          left: 24,
-          right: 24,
-          top: 32,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.center,
-                child: Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(kDefaultTextColorHex),
-                    fontSize: 240,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    height: 1.0,
-                    fontFamily: 'BungeeInline',
-                    fontFamilyFallback: <String>['Bungee'],
-                  ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            // Main message — centered vertically and horizontally.
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(kDefaultTextColorHex),
+                fontSize: 240,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                height: 1.0,
+                fontFamily: 'BungeeInline',
+                fontFamilyFallback: <String>['Bungee'],
+              ),
+            ),
+            const SizedBox(height: 24),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: Text(
+                tagline,
+                key: ValueKey<String>(tagline),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(kDefaultAccentColorHex),
+                  fontSize: 110,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                  fontFamily: 'BungeeInline',
+                  fontFamilyFallback: <String>['Bungee'],
                 ),
               ),
-              const SizedBox(height: 24),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: Text(
-                  tagline,
-                  key: ValueKey<String>(tagline),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(kDefaultAccentColorHex),
-                    fontSize: 110,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                    fontFamily: 'BungeeInline',
-                    fontFamilyFallback: <String>['Bungee'],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -493,11 +487,27 @@ class InvaderMarchPainter extends CustomPainter {
   // top (we use modulo arithmetic against the playfield height).
   static const int _stepsBetweenHalfMarches = 1;
 
+  // Stars + scanlines — CRT backdrop behind the invaders.
+  static const int _starCount = 60;
+  static const double _scanlineSpacing = 3.0;
+  static const double _scanlineAlpha = 0.05;
+
   int? _lastLandingTick;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Total formation footprint.
+    // 1) Scanlines — CRT backdrop.
+    final Paint scanPaint = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: _scanlineAlpha)
+      ..strokeWidth = 1.0;
+    for (double y = 0; y < size.height; y += _scanlineSpacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), scanPaint);
+    }
+
+    // 2) Twinkling stars — sit behind the invaders.
+    _drawStars(canvas, size);
+
+    // 3) Invader formation — sweeps the entire viewport.
     const double formationW =
         (_invaderCols - 1) * _invaderColsSpacing + _invaderPixelSize * 5;
     final double phase = (tick % _invaderMarchPeriodFrames) /
@@ -607,6 +617,37 @@ class InvaderMarchPainter extends CustomPainter {
     }
   }
 
+  void _drawStars(Canvas canvas, Size size) {
+    const double starBaseAlpha = 0.20;
+    final Paint starPaint = Paint();
+    for (int i = 0; i < _starCount; i++) {
+      final double fx = _hash01(seed + i * 7919);
+      final double fy = _hash01(seed + i * 7901 + 13);
+      final double ph = _hash01(seed + i * 7793 + 31) * 6.28;
+      final double rate = 0.04 + _hash01(seed + i * 7727 + 51) * 0.10;
+      final double twinkle =
+          0.5 + 0.5 * ((tick * rate) + ph).remainder(6.28).sinToOne();
+      final double alpha = starBaseAlpha * (0.3 + 0.7 * twinkle);
+      starPaint.color = const Color(0xFF80DEEA).withValues(alpha: alpha);
+      final Offset pos = Offset(fx * size.width, fy * size.height);
+      final double r = 1.2 + twinkle * 1.4;
+      canvas.drawCircle(pos, r, starPaint);
+    }
+  }
+
+  double _hash01(int n) {
+    int x = n;
+    x = ((x >> 16) ^ x) * 0x45D9F3B;
+    x = ((x >> 16) ^ x) * 0x45D9F3B;
+    x = (x >> 16) ^ x;
+    return (x & 0xFFFFFF) / 0x1000000;
+  }
+
   @override
   bool shouldRepaint(InvaderMarchPainter old) => old.tick != tick;
+}
+
+extension on double {
+  /// Map a radians value to a 0..1 sine wave.
+  double sinToOne() => 0.5 + 0.5 * math.sin(this);
 }
