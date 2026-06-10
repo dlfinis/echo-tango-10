@@ -26,10 +26,11 @@ class ResultScreen extends StatelessWidget {
 
   double get _delta => elapsedSeconds - kTargetSeconds;
 
-  /// 4-decimal sub-label (microseconds inside the current second).
-  String get _microsLabel {
-    final int microInsideSecond = _renderedSeconds.inMicroseconds.remainder(1000000);
-    return (microInsideSecond / 100).round().toString().padLeft(4, '0');
+  /// 2-digit sub-label (centiseconds inside the current second).
+  String get _centisLabel {
+    final int microInsideSecond =
+        _renderedSeconds.inMicroseconds.remainder(1000000);
+    return (microInsideSecond / 10000).round().toString().padLeft(2, '0');
   }
 
   Duration get _renderedSeconds =>
@@ -81,10 +82,10 @@ class ResultScreen extends StatelessWidget {
                         '00:${_bigSecondsLabel()}',
                         style: TextStyle(
                           color: bigColor,
-                          fontSize: 600,
+                          fontSize: 720,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
-                          letterSpacing: -14,
+                          letterSpacing: -20,
                           fontFamily: 'DSEG7Modern-Regular',
                           fontFamilyFallback: const <String>[
                             'DSEG7Modern-Bold',
@@ -95,15 +96,15 @@ class ResultScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Transform.translate(
-                        offset: const Offset(0, 30),
+                        offset: const Offset(0, 36),
                         child: Text(
-                          '.$_microsLabel',
+                          '.$_centisLabel',
                           style: TextStyle(
                             color: microColor,
-                            fontSize: 240,
+                            fontSize: 280,
                             fontWeight: FontWeight.w900,
                             height: 1.0,
-                            letterSpacing: -4,
+                            letterSpacing: -5,
                             fontFamily: 'DSEG7Modern-Regular',
                             fontFamilyFallback: const <String>[
                               'DSEG7Modern-Bold',

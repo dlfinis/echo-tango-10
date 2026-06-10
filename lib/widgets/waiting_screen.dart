@@ -434,25 +434,30 @@ class _WaitingScreenState extends State<WaitingScreen>
 }
 
 // ===========================================================================
-// ArcadeBackdropPainter — CRT/Atari/Neo Geo look for the WAITING screen.
+// ArcadeBackdropPainter — Space Invaders attract-mode look for the
+// WAITING screen.
 //
-// Two layers, both intentionally low-contrast so they read as
-// "atmosphere" and never compete with the foreground text or the
-// leaderboard panel:
+// Three layers, all low-contrast so they read as "atmosphere" and
+// never compete with the foreground text or the leaderboard panel:
 //
 //   * Scanlines — thin horizontal lines every ~3 px, alpha 0.05.
-//     The classical CRT effect.
-//   * Stars — ~50 dim points at fixed positions (seeded so the layout
-//     is deterministic across rebuilds). Each star has its own phase
-//     and twinkle rate, derived from its index. The Painter is told
-//     the current [tick] by the AnimatedBuilder so the twinkle reads
-//     as continuous motion without a Controller of its own.
+//   * Stars — ~50 dim twinkling points at seeded positions.
+//   * Invaders — a 4x10 grid of pixel-art sprites that march
+//     left/right and step down one row each time they hit the edge,
+//     exactly like the 1978 Taito arcade game. Each row has a
+//     different color (green → cyan → magenta → amber) and a slightly
+//     different speed so the formation feels alive.
+//
+// The painter takes a monotonically increasing [tick] counter from
+// the parent AnimationController; the sprite positions, marching
+// phase, and twinkle phases are all derived from that tick so the
+// animation reads as continuous motion without managing timers
+// inside the painter.
 // ===========================================================================
 
 class ArcadeBackdropPainter extends CustomPainter {
   ArcadeBackdropPainter({required this.tick, this.seed = 1337});
 
-  /// Monotonically increasing frame counter from the parent ticker.
   final int tick;
   final int seed;
 
@@ -461,12 +466,17 @@ class ArcadeBackdropPainter extends CustomPainter {
   static const double _scanlineAlpha = 0.05;
   static const double _starBaseAlpha = 0.18;
 
+  // Invader formation.
+  static const int _invaderCols = 10;
+  static const int _invaderRows = 4;
+  static const double _invaderColsSpacing = 40.0; // px between invader columns
+  static const double _invaderRowsSpacing = 32.0; // px between invader rows
+  static const double _invaderSpriteSize = 12.0; // px per side of the pixel grid
+  static const double _invaderMarchPeriodFrames = 240.0; // ticks for one edge-to-edge pass
+
   @override
   void paint(Canvas canvas, Size size) {
-    // Fill the background with a near-black tint so the scanlines have
-    // something to draw against; the Scaffold already paints
-    // kDefaultBgColorHex but we want a uniform surface for the painter
-    // to operate on independently of theme changes.
+    // Fill the background with a near-black tint.
     final Paint bgPaint = Paint()..color = const Color(0xFF0A0A0A);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
@@ -478,7 +488,7 @@ class ArcadeBackdropPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), scanPaint);
     }
 
-    // 2) Stars — seeded layout so the screen is deterministic.
+    // 2) Stars — seeded layout, independent of the marching invaders.
     final Paint starPaint = Paint();
     for (int i = 0; i < _starCount; i++) {
       final double fx = _hash01(seed + i * 7919);
@@ -492,6 +502,122 @@ class ArcadeBackdropPainter extends CustomPainter {
       final Offset pos = Offset(fx * size.width, fy * size.height);
       final double r = 1.2 + twinkle * 1.4;
       canvas.drawCircle(pos, r, starPaint);
+    }
+
+    // 3) Invaders — march left/right, step down when they hit the edge.
+    _drawInvaderFormation(canvas, size);
+  }
+
+  void _drawInvaderFormation(Canvas canvas, Size size) {
+    // Total formation width and height.
+    const double formationW =
+        (_invaderCols - 1) * _invaderColsSpacing + _invaderSpriteSize;
+    const double formationH =
+        (_invaderRows - 1) * _invaderRowsSpacing + _invaderSpriteSize;
+    // Horizontal marching: the formation slides left and right across
+    // the screen, bouncing off the edges. Each "step" is a discrete
+    // pixel jump, so the motion looks crunchy and arcade-authentic.
+    final double phase = (tick % _invaderMarchPeriodFrames) /
+        _invaderMarchPeriodFrames;
+    final double arc = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+    // A bit of margin so the front invader doesn't touch the edge.
+    final double horizontalTravel = size.width - formationW - 80;
+    final double originX = 40 + arc * horizontalTravel;
+    // Vertical: the formation sits in the lower third so it doesn't
+    // cover the invitation message in the center. We also step it down
+    // every half-period so the classic "march" + "step down" cadence
+    // is visible.
+    final int step = (tick ~/ (_invaderMarchPeriodFrames ~/ 2)) % 4;
+    final double originY = size.height - formationH - 80 + step * 6;
+
+    // Per-row color and step pattern (each row looks slightly different
+    // so the formation reads as multiple invader types, like the
+    // original arcade game).
+    const List<Color> rowColors = <Color>[
+      Color(0xFF00FF66), // green  - crab
+      Color(0xFF00E5FF), // cyan   - octopus
+      Color(0xFFFF4DD2), // magenta - squid
+      Color(0xFFFFD400), // amber  - ufo
+    ];
+    const List<List<List<int>>> rowShapes =
+        <List<List<int>>>[
+      // Row 0: crab (5x5)
+      <List<int>>[
+        <int>[0, 1, 0, 1, 0],
+        <int>[0, 0, 1, 0, 0],
+        <int>[0, 1, 1, 1, 0],
+        <int>[1, 0, 1, 0, 1],
+        <int>[1, 0, 0, 0, 1],
+      ],
+      // Row 1: octopus (5x5)
+      <List<int>>[
+        <int>[0, 0, 1, 0, 0],
+        <int>[0, 1, 1, 1, 0],
+        <int>[1, 1, 1, 1, 1],
+        <int>[0, 1, 0, 1, 0],
+        <int>[1, 0, 0, 0, 1],
+      ],
+      // Row 2: squid (5x5)
+      <List<int>>[
+        <int>[0, 0, 1, 0, 0],
+        <int>[0, 1, 1, 1, 0],
+        <int>[1, 1, 1, 1, 1],
+        <int>[1, 0, 1, 0, 1],
+        <int>[1, 0, 0, 0, 1],
+      ],
+      // Row 3: ufo (5x3)
+      <List<int>>[
+        <int>[0, 1, 1, 1, 0],
+        <int>[1, 1, 1, 1, 1],
+        <int>[0, 1, 0, 1, 0],
+      ],
+    ];
+
+    // Two-frame "leg" animation: tick alternates which pixels are lit
+    // so each invader looks like it's waddling.
+    final int legFrame = (tick ~/ 6) % 2;
+
+    final Paint pixel = Paint();
+    for (int r = 0; r < _invaderRows; r++) {
+      pixel.color = rowColors[r];
+      final List<List<int>> shape = rowShapes[r];
+      final double yBase = originY + r * _invaderRowsSpacing;
+      for (int c = 0; c < _invaderCols; c++) {
+        final double xBase = originX + c * _invaderColsSpacing;
+        _drawSprite(canvas, pixel, xBase, yBase, shape, legFrame);
+      }
+    }
+  }
+
+  void _drawSprite(
+    Canvas canvas,
+    Paint paint,
+    double xBase,
+    double yBase,
+    List<List<int>> shape,
+    int legFrame,
+  ) {
+    final int rows = shape.length;
+    final int cols = shape[0].length;
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        // Two-frame leg animation: alternate the bottom row to fake
+        // a waddle. The shape's bottom row is replaced by a leg-only
+        // pattern on even frames.
+        bool lit = shape[r][c] != 0;
+        if (r == rows - 1) {
+          // Replace the bottom row with alternating pixels per frame.
+          lit = legFrame == 0 ? (c % 2 == 0) : (c % 2 == 1);
+        }
+        if (!lit) continue;
+        final Rect rect = Rect.fromLTWH(
+          xBase + c * 3.0,
+          yBase + r * 3.0,
+          2.5,
+          2.5,
+        );
+        canvas.drawRect(rect, paint);
+      }
     }
   }
 
