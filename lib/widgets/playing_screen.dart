@@ -80,7 +80,7 @@ class _PlayingScreenState extends State<PlayingScreen>
     _countdownValue = 3;
     _goFlashController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 80),
     );
     _goFlashAnim = CurvedAnimation(
       parent: _goFlashController,
@@ -89,7 +89,8 @@ class _PlayingScreenState extends State<PlayingScreen>
 
     // The fake countdown: 3 (250ms) -> 2 (250ms) -> 1 (250ms) -> GO
     // (250ms) -> null. Total ~1.0s. The real stopwatch is already
-    // running in the background.
+    // running in the background so the player's internal sense of
+    // 'when zero was' is broken by the time the flash settles.
     _countdownTimer = Timer.periodic(const Duration(milliseconds: 250), (t) {
       if (!mounted) {
         t.cancel();
@@ -105,9 +106,12 @@ class _PlayingScreenState extends State<PlayingScreen>
         } else {
           _countdownValue = null;
           t.cancel();
-          // Trigger the GO! flash and reset the stopwatch so the
-          // real chronograph starts cleanly from 0.
-          _goFlashController.forward(from: 1.0);
+          // Trigger a SHORT flash (80ms, max 50% opacity) and
+          // reset the stopwatch so the real chronograph starts
+          // cleanly from 0. The flash is intentionally brief and
+          // semi-transparent so the player can still see the
+          // 00.000.00 start underneath.
+          _goFlashController.forward(from: 0.5);
           widget.controller.reset();
         }
       });
@@ -218,14 +222,19 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
           ),
-          // Main chronograph.
+          // Main chronograph. While the fake countdown is showing
+          // we set opacity to 0 so the player only sees the
+          // countdown digit — no overlap, no 'ghost' stopwatch
+          // value sitting behind the 3-2-1-GO overlay.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.center,
-                child: Row(
+                child: Opacity(
+                  opacity: _countdownValue == null ? 1.0 : 0.0,
+                  child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
@@ -286,12 +295,13 @@ class _PlayingScreenState extends State<PlayingScreen>
                     ),
                   ],
                 ),
+                ),
               ),
             ),
           ),
-          // GO! flash overlay — a white screen that fades out
-          // over 200ms when the fake countdown finishes. It sells
-          // the GO! transition and also acts as a visual reset cue.
+          // GO! flash overlay — a short white pulse (80ms) that
+          // sells the GO! transition. Max alpha 0.5 so the player
+          // can still see the digits starting at 00.000.00.
           IgnorePointer(
             child: AnimatedBuilder(
               animation: _goFlashAnim,

@@ -132,6 +132,14 @@ class _ResultScreenState extends State<ResultScreen>
     return (microInsideSecond ~/ 1000).toString().padLeft(3, '0');
   }
 
+  /// `uu` — 2-digit centimicros inside the current millisecond.
+  String get _centimicrosLabel {
+    final int microInsideSecond =
+        _renderedSeconds.inMicroseconds.remainder(1000000);
+    final int centimicros = (microInsideSecond % 1000) ~/ 10;
+    return centimicros.toString().padLeft(2, '0');
+  }
+
   double get _delta => widget.elapsedSeconds - kTargetSeconds;
 
   String get _deltaText {
@@ -313,6 +321,25 @@ class _ResultScreenState extends State<ResultScreen>
                                     fontWeight: FontWeight.w900,
                                     height: 1.0,
                                     letterSpacing: -12,
+                                    fontFamily: 'DSEG7Modern-Regular',
+                                    fontFamilyFallback: const <String>[
+                                      'DSEG7Modern-Bold',
+                                      'DSEG7Classic-Bold',
+                                      'monospace',
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Transform.translate(
+                                offset: const Offset(0, 64),
+                                child: Text(
+                                  '.$_centimicrosLabel',
+                                  style: TextStyle(
+                                    color: digitColor,
+                                    fontSize: 240,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.0,
+                                    letterSpacing: -6,
                                     fontFamily: 'DSEG7Modern-Regular',
                                     fontFamilyFallback: const <String>[
                                       'DSEG7Modern-Bold',
