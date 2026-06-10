@@ -1,0 +1,27 @@
+name: arcade_timer_10s
+description: "Arcade Timer 10s — kiosk game: stop a stopwatch at exactly 10.000s."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  usb_serial: ^0.5.0
+  wakelock_plus: ^1.2.0
+  shared_preferences: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+# Platform-specific minSdk is configured in android/app/build.gradle
+# (target: minSdkVersion 28 / Android 9 for Fire HD 8 support).
+# For Flutter's pubspec the `sdk` constraint above is the canonical declaration.
+# Note: the actual AndroidManifest.xml and android/app/build.gradle are generated
+# by running `flutter create . --platforms=android,web` from a machine with the
+# Flutter SDK + Android toolchain (see PR1 apply-progress).
