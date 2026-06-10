@@ -52,10 +52,16 @@ const Duration kDebounceWindow = Duration(milliseconds: 200);
 ///
 /// Asymmetric rule: a player wins if `elapsed >= kTargetSeconds` AND
 /// `elapsed <= kTargetSeconds + kVictoryOvershootSeconds` (i.e. they
-/// hit 10.000s or overshot by at most 10 ms). Coming in SHORT
-/// (elapsed < 10.000s) is always a miss — the game punishes hesitation,
+/// hit 10.0000s or overshot by at most 1.9 ms). Coming in SHORT
+/// (elapsed < 10.0000s) is always a miss — the game punishes hesitation,
 /// not slop on the late side.
-const double kVictoryOvershootSeconds = 0.010;
+///
+/// The 1.9 ms ceiling is intentionally tight: a human pressing a
+/// physical button on a USB-attached arcade switch lands inside 5-15 ms
+/// of jitter in practice, so anything looser would make the game
+/// trivial. 1.9 ms keeps the easter-egg (delta == 0.000000) inside the
+/// victory range as a noteworthy highlight.
+const double kVictoryOvershootSeconds = 0.0019;
 
 /// Backward-compatible alias. The active rule is asymmetric (see above);
 /// this constant is kept only so older call sites that read
@@ -75,3 +81,21 @@ const Duration kAdminLongPressDuration = Duration(seconds: 3);
 
 /// Hard cap on persisted leaderboard entries.
 const int kMaxLeaderboardEntries = 20;
+
+// ---------------------------------------------------------------------------
+// PLAYING screen visual rhythm
+// ---------------------------------------------------------------------------
+
+/// How often the playing-screen timer color cycles through the palette.
+const Duration kPlayingColorShiftInterval = Duration(seconds: 3);
+
+/// Color rotation for the live stopwatch digits. White is the start and
+/// end of the loop so the timer is always readable on the dark background.
+const List<int> kPlayingColorPaletteHex = <int>[
+  0xFFFFFFFF, // white
+  0xFF00E5FF, // cyan
+  0xFF00FF66, // mint green
+  0xFFFFD400, // amber
+  0xFFFF4DD2, // magenta
+  0xFFFFFFFF, // white
+];
