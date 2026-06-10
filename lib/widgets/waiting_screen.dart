@@ -1,21 +1,26 @@
-/// WAITING screen — invitation message, sub-tagline, and a
-/// Space-Invaders-style backdrop with a player ship and defenders.
+/// WAITING screen — invitation message, sub-tagline, and a full-screen
+/// Space Invaders march where the invaders sweep the entire viewport
+/// (top to bottom) and trigger a soft background-color shift each time
+/// they touch the bottom edge.
 ///
-/// Visual layout (top to bottom):
-///   * Invitation message — BungeeInline, large, top half of the
-///     screen (above midline).
-///   * Sub-tagline — smaller BungeeInline, just below the message,
-///     rotated through a configurable list every ~6 s.
-///   * The middle band is empty so the Space Invaders formation and
-///     player ship have room to move.
-///   * Bottom 35% — invaders march and the player ship cruises
-///     left/right; tap-to-fire bullets that explode the nearest
-///     defender for a few seconds before the defender respawns.
-///   * Bottom-right gear icon — 3 s long-press to admin.
+/// Layout (top to bottom):
+///   * Top half: invitation message in huge BungeeInline (240sp) +
+///     a sub-tagline underneath in the accent color (110sp).
+///     The sub-tagline rotates every ~6 s through the list read from
+///     [ConfigStore.subTaglines] (defaulted to arcade call-to-action
+///     taglines).
+///   * Bottom half: 4-row x 10-col invader formation that marches
+///     left/right and steps down a full row every time it hits the
+///     edge. The full formation spans the entire viewport so the
+///     players feel the invaders 'invading' the screen, not just
+///     decorating the lower half.
+///   * Each time the formation reaches the bottom edge of the
+///     playfield, the Scaffold's [AnimatedContainer] color animates
+///     to the next entry in [_kBgPalette] — a soft 3s crossfade
+///     between dim arcade tints (deep purple, teal, maroon, navy,
+///     near-black) so the background breathes with the march.
 ///
-/// The screen's [backgroundColor] animates between a palette of dim
-/// arcade tints (deep blue, dark teal, deep purple) on a 12s cycle so
-/// the screen feels alive without distracting from the foreground.
+/// Long-pressing the gear icon for 3s opens the admin panel.
 library;
 
 import 'dart:async';
@@ -75,7 +80,7 @@ class _WaitingScreenState extends State<WaitingScreen>
         if (!mounted) return;
         setState(() => _backdropTick = (_backdropTick + 1) % 100000);
       });
-    _backdropTicker.repeat(period: const Duration(milliseconds: 60));
+    _backdropTicker.repeat(period: const Duration(milliseconds: 50));
   }
 
   @override
@@ -113,16 +118,13 @@ class _WaitingScreenState extends State<WaitingScreen>
       final int newMessage = phase ~/ messageSec;
       final int newTagline =
           (_elapsedSeconds ~/ subTaglineSec) % math.max(taglines.length, 1);
-      final int newBg = (_elapsedSeconds ~/ 12) % _kBgPalette.length;
       if (_showingLeaderboard ||
           newMessage != _messageIndex ||
-          newTagline != _subTaglineIndex ||
-          newBg != _bgIndex) {
+          newTagline != _subTaglineIndex) {
         setState(() {
           _showingLeaderboard = false;
           _messageIndex = newMessage;
           _subTaglineIndex = newTagline;
-          _bgIndex = newBg;
         });
       }
     } else {
@@ -177,39 +179,44 @@ class _WaitingScreenState extends State<WaitingScreen>
     final Color bg = _kBgPalette[_bgIndex];
 
     return Scaffold(
-      // Animated background color so the screen breathes through a
-      // palette of dim arcade tints on a 12s cycle.
+      // The AnimatedContainer color is the result of the invader
+      // formation touching the bottom edge — see the painter.
       body: AnimatedContainer(
         duration: const Duration(seconds: 3),
         curve: Curves.easeInOut,
         color: bg,
         child: Stack(
           children: <Widget>[
-            // Space-Invaders-style backdrop with the player ship and
-            // a defender grid. Painted edge-to-edge.
+            // Full-screen Space Invaders march. The painter takes care
+            // of advancing its own internal state and updating the
+            // background palette when the formation lands.
             Positioned.fill(
               child: AnimatedBuilder(
                 animation: _backdropTicker,
                 builder: (BuildContext context, Widget? _) {
                   return CustomPaint(
-                    painter: SpaceInvadersBackdropPainter(
+                    painter: InvaderMarchPainter(
                       tick: _backdropTick,
                       seed: 1337,
+                      onFormationLanded: (int newBg) {
+                        if (!mounted) return;
+                        if (newBg != _bgIndex) {
+                          setState(() => _bgIndex = newBg);
+                        }
+                      },
                     ),
                   );
                 },
               ),
             ),
-
-            // Foreground: invitation message at the top, sub-tagline
-            // just below it, leaderboard when in leaderboard phase.
+            // Foreground: invitation message + sub-tagline on top,
+            // leaderboard when in leaderboard phase.
             SafeArea(
               child: _showingLeaderboard
                   ? _buildLeaderboardPanel(top)
                   : _buildInvitationPanel(message, tagline),
             ),
-
-            // Gear icon — 3 s long-press → admin.
+            // Gear icon — 3s long-press → admin.
             Positioned(
               right: 24,
               bottom: 24,
@@ -265,63 +272,53 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 
   Widget _buildInvitationPanel(String message, String tagline) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
       children: <Widget>[
-        // Top half of the screen — main message + sub-tagline.
-        Expanded(
-          flex: 55,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                // Main message — large BungeeInline, above the midline.
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(kDefaultTextColorHex),
-                      fontSize: 160,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      height: 1.05,
-                      fontFamily: 'BungeeInline',
-                      fontFamilyFallback: <String>['Bungee'],
-                    ),
+        // Main message — top portion of the screen, anchored to the
+        // top with a Padding so it always sits above the midline.
+        Positioned(
+          left: 24,
+          right: 24,
+          top: 32,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(kDefaultTextColorHex),
+                    fontSize: 240,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                    height: 1.0,
+                    fontFamily: 'BungeeInline',
+                    fontFamilyFallback: <String>['Bungee'],
                   ),
                 ),
-                const SizedBox(height: 20),
-                // Sub-tagline — rotates on a timer, smaller but still big.
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  child: Text(
-                    tagline,
-                    key: ValueKey<String>(tagline),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(kDefaultAccentColorHex),
-                      fontSize: 56,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 4,
-                      fontFamily: 'BungeeInline',
-                      fontFamilyFallback: <String>['Bungee'],
-                    ),
+              ),
+              const SizedBox(height: 24),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: Text(
+                  tagline,
+                  key: ValueKey<String>(tagline),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(kDefaultAccentColorHex),
+                    fontSize: 110,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                    fontFamily: 'BungeeInline',
+                    fontFamilyFallback: <String>['Bungee'],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-        // Bottom half is the Space Invaders formation and player
-        // ship — drawn by the CustomPainter above. The Expanded
-        // keeps the layout balanced if the screen is resized.
-        const Expanded(
-          flex: 45,
-          child: SizedBox.expand(),
         ),
       ],
     );
@@ -436,10 +433,10 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 }
 
-// Soft arcade-tint background palette. Cycled every 12 s; the
-// AnimatedContainer in WaitingScreen crossfades between them.
+// Background palette: dim arcade tints, cycled every time the
+// invader formation lands on the bottom edge.
 const List<Color> _kBgPalette = <Color>[
-  Color(0xFF0A0A0A), // near-black (default)
+  Color(0xFF0A0A0A), // near-black
   Color(0xFF0E0A1A), // deep purple
   Color(0xFF0A1419), // deep teal
   Color(0xFF150A0A), // deep maroon
@@ -447,278 +444,60 @@ const List<Color> _kBgPalette = <Color>[
 ];
 
 // ===========================================================================
-// SpaceInvadersBackdropPainter — full Space Invaders attract-mode
-// backdrop for the WAITING screen.
+// InvaderMarchPainter — full-screen Space Invaders march that sweeps
+// the entire viewport and triggers a soft background-color shift each
+// time the formation touches the bottom edge.
 //
-// Layers, back to front:
-//   1) Scanlines — every 3 px, alpha 0.05.
-//   2) Twinkling stars — 60 dim points, independent of the rest.
-//   3) Defender grid — 5 columns x 4 rows of bunker shapes that the
-//      player can shoot. Each defender is "alive" by default and goes
-//      into a 'destroyed' state for 4 s when shot, then respawns.
-//   4) Invader formation — 4 rows x 10 cols that march across the
-//      screen, stepping down each time they hit the edge.
-//   5) Player ship — a single white triangular ship that cruises
-//      along the bottom of the playfield, firing bullets on a
-//      cooldown. Each bullet can destroy one defender per cycle.
+// The formation is 4 rows x 10 cols. Each row is a different colored
+// invader (green / cyan / magenta / amber). The formation marches
+// left/right across the screen, stepping down by one row each time it
+// hits an edge. After enough steps the formation has descended through
+// the whole playfield and the bottom row reaches the bottom of the
+// screen — at that point the painter fires [onFormationLanded] with
+// the next palette index and the screen's AnimatedContainer
+// crossfades to the new background color.
+//
+// The painter is the only place that knows the march state — the
+// parent widget just supplies a monotonically increasing [tick] and
+// gets a callback when a 'landing' event happens. No timers, no
+// AnimationController, no extra state in the parent.
 // ===========================================================================
 
-class SpaceInvadersBackdropPainter extends CustomPainter {
-  SpaceInvadersBackdropPainter({required this.tick, this.seed = 1337});
+class InvaderMarchPainter extends CustomPainter {
+  InvaderMarchPainter({
+    required this.tick,
+    required this.seed,
+    required this.onFormationLanded,
+  });
 
   final int tick;
   final int seed;
+  final void Function(int newBgIndex) onFormationLanded;
 
-  static const int _starCount = 60;
-  static const double _scanlineSpacing = 3.0;
-  static const double _scanlineAlpha = 0.05;
-
-  // Defender grid.
-  static const int _defenderCols = 5;
-  static const int _defenderRows = 4;
-  static const double _defenderSpacingX = 220.0;
-  static const double _defenderSpacingY = 70.0;
-  static const double _defenderSize = 40.0;
-  static const int _defenderRespawnTicks = 240; // ~4 s @ 60ms tick
-
-  // Invader formation.
   static const int _invaderCols = 10;
   static const int _invaderRows = 4;
-  static const double _invaderColsSpacing = 60.0;
-  static const double _invaderRowsSpacing = 48.0;
+  // March + step animation tuned so one full screen traversal takes
+  // ~10 seconds. The formation steps down every half-period, and the
+  // bottom row reaches the bottom of the screen after
+  // _stepDownsPerTraversal steps.
+  static const double _invaderColsSpacing = 70.0;
+  static const double _invaderRowsSpacing = 58.0;
   static const double _invaderPixelSize = 3.0;
-  static const double _invaderMarchPeriodFrames = 240.0;
+  static const double _invaderMarchPeriodFrames = 220.0;
 
-  // Player ship.
-  static const int _bulletCooldownTicks = 24;
-  static const int _bulletFlightTicks = 80;
+  // The formation has to step down _rowsPerTraversal * (rows-1) times
+  // The formation descends _stepsBetweenHalfMarches rows every
+  // half-march. With 4 rows and 1 step per half-march, the bottom
+  // row reaches the bottom of the playfield in a few seconds of
+  // march + descent time. After that the formation respawns at the
+  // top (we use modulo arithmetic against the playfield height).
+  static const int _stepsBetweenHalfMarches = 1;
+
+  int? _lastLandingTick;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Scanlines.
-    final Paint scanPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: _scanlineAlpha)
-      ..strokeWidth = 1.0;
-    for (double y = 0; y < size.height; y += _scanlineSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), scanPaint);
-    }
-
-    // Stars.
-    _drawStars(canvas, size);
-
-    // Player ship is in the lower 18% of the screen.
-    final double playfieldBottom = size.height - 16;
-    final double playfieldTop = size.height * 0.42;
-    final double playerY = playfieldBottom - 30;
-    final double playerX =
-        _playerX(size, tick) * (size.width - 80) + 40;
-    _drawBullets(canvas, size, playerX, playerY, playfieldTop);
-    _drawPlayerShip(canvas, playerX, playerY);
-
-    // Defenders sit just above the player, in a 5x4 grid.
-    _drawDefenderGrid(canvas, size, playfieldTop, playfieldBottom);
-
-    // Invaders march in the middle of the screen, between the
-    // invitation message and the defender grid.
-    _drawInvaderFormation(canvas, size, playfieldTop);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Stars
-  // ---------------------------------------------------------------------------
-
-  void _drawStars(Canvas canvas, Size size) {
-    final Paint starPaint = Paint();
-    const double starBaseAlpha = 0.18;
-    for (int i = 0; i < _starCount; i++) {
-      final double fx = _hash01(seed + i * 7919);
-      final double fy = _hash01(seed + i * 7901 + 13);
-      final double ph = _hash01(seed + i * 7793 + 31) * 6.28;
-      final double rate = 0.04 + _hash01(seed + i * 7727 + 51) * 0.10;
-      final double twinkle =
-          0.5 + 0.5 * ((tick * rate) + ph).remainder(6.28).sinToOne();
-      final double alpha = starBaseAlpha * (0.3 + 0.7 * twinkle);
-      starPaint.color = const Color(0xFF80DEEA).withValues(alpha: alpha);
-      final Offset pos = Offset(fx * size.width, fy * size.height);
-      final double r = 1.2 + twinkle * 1.4;
-      canvas.drawCircle(pos, r, starPaint);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Player ship + bullets
-  // ---------------------------------------------------------------------------
-
-  double _playerX(Size size, int t) {
-    // Full-width cruise, period 600 ticks. Triangle shape.
-    final double phase = (t % 600) / 600.0;
-    return phase < 0.5 ? phase * 2 : (1 - phase) * 2;
-  }
-
-  int _bulletShotTick() {
-    // One shot every _bulletCooldownTicks; index by tick.
-    return tick ~/ _bulletCooldownTicks;
-  }
-
-  int _bulletAgeTicks() => tick % _bulletCooldownTicks;
-
-  void _drawPlayerShip(Canvas canvas, double cx, double cy) {
-    final Paint shipPaint = Paint()..color = const Color(0xFFFFFFFF);
-    final Path p = Path()
-      ..moveTo(cx, cy - 14)
-      ..lineTo(cx - 18, cy + 10)
-      ..lineTo(cx - 8, cy + 10)
-      ..lineTo(cx - 8, cy + 16)
-      ..lineTo(cx + 8, cy + 16)
-      ..lineTo(cx + 8, cy + 10)
-      ..lineTo(cx + 18, cy + 10)
-      ..close();
-    canvas.drawPath(p, shipPaint);
-    // Engine flame.
-    final Paint flame = Paint()
-      ..color = const Color(0xFFFFD400)
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(
-      Rect.fromCenter(center: Offset(cx, cy + 22), width: 8, height: 8),
-      flame,
-    );
-  }
-
-  void _drawBullets(
-      Canvas canvas, Size size, double playerX, double playerY, double topY) {
-    final Paint bullet = Paint()..color = const Color(0xFFFFFFFF);
-    final int shotTick = _bulletShotTick();
-    final int age = _bulletAgeTicks();
-    if (age < _bulletFlightTicks) {
-      // Only render the most recent shot, otherwise the screen is
-      // full of bullets and the formation gets occluded.
-      final double y = playerY - 14 - (age / _bulletFlightTicks) *
-          (playerY - topY - 40);
-      if (y > topY) {
-        canvas.drawRect(
-          Rect.fromCenter(
-              center: Offset(playerX, y.toDouble()), width: 3, height: 12),
-          bullet,
-        );
-      }
-    }
-    // Suppress the unused warning by referencing the previous shot
-    // index in a deterministic way (so shouldRepaint can use it if
-    // needed in the future).
-    if (shotTick < 0) {
-      // unreachable
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Defenders (bunkers)
-  // ---------------------------------------------------------------------------
-
-  bool _defenderAlive(int col, int row, int t) {
-    // Each defender has a 'destroyed' phase every 600 ticks
-    // (when a bullet hits). After 4 s the defender respawns.
-    final int hitSlot = (t ~/ 600) % (_defenderCols * _defenderRows);
-    final int hitCol = hitSlot % _defenderCols;
-    final int hitRow = hitSlot ~/ _defenderCols;
-    if (col == hitCol && row == hitRow) {
-      final int sinceHit = t % 600;
-      return sinceHit > _defenderRespawnTicks;
-    }
-    return true;
-  }
-
-  int _defenderBlowTick(int col, int row, int t) {
-    final int hitSlot = (t ~/ 600) % (_defenderCols * _defenderRows);
-    final int hitCol = hitSlot % _defenderCols;
-    final int hitRow = hitSlot ~/ _defenderCols;
-    if (col == hitCol && row == hitRow) {
-      return t % 600;
-    }
-    return -1;
-  }
-
-  void _drawDefenderGrid(
-      Canvas canvas, Size size, double playfieldTop, double playfieldBottom) {
-    const double gridW =
-        (_defenderCols - 1) * _defenderSpacingX + _defenderSize;
-    final double originX = (size.width - gridW) / 2;
-    final double originY = playfieldBottom - 180;
-    final Paint alive = Paint()..color = const Color(0xFF00FF66);
-    final Paint dead = Paint()..color = const Color(0x33FF1744);
-
-    for (int r = 0; r < _defenderRows; r++) {
-      for (int c = 0; c < _defenderCols; c++) {
-        final double x = originX + c * _defenderSpacingX;
-        final double y = originY - r * _defenderSpacingY;
-        if (_defenderAlive(c, r, tick)) {
-          _drawBunker(canvas, alive, x, y);
-        } else {
-          final int sinceHit = _defenderBlowTick(c, r, tick);
-          // Draw the explosion particles during the destroyed phase.
-          _drawExplosion(canvas, dead, x, y, sinceHit);
-        }
-      }
-    }
-  }
-
-  void _drawBunker(Canvas canvas, Paint paint, double x, double y) {
-    // Simple bunker: a 5x4 pixel grid that resembles the original
-    // Space Invaders 'fortress' shape. Each pixel is _defenderSize/5
-    // wide and tall.
-    const double px = _defenderSize / 5.0;
-    final List<List<int>> shape = <List<int>>[
-      <int>[0, 1, 1, 1, 0],
-      <int>[1, 1, 1, 1, 1],
-      <int>[1, 1, 0, 1, 1],
-      <int>[1, 0, 0, 0, 1],
-    ];
-    for (int r = 0; r < shape.length; r++) {
-      for (int c = 0; c < shape[r].length; c++) {
-        if (shape[r][c] == 1) {
-          canvas.drawRect(
-            Rect.fromLTWH(
-              x + c * px,
-              y + r * px,
-              px,
-              px,
-            ),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  void _drawExplosion(Canvas canvas, Paint paint, double x, double y, int age) {
-    // 8 particles bursting outward from the bunker center.
-    final double t = (age / _defenderRespawnTicks).clamp(0.0, 1.0);
-    const double maxR = _defenderSize;
-    final double r = t * maxR;
-    final double cx = x + _defenderSize / 2;
-    final double cy = y + (_defenderSize * 4 / 5) / 2;
-    final Paint red = Paint()..color = const Color(0xFFFF5252);
-    final Paint yellow = Paint()..color = const Color(0xFFFFD400);
-    for (int i = 0; i < 8; i++) {
-      final double a = (i / 8.0) * 2 * math.pi;
-      final double px = cx + math.cos(a) * r;
-      final double py = cy + math.sin(a) * r;
-      // alternate red and yellow particles
-      canvas.drawCircle(
-        Offset(px, py),
-        4 * (1 - t * 0.5),
-        i.isEven ? red : yellow,
-      );
-    }
-    // suppress the unused 'paint' warning
-    paint.color = paint.color;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Invader formation (marches + steps)
-  // ---------------------------------------------------------------------------
-
-  void _drawInvaderFormation(
-      Canvas canvas, Size size, double playfieldTop) {
+    // Total formation footprint.
     const double formationW =
         (_invaderCols - 1) * _invaderColsSpacing + _invaderPixelSize * 5;
     final double phase = (tick % _invaderMarchPeriodFrames) /
@@ -726,9 +505,38 @@ class SpaceInvadersBackdropPainter extends CustomPainter {
     final double arc = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
     final double horizontalTravel = size.width - formationW - 80;
     final double originX = 40 + arc * horizontalTravel;
-    final int step = (tick ~/ (_invaderMarchPeriodFrames / 2)) % 4;
-    final double originY = playfieldTop + step * 6;
 
+    // Number of half-marches (each edge bounce = 1 half-march).
+    final int halfMarches = (tick ~/ (_invaderMarchPeriodFrames / 2)) % 100000;
+    // The formation descends _stepsBetweenHalfMarches rows every
+    // half-march. After enough half-marches the bottom row reaches
+    // the bottom of the playfield. The formation then 'respawns' by
+    // jumping the row offset back to 0 (we use modulo against the
+    // height of the playfield, measured in row-spacings).
+    final int playfieldHeightRows = (size.height / _invaderRowsSpacing).floor();
+    final int totalRowOffset = halfMarches * _stepsBetweenHalfMarches;
+    // Modulo so the formation keeps cycling: 0 -> playfieldHeightRows-1.
+    final int visibleRowOffset =
+        totalRowOffset % (playfieldHeightRows + _invaderRows);
+    final double descentOriginY =
+        (size.height * 0.05) + visibleRowOffset * _invaderRowsSpacing;
+    // The formation has reached the bottom when the bottom row's
+    // Y exceeds the screen height minus one row spacing.
+    final double bottomRowY = descentOriginY +
+        (_invaderRows - 1) * _invaderRowsSpacing;
+    final bool landed = bottomRowY > size.height - 80;
+    if (landed && _lastLandingTick != tick) {
+      _lastLandingTick = tick;
+      final int newBg =
+          ((tick ~/ (_invaderMarchPeriodFrames * 4)) % _kBgPalette.length);
+      onFormationLanded(newBg);
+    }
+
+    final double originY = landed
+        ? size.height - 80 - (_invaderRows - 1) * _invaderRowsSpacing
+        : descentOriginY;
+
+    // Per-row color and shape (different invader types per row).
     const List<Color> rowColors = <Color>[
       Color(0xFF00FF66), // green
       Color(0xFF00E5FF), // cyan
@@ -799,18 +607,6 @@ class SpaceInvadersBackdropPainter extends CustomPainter {
     }
   }
 
-  double _hash01(int n) {
-    int x = n;
-    x = ((x >> 16) ^ x) * 0x45D9F3B;
-    x = ((x >> 16) ^ x) * 0x45D9F3B;
-    x = (x >> 16) ^ x;
-    return (x & 0xFFFFFF) / 0x1000000;
-  }
-
   @override
-  bool shouldRepaint(SpaceInvadersBackdropPainter old) => old.tick != tick;
-}
-
-extension on double {
-  double sinToOne() => 0.5 + 0.5 * math.sin(this);
+  bool shouldRepaint(InvaderMarchPainter old) => old.tick != tick;
 }

@@ -55,12 +55,6 @@ const Duration kDebounceWindow = Duration(milliseconds: 200);
 /// hit 10.0000s or overshot by at most 1.9 ms). Coming in SHORT
 /// (elapsed < 10.0000s) is always a miss — the game punishes hesitation,
 /// not slop on the late side.
-///
-/// The 1.9 ms ceiling is intentionally tight: a human pressing a
-/// physical button on a USB-attached arcade switch lands inside 5-15 ms
-/// of jitter in practice, so anything looser would make the game
-/// trivial. 1.9 ms keeps the easter-egg (delta == 0.000000) inside the
-/// victory range as a noteworthy highlight.
 const double kVictoryOvershootSeconds = 0.0019;
 
 /// Backward-compatible alias. The active rule is asymmetric (see above);
@@ -68,6 +62,14 @@ const double kVictoryOvershootSeconds = 0.0019;
 /// `|delta| < kVictoryToleranceSeconds` still type-check. AppRoot
 /// must NOT rely on it — it must use [isVictory] from the spec contract.
 const double kVictoryToleranceSeconds = kVictoryOvershootSeconds;
+
+/// |delta| above which the result is no longer "CASI" but "UPS"
+/// (the player was so far off that it's clearly a miss, not a
+/// near-miss). Set to 100 ms — the player can hear/feel a 100 ms
+/// discrepancy, so anything looser than that doesn't deserve the
+/// encouragement of "casi". Below this threshold and above
+/// [kVictoryOvershootSeconds] the screen shows CASI.
+const double kNearMissUpperBoundSeconds = 0.100;
 
 /// Exact zero-delta easter-egg threshold (raw microsecond comparison).
 const double kEasterEggToleranceSeconds = 0.000001;
