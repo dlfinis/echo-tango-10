@@ -26,6 +26,7 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/leaderboard_entry.dart';
@@ -61,6 +62,14 @@ class _WaitingScreenState extends State<WaitingScreen>
   double _adminHoldProgress = 0.0;
   int _backdropTick = 0;
   int _bgIndex = 0;
+
+  /// The painter increments this on every 'landing' event. The
+  /// parent wraps the CustomPaint in a [ValueListenableBuilder]
+  /// that reads it and updates [_bgIndex]. This indirection
+  /// keeps the painter free of any callback that would have to
+  /// fire setState inside the render frame.
+  final ValueNotifier<int> _landingCount = ValueNotifier<int>(0);
+
   late final AnimationController _backdropTicker;
 
   static const Duration _adminHoldTickInterval =
@@ -89,6 +98,7 @@ class _WaitingScreenState extends State<WaitingScreen>
     _adminHoldTimer?.cancel();
     _adminHoldTicker?.cancel();
     _backdropTicker.dispose();
+    _landingCount.dispose();
     super.dispose();
   }
 
@@ -194,17 +204,36 @@ class _WaitingScreenState extends State<WaitingScreen>
               child: AnimatedBuilder(
                 animation: _backdropTicker,
                 builder: (BuildContext context, Widget? _) {
-                  return CustomPaint(
-                    painter: InvaderMarchPainter(
-                      tick: _backdropTick,
-                      seed: 1337,
-                      onFormationLanded: (int newBg) {
-                        if (!mounted) return;
-                        if (newBg != _bgIndex) {
-                          setState(() => _bgIndex = newBg);
-                        }
-                      },
-                    ),
+                  return ValueListenableBuilder<int>(
+                    valueListenable: _landingCount,
+                    builder: (BuildContext context, int landings, Widget? _) {
+                      // The builder runs in a normal build pass, not
+                      // in a paint callback, so updating the
+                      // bg index here is legal. We pick the
+                      // palette entry from the running landings
+                      // count so each new landing advances the
+                      // background color.
+                      final int next = landings % _kBgPalette.length;
+                      if (next != _bgIndex) {
+                        // Schedule the update for after this
+                        // build completes via a microtask so we
+                        // don't mutate state during build.
+                        WidgetsBinding.instance.addPostFrameCallback(
+                          (_) {
+                            if (mounted) {
+                              setState(() => _bgIndex = next);
+                            }
+                          },
+                        );
+                      }
+                      return CustomPaint(
+                        painter: InvaderMarchPainter(
+                          tick: _backdropTick,
+                          seed: 1337,
+                          landingCount: _landingCount,
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -470,12 +499,25 @@ class InvaderMarchPainter extends CustomPainter {
   InvaderMarchPainter({
     required this.tick,
     required this.seed,
-    required this.onFormationLanded,
-  });
+    required ValueNotifier<int> landingCount,
+  }) : _landingCount = landingCount;
 
   final int tick;
   final int seed;
-  final void Function(int newBgIndex) onFormationLanded;
+
+  /// The painter increments this counter every time the bottom
+  /// row of the formation touches the bottom edge of the
+  /// playfield. The parent widget reads it through a
+  /// [ValueListenableBuilder] and updates the background color
+  /// accordingly. This is the canonical Flutter pattern for
+  /// "non-widget object emits events to a widget" — listeners
+  /// fire on the microtask queue, outside the render frame,
+  /// so setState is legal from the listener.
+  ///
+  /// We type this as [ValueNotifier] (not [ValueListenable])
+  /// because the painter is the side that *writes* to it; the
+  /// parent only reads through the listenable interface.
+  final ValueNotifier<int> _landingCount;
 
   static const int _invaderCols = 10;
   static const int _invaderRows = 4;
@@ -547,9 +589,13 @@ class InvaderMarchPainter extends CustomPainter {
     final bool landed = bottomRowY > size.height - 80;
     if (landed && _lastLandingTick != tick) {
       _lastLandingTick = tick;
-      final int newBg =
-          ((tick ~/ (_invaderMarchPeriodFrames * 4)) % _kBgPalette.length);
-      onFormationLanded(newBg);
+      // Bumping a ValueNotifier inside paint() is legal — its
+      // listeners are scheduled on the microtask queue, not
+      // invoked synchronously, so no widget is marked dirty
+      // until the current frame is fully painted. The parent
+      // listens via ValueListenableBuilder and updates its
+      // background color index on the next build.
+      _landingCount.value = _landingCount.value + 1;
     }
 
     final double originY = landed
