@@ -81,10 +81,10 @@ class ResultScreen extends StatelessWidget {
                         '00:${_bigSecondsLabel()}',
                         style: TextStyle(
                           color: bigColor,
-                          fontSize: 380,
+                          fontSize: 480,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
-                          letterSpacing: -8,
+                          letterSpacing: -10,
                           fontFamily: 'monospace',
                           fontFamilyFallback: const <String>[
                             'Menlo',
@@ -98,15 +98,15 @@ class ResultScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Transform.translate(
-                        offset: const Offset(0, 18),
+                        offset: const Offset(0, 24),
                         child: Text(
                           '.$_microsLabel',
                           style: TextStyle(
                             color: microColor,
-                            fontSize: 140,
+                            fontSize: 180,
                             fontWeight: FontWeight.w900,
                             height: 1.0,
-                            letterSpacing: -2,
+                            letterSpacing: -3,
                             fontFamily: 'monospace',
                             fontFamilyFallback: const <String>[
                               'Menlo',

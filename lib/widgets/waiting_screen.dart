@@ -270,7 +270,7 @@ class _WaitingScreenState extends State<WaitingScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Color(kDefaultTextColorHex),
-              fontSize: 120,
+              fontSize: 180,
               fontWeight: FontWeight.w900,
               letterSpacing: -2,
               height: 1.05,

@@ -112,10 +112,10 @@ class _PlayingScreenState extends State<PlayingScreen> {
                   '00:${_bigSeconds()}',
                   style: TextStyle(
                     color: bigColor,
-                    fontSize: 480,
+                    fontSize: 600,
                     fontWeight: FontWeight.w900,
                     height: 1.0,
-                    letterSpacing: -12,
+                    letterSpacing: -16,
                     fontFamily: 'monospace',
                     fontFamilyFallback: const <String>[
                       'Menlo',
@@ -129,15 +129,15 @@ class _PlayingScreenState extends State<PlayingScreen> {
                 ),
                 const SizedBox(width: 8),
                 Transform.translate(
-                  offset: const Offset(0, 24),
+                  offset: const Offset(0, 32),
                   child: Text(
                     '.${_micros()}',
                     style: const TextStyle(
                       color: microColor,
-                      fontSize: 180,
+                      fontSize: 240,
                       fontWeight: FontWeight.w900,
                       height: 1.0,
-                      letterSpacing: -4,
+                      letterSpacing: -6,
                       fontFamily: 'monospace',
                       fontFamilyFallback: <String>[
                         'Menlo',
