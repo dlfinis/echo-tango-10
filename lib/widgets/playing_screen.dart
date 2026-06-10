@@ -2,27 +2,29 @@
 /// segments (seconds, milliseconds, centimicros) on a pure-white
 /// background, with arcade-style psychological pressure mechanisms:
 ///
-///   * **Falsa cuenta atrás 3-2-1-GO!** at the start of the play —
-///     the digits count 3, 2, 1, GO! in 1s while the real stopwatch
-///     is already running underneath. The instant the GO! step
-///     finishes the stopwatch is RESET to 0 and a bright white
-///     "GO!" flash lights the whole screen for 200ms. The player
-///     presses the button thinking "GO!" is the start, but by
-///     the time the flash settles and the real chronograph is
-///     visible the clock is already counting again from 0 — they
-///     have no anchor for when the timer "really" started.
+///   * **Fake 3-2-1-GO countdown** at the start of the play — the
+///     overlay counts 3, 2, 1, GO! in 1s while the actual stopwatch
+///     is hidden. When the GO! step finishes the real stopwatch
+///     starts from 0 and a brief white pulse (80ms @ 0.5 alpha)
+///     lights the screen. The player presses the button thinking
+///     'GO!' is the start signal; by the time the flash settles
+///     the real chronograph is already counting from 0, breaking
+///     their internal anchor for when the timer 'really' began.
 ///   * **Mensajes de aliento / chantaje** rotating every ~2 s while
-///     the stopwatch runs: "¡DALE!", "¡APURATE!", "¡CASI CASI!",
-///     "¡YA!", "¡APRIETA!". The text is small and dim so it
-///     doesn't pull focus from the digits.
-///   * **Truco near-miss al pasar 9.999s** — a bright green flash
-///     on the digits for 200ms, suggesting "you were right there!"
-///     even though the real victory is at 10.000s.
+///     the stopwatch runs.
+///   * **Truco near-miss al pasar 9.999s** — bright green flash
+///     for 200ms suggesting 'you were right there!'.
 ///   * **Color rotation** — digits start black, drift through a
 ///     5-color palette, return to black, every 3s.
-///   * **Format** — `SS` (seconds, biggest), `.mmm` (millis, mid),
-///     `.uu` (centimicros, smallest). 2-digit microseconds at
-///     10us resolution is plenty for the 1.9 ms victory window.
+///   * **Format** — `SS` (880sp) / `.mmm` (420sp) / `.uu` (240sp).
+///   * **Self-contained stopwatch** — the screen owns its own
+///     [Stopwatch] instance so the countdown can run while the
+///     visible chronograph is hidden, then start the real count
+///     at the flash without any 'head start' that would skew
+///     the player's timing. The [widget.controller] from the
+///     parent AppRoot is only consulted for the 60s timeout
+///     guard so the orchestration layer can still enforce
+///     'no game longer than a minute'.
 library;
 
 import 'dart:async';
@@ -53,14 +55,25 @@ class _PlayingScreenState extends State<PlayingScreen>
   Timer? _colorTimer;
   Timer? _cheerTimer;
   Timer? _countdownTimer;
+
+  /// The stopwatch that the visible chronograph reads. Owned by
+  /// this widget (not the parent's controller) so we can start
+  /// it exactly when the GO! flash ends, not when the screen
+  /// mounts.
+  final Stopwatch _visibleStopwatch = Stopwatch();
+
+  /// Mirror of the visible stopwatch's elapsed time, updated by
+  /// the per-frame ticker.
   Duration _rendered = Duration.zero;
+
   int _colorIndex = 0;
   int _cheerIndex = 0;
   bool _nearMissFlashed = false;
   int? _countdownValue;
 
-  /// Drives the GO! flash. Filled 1.0 -> 0.0 over 200ms when the
-  /// countdown finishes. White screen at value 1.0 (full opacity).
+  /// Drives the GO! flash. Filled 1.0 -> 0.0 over 80ms when the
+  /// countdown finishes. Peak alpha 0.5 so the digits stay
+  /// visible underneath.
   late final AnimationController _goFlashController;
   late final Animation<double> _goFlashAnim;
 
@@ -87,10 +100,6 @@ class _PlayingScreenState extends State<PlayingScreen>
       curve: Curves.easeOut,
     );
 
-    // The fake countdown: 3 (250ms) -> 2 (250ms) -> 1 (250ms) -> GO
-    // (250ms) -> null. Total ~1.0s. The real stopwatch is already
-    // running in the background so the player's internal sense of
-    // 'when zero was' is broken by the time the flash settles.
     _countdownTimer = Timer.periodic(const Duration(milliseconds: 250), (t) {
       if (!mounted) {
         t.cancel();
@@ -106,13 +115,16 @@ class _PlayingScreenState extends State<PlayingScreen>
         } else {
           _countdownValue = null;
           t.cancel();
-          // Trigger a SHORT flash (80ms, max 50% opacity) and
-          // reset the stopwatch so the real chronograph starts
-          // cleanly from 0. The flash is intentionally brief and
-          // semi-transparent so the player can still see the
-          // 00.000.00 start underneath.
+          // Trigger a short flash and start the VISIBLE stopwatch
+          // from 0 — that's the one the player reads. The
+          // parent's StopwatchController is the one the AppRoot
+          // uses to enforce the 60s timeout, and that one is
+          // already running because AppRoot called start() on
+          // the WAITING -> PLAYING transition.
           _goFlashController.forward(from: 0.5);
-          widget.controller.reset();
+          _visibleStopwatch
+            ..reset()
+            ..start();
         }
       });
     });
@@ -140,7 +152,8 @@ class _PlayingScreenState extends State<PlayingScreen>
 
   void _onTick() {
     if (!mounted) return;
-    final Duration elapsed = widget.controller.elapsed;
+    if (!_visibleStopwatch.isRunning) return;
+    final Duration elapsed = _visibleStopwatch.elapsed;
     setState(() {
       _rendered = elapsed;
     });
@@ -157,6 +170,7 @@ class _PlayingScreenState extends State<PlayingScreen>
     _cheerTimer?.cancel();
     _countdownTimer?.cancel();
     _goFlashController.dispose();
+    _visibleStopwatch.stop();
     super.dispose();
   }
 
@@ -222,10 +236,11 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
           ),
-          // Main chronograph. While the fake countdown is showing
-          // we set opacity to 0 so the player only sees the
-          // countdown digit — no overlap, no 'ghost' stopwatch
-          // value sitting behind the 3-2-1-GO overlay.
+          // Main chronograph. Hidden during the fake countdown
+          // (Opacity 0) so the player only sees the countdown
+          // digit; the visible stopwatch is started at the
+          // moment the countdown finishes, so the digits
+          // appear already at 00.000.00 and start counting up.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Center(
@@ -235,36 +250,18 @@ class _PlayingScreenState extends State<PlayingScreen>
                 child: Opacity(
                   opacity: _countdownValue == null ? 1.0 : 0.0,
                   child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: <Widget>[
-                    Text(
-                      _seconds,
-                      style: TextStyle(
-                        color: digitColor,
-                        fontSize: 880,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        letterSpacing: -28,
-                        fontFamily: 'DSEG7Modern-Regular',
-                        fontFamilyFallback: const <String>[
-                          'DSEG7Modern-Bold',
-                          'DSEG7Classic-Bold',
-                          'monospace',
-                        ],
-                      ),
-                    ),
-                    Transform.translate(
-                      offset: const Offset(0, 36),
-                      child: Text(
-                        '.$_millis',
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: <Widget>[
+                      Text(
+                        _seconds,
                         style: TextStyle(
                           color: digitColor,
-                          fontSize: 420,
+                          fontSize: 880,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
-                          letterSpacing: -12,
+                          letterSpacing: -28,
                           fontFamily: 'DSEG7Modern-Regular',
                           fontFamilyFallback: const <String>[
                             'DSEG7Modern-Bold',
@@ -273,28 +270,46 @@ class _PlayingScreenState extends State<PlayingScreen>
                           ],
                         ),
                       ),
-                    ),
-                    Transform.translate(
-                      offset: const Offset(0, 64),
-                      child: Text(
-                        '.$_centimicros',
-                        style: TextStyle(
-                          color: digitColor,
-                          fontSize: 240,
-                          fontWeight: FontWeight.w900,
-                          height: 1.0,
-                          letterSpacing: -6,
-                          fontFamily: 'DSEG7Modern-Regular',
-                          fontFamilyFallback: const <String>[
-                            'DSEG7Modern-Bold',
-                            'DSEG7Classic-Bold',
-                            'monospace',
-                          ],
+                      Transform.translate(
+                        offset: const Offset(0, 36),
+                        child: Text(
+                          '.$_millis',
+                          style: TextStyle(
+                            color: digitColor,
+                            fontSize: 420,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                            letterSpacing: -12,
+                            fontFamily: 'DSEG7Modern-Regular',
+                            fontFamilyFallback: const <String>[
+                              'DSEG7Modern-Bold',
+                              'DSEG7Classic-Bold',
+                              'monospace',
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                      Transform.translate(
+                        offset: const Offset(0, 64),
+                        child: Text(
+                          '.$_centimicros',
+                          style: TextStyle(
+                            color: digitColor,
+                            fontSize: 240,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                            letterSpacing: -6,
+                            fontFamily: 'DSEG7Modern-Regular',
+                            fontFamilyFallback: const <String>[
+                              'DSEG7Modern-Bold',
+                              'DSEG7Classic-Bold',
+                              'monospace',
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
