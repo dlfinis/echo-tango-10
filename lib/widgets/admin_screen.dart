@@ -1,0 +1,516 @@
+/// ADMIN screen — full config editor.
+///
+/// Sections (top-to-bottom):
+///   1. Mensajes de invitación — editable TextField list, add/remove.
+///   2. Intervalos de rotación — two numeric fields (1..3600).
+///   3. Colores — three "siguiente color preset" cycles (full picker is
+///      overkill for PR2; Diego can pick from a curated palette).
+///   4. Zona peligrosa — "Borrar base de datos" with confirm dialog.
+///   5. Salir — returns to WAITING.
+///
+/// Edits save on blur (or on a "Guardar" tap for numeric fields). The
+/// caller passes the [ConfigStore] and [Leaderboard] in; this widget
+/// never touches `SharedPreferences` directly.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/config_store.dart';
+import '../services/leaderboard.dart';
+import '../utils/constants.dart';
+
+class AdminScreen extends StatefulWidget {
+  const AdminScreen({
+    super.key,
+    required this.configStore,
+    required this.leaderboard,
+    required this.onExit,
+    this.onConnectUsb,
+  });
+
+  final ConfigStore configStore;
+  final Leaderboard leaderboard;
+  final VoidCallback onExit;
+
+  /// Optional dev-only hook (see [AdminScreen._handleConnectUsb]).
+  /// When null the "Connect USB (Web Serial)" button is hidden.
+  final Future<void> Function()? onConnectUsb;
+
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> {
+  // Text controllers — recreated on every build from the store so the
+  // form always reflects the persisted truth.
+  late List<TextEditingController> _messageControllers;
+  late TextEditingController _messageIntervalController;
+  late TextEditingController _leaderboardIntervalController;
+
+  // Working copy of the current color indices into the preset palette.
+  int _bgIndex = 0;
+  int _textIndex = 0;
+  int _accentIndex = 0;
+
+  // Fixed, curated palette (PR2). Future PR may swap in a real picker.
+  static const List<Color> _bgPalette = <Color>[
+    Color(0xFF121212),
+    Color(0xFF000000),
+    Color(0xFF1A237E),
+    Color(0xFF263238),
+    Color(0xFF3E2723),
+  ];
+  static const List<Color> _textPalette = <Color>[
+    Color(0xFFFFFFFF),
+    Color(0xFFFFEB3B),
+    Color(0xFFFF4081),
+    Color(0xFF80DEEA),
+  ];
+  static const List<Color> _accentPalette = <Color>[
+    Color(0xFF00FF00),
+    Color(0xFFFFC107),
+    Color(0xFFFF1744),
+    Color(0xFF00E5FF),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _hydrate();
+  }
+
+  void _hydrate() {
+    _messageControllers = widget.configStore
+        .invitationMessages()
+        .map((String s) => TextEditingController(text: s))
+        .toList();
+    _messageIntervalController = TextEditingController(
+      text: widget.configStore.messageRotationSeconds().toString(),
+    );
+    _leaderboardIntervalController = TextEditingController(
+      text: widget.configStore.leaderboardRotationSeconds().toString(),
+    );
+    _bgIndex = _findClosest(widget.configStore.bgColorArgb(), _bgPalette);
+    _textIndex =
+        _findClosest(widget.configStore.textColorArgb(), _textPalette);
+    _accentIndex =
+        _findClosest(widget.configStore.accentColorArgb(), _accentPalette);
+  }
+
+  int _findClosest(int targetArgb, List<Color> palette) {
+    int bestIdx = 0;
+    int bestDistance = 1 << 30;
+    for (int i = 0; i < palette.length; i++) {
+      final int d = (palette[i].toARGB32() & 0xFFFFFF) -
+          (targetArgb & 0xFFFFFF); // ignore alpha
+      final int dist = d.abs();
+      if (dist < bestDistance) {
+        bestDistance = dist;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
+  }
+
+  @override
+  void dispose() {
+    for (final TextEditingController c in _messageControllers) {
+      c.dispose();
+    }
+    _messageIntervalController.dispose();
+    _leaderboardIntervalController.dispose();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mutation handlers
+  // ---------------------------------------------------------------------------
+
+  Future<void> _saveMessages() async {
+    await widget.configStore.setInvitationMessages(
+      _messageControllers.map((TextEditingController c) => c.text).toList(),
+    );
+  }
+
+  Future<void> _saveIntervals() async {
+    final int? msg = int.tryParse(_messageIntervalController.text.trim());
+    final int? lb = int.tryParse(_leaderboardIntervalController.text.trim());
+    if (msg != null && msg >= 1 && msg <= 3600) {
+      await widget.configStore.setMessageRotationSeconds(msg);
+    }
+    if (lb != null && lb >= 1 && lb <= 3600) {
+      await widget.configStore.setLeaderboardRotationSeconds(lb);
+    }
+  }
+
+  Future<void> _cycleBg() async {
+    setState(() {
+      _bgIndex = (_bgIndex + 1) % _bgPalette.length;
+    });
+    await widget.configStore.setBgColorArgb(_bgPalette[_bgIndex].toARGB32());
+  }
+
+  Future<void> _cycleText() async {
+    setState(() {
+      _textIndex = (_textIndex + 1) % _textPalette.length;
+    });
+    await widget.configStore
+        .setTextColorArgb(_textPalette[_textIndex].toARGB32());
+  }
+
+  Future<void> _cycleAccent() async {
+    setState(() {
+      _accentIndex = (_accentIndex + 1) % _accentPalette.length;
+    });
+    await widget.configStore
+        .setAccentColorArgb(_accentPalette[_accentIndex].toARGB32());
+  }
+
+  Future<void> _confirmWipe() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(kDefaultBgColorHex),
+          title: const Text(
+            '¿Borrar base de datos?',
+            style: TextStyle(color: Color(kDefaultTextColorHex)),
+          ),
+          content: const Text(
+            'Se eliminarán todos los mensajes, intervalos, colores y los registros del leaderboard. Esta acción no se puede deshacer.',
+            style: TextStyle(color: Color(kDefaultTextColorHex)),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFFF1744),
+              ),
+              child: const Text('Borrar todo'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    // Clear everything at the SharedPreferences level, then the
+    // in-memory Leaderboard mirror, then re-hydrate the form.
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await widget.leaderboard.clear();
+
+    if (!mounted) return;
+    setState(() {
+      for (final TextEditingController c in _messageControllers) {
+        c.dispose();
+      }
+      _hydrate();
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Base de datos borrada'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Web Serial dev gate (PR2 stretch; see keyboard_input.dart).
+  // ---------------------------------------------------------------------------
+  Future<void> _handleConnectUsb() async {
+    if (widget.onConnectUsb == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Web Serial no disponible en esta build',
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      await widget.onConnectUsb!();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('USB conectado')),
+      );
+    } on Object catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error USB: $e')),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(kDefaultBgColorHex),
+      appBar: AppBar(
+        title: const Text('Administración'),
+        backgroundColor: const Color(kDefaultBgColorHex),
+        foregroundColor: const Color(kDefaultTextColorHex),
+      ),
+      body: SafeArea(
+        child: Form(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: <Widget>[
+              _sectionHeader('Mensajes de invitación'),
+              ..._buildMessagesSection(),
+              const SizedBox(height: 24),
+
+              _sectionHeader('Intervalos de rotación (segundos)'),
+              _numericField(
+                label: 'Rotación de mensajes',
+                controller: _messageIntervalController,
+                onSave: _saveIntervals,
+              ),
+              const SizedBox(height: 12),
+              _numericField(
+                label: 'Rotación de leaderboard',
+                controller: _leaderboardIntervalController,
+                onSave: _saveIntervals,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeader('Colores'),
+              _colorRow(
+                label: 'Fondo',
+                color: _bgPalette[_bgIndex],
+                onCycle: _cycleBg,
+              ),
+              _colorRow(
+                label: 'Texto',
+                color: _textPalette[_textIndex],
+                onCycle: _cycleText,
+              ),
+              _colorRow(
+                label: 'Acento',
+                color: _accentPalette[_accentIndex],
+                onCycle: _cycleAccent,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeader('Zona peligrosa'),
+              OutlinedButton.icon(
+                onPressed: _confirmWipe,
+                icon: const Icon(Icons.delete_forever,
+                    color: Color(0xFFFF1744)),
+                label: const Text(
+                  'Borrar base de datos',
+                  style: TextStyle(color: Color(0xFFFF1744)),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFF1744)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Entradas en leaderboard: ${widget.leaderboard.length}',
+                style: const TextStyle(
+                  color: Color(0xFFAAAAAA),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Dev section — only visible when the host wired a callback.
+              if (widget.onConnectUsb != null) ...<Widget>[
+                _sectionHeader('Dev'),
+                OutlinedButton.icon(
+                  // WEB SERIAL DEV GATE — requires Chrome HTTPS or localhost
+                  onPressed: _handleConnectUsb,
+                  icon: const Icon(Icons.usb,
+                      color: Color(kDefaultAccentColorHex)),
+                  label: const Text(
+                    'Connect USB (Web Serial)',
+                    style: TextStyle(
+                      color: Color(kDefaultAccentColorHex),
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(
+                      color: Color(kDefaultAccentColorHex),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              ElevatedButton(
+                onPressed: widget.onExit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(kDefaultAccentColorHex),
+                  foregroundColor: const Color(kDefaultBgColorHex),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'Salir',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section helpers
+  // ---------------------------------------------------------------------------
+
+  Widget _sectionHeader(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(kDefaultTextColorHex),
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildMessagesSection() {
+    final List<Widget> out = <Widget>[];
+    for (int i = 0; i < _messageControllers.length; i++) {
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  controller: _messageControllers[i],
+                  style: const TextStyle(color: Color(kDefaultTextColorHex)),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                    labelText: 'Mensaje ${i + 1}',
+                    labelStyle:
+                        const TextStyle(color: Color(0xFFAAAAAA)),
+                  ),
+                  onChanged: (_) => _saveMessages(),
+                ),
+              ),
+              IconButton(
+                onPressed: _messageControllers.length <= 1
+                    ? null
+                    : () {
+                        setState(() {
+                          _messageControllers[i].dispose();
+                          _messageControllers.removeAt(i);
+                        });
+                        _saveMessages();
+                      },
+                icon: const Icon(Icons.remove_circle_outline,
+                    color: Color(0xFFFF1744)),
+                tooltip: 'Eliminar',
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    out.add(
+      TextButton.icon(
+        onPressed: () {
+          setState(() {
+            _messageControllers.add(TextEditingController());
+          });
+        },
+        icon: const Icon(Icons.add_circle_outline,
+            color: Color(kDefaultAccentColorHex)),
+        label: const Text(
+          'Agregar mensaje',
+          style: TextStyle(color: Color(kDefaultAccentColorHex)),
+        ),
+      ),
+    );
+    return out;
+  }
+
+  Widget _numericField({
+    required String label,
+    required TextEditingController controller,
+    required Future<void> Function() onSave,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      style: const TextStyle(color: Color(kDefaultTextColorHex)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
+        border: const OutlineInputBorder(),
+        helperText: 'Entre 1 y 3600 segundos',
+        helperStyle: const TextStyle(color: Color(0xFFAAAAAA)),
+      ),
+      onFieldSubmitted: (_) => onSave(),
+      onEditingComplete: onSave,
+    );
+  }
+
+  Widget _colorRow({
+    required String label,
+    required Color color,
+    required Future<void> Function() onCycle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color,
+              border: Border.all(color: const Color(kDefaultTextColorHex)),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(kDefaultTextColorHex),
+                fontSize: 18,
+              ),
+            ),
+          ),
+          OutlinedButton(
+            onPressed: onCycle,
+            child: const Text('Cambiar'),
+          ),
+        ],
+      ),
+    );
+  }
+}

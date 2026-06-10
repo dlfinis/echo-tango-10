@@ -2,6 +2,7 @@
 ///
 /// Responsibilities:
 ///   * Hold the single [AppState] and the latest [StopwatchController].
+///   * Own a [ConfigStore] + [Leaderboard], loaded on first frame.
 ///   * Listen to the [InputService] and forward accepted pulses to [next].
 ///   * Render the right screen for the current state.
 ///   * Apply the 60 s PLAYING timeout and call [next] with `TimerEvent.timeout`.
@@ -16,14 +17,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'services/config_store.dart';
 import 'services/input_service.dart';
 import 'services/keyboard_input.dart';
+import 'services/leaderboard.dart';
+import 'services/web_serial.dart' as web_serial;
 import 'state/app_state.dart';
 import 'state/stopwatch_controller.dart';
 import 'utils/constants.dart';
+import 'widgets/admin_screen.dart';
 import 'widgets/playing_screen.dart';
 import 'widgets/result_screen.dart';
 import 'widgets/waiting_screen.dart';
+import 'widgets/winner_name_screen.dart';
 
 class AppRoot extends StatefulWidget {
   const AppRoot({super.key, required this.input});
@@ -38,6 +44,12 @@ class _AppRootState extends State<AppRoot> {
   AppState _state = AppState.waiting;
   final StopwatchController _stopwatch = StopwatchController();
   double _lastElapsedSeconds = 0.0;
+
+  // Persistence — null until [ConfigStore.load] resolves on the first
+  // post-frame callback. The build method renders a thin loader while
+  // these are still null.
+  ConfigStore? _configStore;
+  Leaderboard? _leaderboard;
 
   @override
   void initState() {
@@ -54,6 +66,21 @@ class _AppRootState extends State<AppRoot> {
     }
 
     widget.input.onPulse(_handlePulse);
+
+    // Async init — SharedPreferences is async, so we can't await it in
+    // initState. Defer to the first post-frame callback.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initPersistence();
+    });
+  }
+
+  Future<void> _initPersistence() async {
+    final ConfigStore store = await ConfigStore.load();
+    if (!mounted) return;
+    setState(() {
+      _configStore = store;
+      _leaderboard = Leaderboard(store);
+    });
   }
 
   void _handlePulse() {
@@ -76,15 +103,16 @@ class _AppRootState extends State<AppRoot> {
 
       case AppState.result:
         _stopwatch.reset();
-        // PR1 simplification: the WINNER_NAME branch is wired in the pure
-        // state machine but always returns to WAITING from the screen.
-        // PR2 will feed `isVictory: true` when the delta is in range.
-        nextState = next(_state, TimerEvent.pulse);
+        final bool isVictory = (_lastElapsedSeconds - kTargetSeconds).abs() <
+            kVictoryToleranceSeconds;
+        nextState = next(_state, TimerEvent.pulse, isVictory: isVictory);
         break;
 
       case AppState.winnerName:
       case AppState.admin:
-        // No-op until PR2 lands the corresponding screens.
+        // WinnerName: no pulse should advance — the user types + presses
+        // "Aceptar" which calls `_handleAcceptWinner` directly.
+        // Admin: inputs are routed through the admin form, not the pulse.
         return;
     }
 
@@ -97,6 +125,29 @@ class _AppRootState extends State<AppRoot> {
     _stopwatch.reset();
     if (!mounted) return;
     setState(() => _state = next(_state, TimerEvent.timeout));
+  }
+
+  void _openAdmin() {
+    if (_state != AppState.waiting) return;
+    setState(() => _state = next(_state, TimerEvent.adminGesture));
+  }
+
+  void _exitAdmin() {
+    if (_state != AppState.admin) return;
+    setState(() => _state = next(_state, TimerEvent.exitAdmin));
+  }
+
+  void _handleAcceptWinner() {
+    if (_state != AppState.winnerName) return;
+    setState(() => _state = next(_state, TimerEvent.acceptWinner));
+  }
+
+  // WEB SERIAL DEV GATE — requires Chrome HTTPS or localhost
+  Future<void> _connectUsbSerial() async {
+    if (!kIsWeb) {
+      throw UnsupportedError('Web Serial solo disponible en Web.');
+    }
+    await web_serial.connectUsbSerial(widget.input);
   }
 
   @override
@@ -135,12 +186,26 @@ class _AppRootState extends State<AppRoot> {
   }
 
   Widget _buildScreen() {
+    if (_configStore == null || _leaderboard == null) {
+      // First-frame loader. Shown for ~1 frame in practice because
+      // SharedPreferences mock values are available synchronously on
+      // most platforms and the platform channel is fast.
+      return const Scaffold(
+        backgroundColor: Color(kDefaultBgColorHex),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(kDefaultAccentColorHex),
+          ),
+        ),
+      );
+    }
     switch (_state) {
       case AppState.waiting:
-      case AppState.admin:
-      case AppState.winnerName:
-        // PR1: admin + winner-name screens not yet built; render WAITING.
-        return const WaitingScreen();
+        return WaitingScreen(
+          configStore: _configStore!,
+          leaderboard: _leaderboard!,
+          onAdminGesture: _openAdmin,
+        );
 
       case AppState.playing:
         return PlayingScreen(
@@ -152,6 +217,23 @@ class _AppRootState extends State<AppRoot> {
         return ResultScreen(
           elapsedSeconds: _lastElapsedSeconds,
           onNext: _handlePulse,
+        );
+
+      case AppState.winnerName:
+        return WinnerNameScreen(
+          elapsedSeconds: _lastElapsedSeconds,
+          leaderboard: _leaderboard!,
+          onAccept: _handleAcceptWinner,
+          isEasterEgg: (_lastElapsedSeconds - kTargetSeconds).abs() <
+              kEasterEggToleranceSeconds,
+        );
+
+      case AppState.admin:
+        return AdminScreen(
+          configStore: _configStore!,
+          leaderboard: _leaderboard!,
+          onExit: _exitAdmin,
+          onConnectUsb: kIsWeb ? _connectUsbSerial : null,
         );
     }
   }
