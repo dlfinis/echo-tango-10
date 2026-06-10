@@ -1,12 +1,12 @@
 /// RESULT screen — shows raw time and signed delta vs the 10 s target.
 ///
-/// On `|delta| < kVictoryToleranceSeconds` (10 ms) the delta text is
-/// rendered in the green accent color (spec requirement 6).
+/// On asymmetric victory (10.000s <= elapsed <= 10.010s) the screen
+/// flashes "VICTORIA" in the green accent color. A miss shows the
+/// raw time + signed delta in white.
 ///
-/// PR1 simplification: the WINNER_NAME branch is wired in the state
-/// machine but this screen is a placeholder that always returns to
-/// WAITING on the next pulse. The real winner flow with name entry
-/// and confetti lands in PR2 (task T8).
+/// The next pulse advances to WINNER_NAME (handled by the AppRoot once
+/// the state machine has read the isVictory flag). This screen itself
+/// is presentation only — it calls [onNext] on tap or external pulse.
 library;
 
 import 'package:flutter/material.dart';
@@ -36,7 +36,13 @@ class ResultScreen extends StatelessWidget {
     return '$sign${d.abs().toStringAsFixed(4)}s';
   }
 
-  bool get _isVictory => _delta.abs() < kVictoryToleranceSeconds;
+  /// Asymmetric victory: 10.000s <= elapsed <= 10.010s. Coming in short
+  /// is always a miss.
+  bool get _isVictory =>
+      elapsedSeconds >= kTargetSeconds &&
+      elapsedSeconds <= kTargetSeconds + kVictoryOvershootSeconds;
+
+  bool get _isMiss => !_isVictory;
 
   @override
   Widget build(BuildContext context) {
@@ -45,39 +51,61 @@ class ResultScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(kDefaultBgColorHex),
-      body: SafeArea(
-        child: GestureDetector(
-          // Make the next-pulse tap work even before a keyboard listener
-          // is wired up (handy for manual web testing on a trackpad).
-          behavior: HitTestBehavior.opaque,
-          onTap: onNext,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onNext,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _rawTime,
-                style: const TextStyle(
-                  color: white,
-                  fontSize: 96,
-                  fontWeight: FontWeight.w900,
-                  fontFeatures: [FontFeature.tabularFigures()],
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              // Big raw time — same FittedBox trick as the playing screen.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  _rawTime,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _isVictory ? accent : white,
+                    fontSize: 280,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -6,
+                    height: 1.0,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              Text(
-                _deltaText,
-                style: TextStyle(
-                  color: _isVictory ? accent : white,
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(height: 16),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  _deltaText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _isMiss ? white : accent,
+                    fontSize: 120,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -2,
+                  ),
                 ),
               ),
-              const SizedBox(height: 64),
-              // PR1 placeholder — PR2 wires confetti + winner name entry.
-              const Text(
-                'VICTORIA — ingreso de nombre en PR2',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: white, fontSize: 18),
+              const SizedBox(height: 32),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  _isVictory ? '¡VICTORIA!' : '¡CASI!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _isVictory ? accent : white,
+                    fontSize: 96,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
               ),
             ],
           ),

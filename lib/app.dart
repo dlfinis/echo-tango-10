@@ -103,8 +103,12 @@ class _AppRootState extends State<AppRoot> {
 
       case AppState.result:
         _stopwatch.reset();
-        final bool isVictory = (_lastElapsedSeconds - kTargetSeconds).abs() <
-            kVictoryToleranceSeconds;
+        // Asymmetric victory rule (per Diego): win if you hit 10.000s
+        // exactly OR overshot by at most 10ms. Coming in short always
+        // counts as a miss — the game punishes hesitation, not slop.
+        final bool isVictory = _lastElapsedSeconds >= kTargetSeconds &&
+            _lastElapsedSeconds <=
+                kTargetSeconds + kVictoryOvershootSeconds;
         nextState = next(_state, TimerEvent.pulse, isVictory: isVictory);
         break;
 

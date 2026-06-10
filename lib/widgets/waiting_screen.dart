@@ -198,15 +198,21 @@ class _WaitingScreenState extends State<WaitingScreen> {
     return KeyedSubtree(
       key: const ValueKey<String>('message'),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Text(
-          text,
-          key: ValueKey<String>(text),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(kDefaultTextColorHex),
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Text(
+            text,
+            key: ValueKey<String>(text),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(kDefaultTextColorHex),
+              fontSize: 120,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -2,
+              height: 1.05,
+            ),
           ),
         ),
       ),
@@ -216,27 +222,37 @@ class _WaitingScreenState extends State<WaitingScreen> {
   Widget _buildLeaderboardPanel(List<LeaderboardEntry> top) {
     return KeyedSubtree(
       key: const ValueKey<String>('leaderboard'),
-      child: SizedBox(
-        width: 520,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Text(
-              'Últimos ganadores',
-              style: TextStyle(
-                color: Color(kDefaultAccentColorHex),
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
+            const FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Últimos ganadores',
+                style: TextStyle(
+                  color: Color(kDefaultAccentColorHex),
+                  fontSize: 64,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
               ),
             ),
             const SizedBox(height: 16),
             if (top.isEmpty)
-              const Text(
-                'Todavía no hay ganadores. ¡Sé el primero!',
-                style: TextStyle(
-                  color: Color(0xFFAAAAAA),
-                  fontSize: 22,
+              const FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Todavía no hay ganadores. ¡Sé el primero!',
+                  style: TextStyle(
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               )
             else
@@ -245,41 +261,47 @@ class _WaitingScreenState extends State<WaitingScreen> {
                 final LeaderboardEntry entry = e.value;
                 final String deltaStr = _formatSignedDelta(entry.delta);
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: <Widget>[
-                      SizedBox(
-                        width: 32,
-                        child: Text(
-                          '$rank.',
-                          style: const TextStyle(
-                            color: Color(0xFFAAAAAA),
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 80,
+                          child: Text(
+                            '$rank.',
+                            style: const TextStyle(
+                              color: Color(0xFFAAAAAA),
+                              fontSize: 44,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          entry.name,
-                          style: const TextStyle(
-                            color: Color(kDefaultTextColorHex),
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                        SizedBox(
+                          width: 600,
+                          child: Text(
+                            entry.name,
+                            style: const TextStyle(
+                              color: Color(kDefaultTextColorHex),
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      Text(
-                        deltaStr,
-                        style: const TextStyle(
-                          color: Color(kDefaultAccentColorHex),
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                        Text(
+                          deltaStr,
+                          style: const TextStyle(
+                            color: Color(kDefaultAccentColorHex),
+                            fontSize: 44,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }),

@@ -49,7 +49,19 @@ const Duration kPlayingTimeout = Duration(seconds: 60);
 const Duration kDebounceWindow = Duration(milliseconds: 200);
 
 /// |delta| strictly below this counts as a victory (enters WINNER_NAME).
-const double kVictoryToleranceSeconds = 0.010;
+///
+/// Asymmetric rule: a player wins if `elapsed >= kTargetSeconds` AND
+/// `elapsed <= kTargetSeconds + kVictoryOvershootSeconds` (i.e. they
+/// hit 10.000s or overshot by at most 10 ms). Coming in SHORT
+/// (elapsed < 10.000s) is always a miss — the game punishes hesitation,
+/// not slop on the late side.
+const double kVictoryOvershootSeconds = 0.010;
+
+/// Backward-compatible alias. The active rule is asymmetric (see above);
+/// this constant is kept only so older call sites that read
+/// `|delta| < kVictoryToleranceSeconds` still type-check. AppRoot
+/// must NOT rely on it — it must use [isVictory] from the spec contract.
+const double kVictoryToleranceSeconds = kVictoryOvershootSeconds;
 
 /// Exact zero-delta easter-egg threshold (raw microsecond comparison).
 const double kEasterEggToleranceSeconds = 0.000001;

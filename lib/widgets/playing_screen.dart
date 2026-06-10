@@ -1,9 +1,10 @@
 /// PLAYING screen — shows the live stopwatch in microsecond resolution.
 ///
-/// Renders `elapsedMicroseconds / 1e6` with 4 decimals (spec requirement 3).
-/// Schedules a 60 s `Timer` that calls back to the orchestrator if the
-/// player never stops — the orchestrator transitions WAITING via the
-/// pure state machine.
+/// The timer is rendered fullscreen via [FittedBox] + a very large base
+/// fontSize (320sp), so it scales to fill the available width on any
+/// device (Chrome laptop, Fire HD 8, etc.) without manual tweaking.
+///
+/// 4-decimal display (`/1e6`) honors spec requirement 3.
 library;
 
 import 'dart:async';
@@ -69,14 +70,25 @@ class _PlayingScreenState extends State<PlayingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(kDefaultBgColorHex),
-      body: Center(
-        child: Text(
-          _formatted(),
-          style: const TextStyle(
-            color: Color(kDefaultTextColorHex),
-            fontSize: 96,
-            fontWeight: FontWeight.w900,
-            fontFeatures: [FontFeature.tabularFigures()],
+      // FittedBox + scaleDown means the digits always fit the screen
+      // width but grow as large as possible. BoxFit.scaleDown never
+      // upscales beyond the parent's constraints.
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Text(
+            _formatted(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(kDefaultTextColorHex),
+              fontSize: 320,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -8,
+              height: 1.0,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       ),
