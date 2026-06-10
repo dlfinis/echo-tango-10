@@ -116,6 +116,12 @@ class _PlayingScreenState extends State<PlayingScreen> {
                     fontWeight: FontWeight.w900,
                     height: 1.0,
                     letterSpacing: -12,
+                    fontFamily: 'monospace',
+                    fontFamilyFallback: const <String>[
+                      'Menlo',
+                      'Consolas',
+                      'Courier New',
+                    ],
                     fontFeatures: const <FontFeature>[
                       FontFeature.tabularFigures(),
                     ],
@@ -132,6 +138,12 @@ class _PlayingScreenState extends State<PlayingScreen> {
                       fontWeight: FontWeight.w900,
                       height: 1.0,
                       letterSpacing: -4,
+                      fontFamily: 'monospace',
+                      fontFamilyFallback: <String>[
+                        'Menlo',
+                        'Consolas',
+                        'Courier New',
+                      ],
                       fontFeatures: <FontFeature>[
                         FontFeature.tabularFigures(),
                       ],

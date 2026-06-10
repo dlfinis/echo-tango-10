@@ -78,13 +78,19 @@ class ResultScreen extends StatelessWidget {
                     textBaseline: TextBaseline.alphabetic,
                     children: <Widget>[
                       Text(
-                        '00:$_bigSecondsLabel',
+                        '00:${_bigSecondsLabel()}',
                         style: TextStyle(
                           color: bigColor,
                           fontSize: 380,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
                           letterSpacing: -8,
+                          fontFamily: 'monospace',
+                          fontFamilyFallback: const <String>[
+                            'Menlo',
+                            'Consolas',
+                            'Courier New',
+                          ],
                           fontFeatures: const <FontFeature>[
                             FontFeature.tabularFigures(),
                           ],
@@ -101,6 +107,12 @@ class ResultScreen extends StatelessWidget {
                             fontWeight: FontWeight.w900,
                             height: 1.0,
                             letterSpacing: -2,
+                            fontFamily: 'monospace',
+                            fontFamilyFallback: const <String>[
+                              'Menlo',
+                              'Consolas',
+                              'Courier New',
+                            ],
                             fontFeatures: const <FontFeature>[
                               FontFeature.tabularFigures(),
                             ],

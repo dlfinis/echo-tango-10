@@ -169,6 +169,16 @@ class _AppRootState extends State<AppRoot> {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(kDefaultBgColorHex),
+        // Monospace + tabular figures + bold weight = "chronograph" feel
+        // without pulling a custom font (which would add a network
+        // dependency for a kiosk that may run offline at the fair).
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(
+            fontFamily: 'monospace',
+            fontFamilyFallback: <String>['Menlo', 'Consolas', 'Courier New'],
+            fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
+          ),
+        ),
       ),
       home: _buildInputLayer(child: _buildScreen()),
     );

@@ -58,6 +58,14 @@ class _WaitingScreenState extends State<WaitingScreen> {
   /// Tracks the 3 s long-press window for the admin gesture.
   Timer? _adminHoldTimer;
 
+  /// Visual progress of the long-press (0.0..1.0). Re-renders the
+  /// gear icon so the operator sees that the press is being detected
+  /// and doesn't think the icon is broken.
+  double _adminHoldProgress = 0.0;
+
+  /// Frame ticker for the long-press progress (10 fps is plenty).
+  Timer? _adminHoldTicker;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +79,7 @@ class _WaitingScreenState extends State<WaitingScreen> {
   void dispose() {
     _ticker?.cancel();
     _adminHoldTimer?.cancel();
+    _adminHoldTicker?.cancel();
     super.dispose();
   }
 
@@ -129,16 +138,35 @@ class _WaitingScreenState extends State<WaitingScreen> {
   // Admin long-press (3 s)
   // ---------------------------------------------------------------------------
 
+  static const Duration _adminHoldTickInterval =
+      Duration(milliseconds: 100);
+
   void _startAdminHold() {
     _adminHoldTimer?.cancel();
+    _adminHoldTicker?.cancel();
+    setState(() => _adminHoldProgress = 0.0);
+    final DateTime startedAt = DateTime.now();
+    _adminHoldTicker = Timer.periodic(_adminHoldTickInterval, (Timer t) {
+      if (!mounted) return;
+      final double elapsed =
+          DateTime.now().difference(startedAt).inMilliseconds /
+              kAdminLongPressDuration.inMilliseconds;
+      setState(() => _adminHoldProgress = elapsed.clamp(0.0, 1.0));
+    });
     _adminHoldTimer = Timer(kAdminLongPressDuration, () {
+      _adminHoldTicker?.cancel();
+      _adminHoldTicker = null;
+      if (mounted) setState(() => _adminHoldProgress = 0.0);
       widget.onAdminGesture?.call();
     });
   }
 
   void _cancelAdminHold() {
     _adminHoldTimer?.cancel();
+    _adminHoldTicker?.cancel();
     _adminHoldTimer = null;
+    _adminHoldTicker = null;
+    if (mounted) setState(() => _adminHoldProgress = 0.0);
   }
 
   // ---------------------------------------------------------------------------
@@ -167,20 +195,54 @@ class _WaitingScreenState extends State<WaitingScreen> {
             ),
 
             // Gear icon — bottom-right, 3 s long-press → admin.
+            // Visually obvious: circular container with accent border,
+            // a clear "config" tooltip, and a progress arc that fills
+            // during the 3s hold so the operator knows the press is
+            // being detected.
             Positioned(
               right: 24,
               bottom: 24,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onLongPressStart: (_) => _startAdminHold(),
-                onLongPressEnd: (_) => _cancelAdminHold(),
-                onLongPressCancel: _cancelAdminHold,
-                child: const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Icon(
-                    Icons.settings,
-                    color: Color(kDefaultTextColorHex),
-                    size: 32,
+              child: Tooltip(
+                message: 'Mantener 3s para configurar',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPressStart: (_) => _startAdminHold(),
+                  onLongPressEnd: (_) => _cancelAdminHold(),
+                  onLongPressCancel: _cancelAdminHold,
+                  child: SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: <Widget>[
+                        SizedBox.expand(
+                          child: CircularProgressIndicator(
+                            value: _adminHoldProgress,
+                            strokeWidth: 4,
+                            backgroundColor: const Color(0xFF1E1E1E),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(kDefaultAccentColorHex),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E1E),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(kDefaultAccentColorHex),
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.settings,
+                            color: Color(kDefaultAccentColorHex),
+                            size: 40,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -212,6 +274,12 @@ class _WaitingScreenState extends State<WaitingScreen> {
               fontWeight: FontWeight.w900,
               letterSpacing: -2,
               height: 1.05,
+              fontFamily: 'monospace',
+              fontFamilyFallback: <String>[
+                'Menlo',
+                'Consolas',
+                'Courier New',
+              ],
             ),
           ),
         ),

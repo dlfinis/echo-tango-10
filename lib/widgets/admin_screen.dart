@@ -261,9 +261,22 @@ class _AdminScreenState extends State<AdminScreen> {
     return Scaffold(
       backgroundColor: const Color(kDefaultBgColorHex),
       appBar: AppBar(
-        title: const Text('Administración'),
+        title: const Text(
+          'Administración',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         backgroundColor: const Color(kDefaultBgColorHex),
         foregroundColor: const Color(kDefaultTextColorHex),
+        // Big visible close button (X) on the right.
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Salir',
+            iconSize: 40,
+            color: const Color(kDefaultAccentColorHex),
+            icon: const Icon(Icons.close),
+            onPressed: widget.onExit,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Form(
@@ -354,24 +367,111 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 24),
               ],
 
-              ElevatedButton(
-                onPressed: widget.onExit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(kDefaultAccentColorHex),
-                  foregroundColor: const Color(kDefaultBgColorHex),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+      // Sticky bottom action bar — always visible regardless of scroll
+      // position, so the operator can always reach "Salir" and
+      // "Cerrar juego" without hunting through the form.
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(kDefaultBgColorHex),
+            border: Border(
+              top: BorderSide(
+                color: Color(0xFF333333),
+                width: 1,
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: widget.onExit,
+                  icon: const Icon(Icons.arrow_back, size: 28),
+                  label: const Text(
+                    'Salir',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(kDefaultAccentColorHex),
+                    foregroundColor: const Color(kDefaultBgColorHex),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                  ),
                 ),
-                child: const Text(
-                  'Salir',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _confirmCloseApp,
+                  icon: const Icon(Icons.power_settings_new, size: 28),
+                  label: const Text(
+                    'Cerrar juego',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFB71C1C),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                   ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _confirmCloseApp() async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          '¿Cerrar el juego?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'La aplicación se va a cerrar. En la tablet, volve a abrirla desde el launcher.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Cerrar',
+              style: TextStyle(color: Color(0xFFFF5252)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    // On Web there is no way to terminate the browser tab, so we just
+    // show a snackbar. On Android (PR3) we'll wire SystemNavigator.pop.
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'En la tablet usá el botón de atrás del sistema. '
+          'Cierre real en PR3.',
+        ),
+        backgroundColor: Color(0xFFB71C1C),
       ),
     );
   }
