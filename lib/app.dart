@@ -16,7 +16,6 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'services/config_store.dart';
 import 'services/input_service.dart';
@@ -170,20 +169,14 @@ class _AppRootState extends State<AppRoot> {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(kDefaultBgColorHex),
-        // Orbitron is the chronograph/arcade-display font we use for
-        // every digit on the playing/result/waiting screens. The
-        // google_fonts package fetches the WOFF2 at runtime from
-        // fonts.google.com on the first build, then caches it in the
-        // browser/app storage. If the network is unavailable the
-        // package falls back to the platform's default sans-serif —
-        // we never want a missing font to break the kiosk, so the
-        // monospace fallback chain in screens still kicks in.
-        textTheme: GoogleFonts.orbitronTextTheme(
-          ThemeData.dark().textTheme,
-        ).apply(
-          bodyColor: const Color(kDefaultTextColorHex),
-          displayColor: const Color(kDefaultTextColorHex),
-        ),
+        // The chronograph digits use the DSEG7-Classic-Bold font
+        // (declared in pubspec.yaml), a 7-segment LCD display face
+        // bundled locally so the kiosk works offline. The default
+        // body text falls back to the platform sans-serif.
+        textTheme: ThemeData.dark().textTheme.apply(
+              bodyColor: const Color(kDefaultTextColorHex),
+              displayColor: const Color(kDefaultTextColorHex),
+            ),
       ),
       home: _buildInputLayer(child: _buildScreen()),
     );

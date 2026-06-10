@@ -123,3 +123,6 @@ app.*.symbols
 .idea/
 *.iml
 *.iws
+
+# macOS Finder noise
+.DS_Store

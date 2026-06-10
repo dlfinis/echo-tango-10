@@ -13,7 +13,6 @@ dependencies:
   usb_serial: ^0.5.0
   wakelock_plus: ^1.2.0
   shared_preferences: ^2.2.0
-  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -22,13 +21,20 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # Asset bundle for the MaterialIcons font (Icons.settings, Icons.close,
-  # Icons.power_settings_new, Icons.arrow_back, Icons.add, Icons.delete,
-  # etc.). Without this entry, the web build ships an empty FontManifest
-  # and every IconData renders as a fallback glyph (in Chromium that
-  # glyph is the "tofu" box, on this kiosk it visually reads as a big X).
-  #
-  # The font file is provided by the Flutter SDK at
-  #   packages/flutter_tools/lib/src/build_system/targets/web.dart
-  # via the canonical SDK-relative path below. We declare it as a
-  # package asset so the web bundler picks it up.
+
+  # Bundled 7-segment LCD fonts (https://www.keshikan.net/fonts-e.html,
+  # SIL Open Font License 1.1). The Classic Bold variant gives the
+  # chronograph look the kiosk wants for the playing/result/waiting
+  # screens. Material Icons stays for the operator-facing chrome
+  # (gear, close, power, back, add, delete) since DSEGWeather only
+  # ships weather glyphs.
+  fonts:
+    - family: DSEG7Classic-Bold
+      fonts:
+        - asset: fonts/DSEG7-Classic/DSEG7Classic-Bold.ttf
+    - family: DSEG7Classic-Light
+      fonts:
+        - asset: fonts/DSEG7-Classic/DSEG7Classic-Light.ttf
+    - family: DSEG7Modern-Bold
+      fonts:
+        - asset: fonts/DSEG7-Modern/DSEG7Modern-Bold.ttf
