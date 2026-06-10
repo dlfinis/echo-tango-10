@@ -47,7 +47,7 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _glitchController;
   late final Animation<double> _glitchAnim;
   late final AnimationController _shakeController;

@@ -272,11 +272,13 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 
   Widget _buildInvitationPanel(String message, String tagline) {
-    // Use SizedBox.expand + FittedBox(BoxFit.contain) so the text
-    // GROWS to fill the available space (down to the larger of
-    // width and height) and only shrinks if the content would
-    // overflow. Previously BoxFit.scaleDown only shrank, which
-    // left the text hugging its natural size on big screens.
+    // SizedBox.expand + FittedBox(BoxFit.contain) makes the text
+    // GROW to fill the available space (down to the larger of
+    // width and height) and only shrink if the content would
+    // overflow. Base fontSize is intentionally larger than the
+    // screen can fit so the FittedBox always shrinks the text
+    // down to fill — but the natural size keeps growing on
+    // bigger screens.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: SizedBox.expand(
@@ -287,14 +289,13 @@ class _WaitingScreenState extends State<WaitingScreen>
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              // Main message — fills the available width and grows
-              // with the screen.
+              // Main message — larger so it dominates the screen.
               Text(
                 message,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(kDefaultTextColorHex),
-                  fontSize: 240,
+                  fontSize: 480,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2,
                   height: 1.0,
@@ -302,7 +303,7 @@ class _WaitingScreenState extends State<WaitingScreen>
                   fontFamilyFallback: <String>['Bungee'],
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 48),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 child: Text(
@@ -311,7 +312,7 @@ class _WaitingScreenState extends State<WaitingScreen>
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(kDefaultAccentColorHex),
-                    fontSize: 110,
+                    fontSize: 220,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 4,
                     fontFamily: 'BungeeInline',
@@ -497,8 +498,9 @@ class InvaderMarchPainter extends CustomPainter {
 
   // Stars + scanlines — CRT backdrop behind the invaders.
   static const int _starCount = 60;
-  static const double _scanlineSpacing = 3.0;
-  static const double _scanlineAlpha = 0.05;
+  // Diego wanted the scanlines more visible / further apart.
+  static const double _scanlineSpacing = 8.0;
+  static const double _scanlineAlpha = 0.10;
 
   int? _lastLandingTick;
 

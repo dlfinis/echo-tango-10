@@ -2,29 +2,27 @@
 /// segments (seconds, milliseconds, centimicros) on a pure-white
 /// background, with arcade-style psychological pressure mechanisms:
 ///
-///   * **Falsa cuenta atrás 3-2-1** at the start of the play —
-///     the digits count 3, 2, 1 before the real stopwatch starts.
-///     The player presses the button thinking "GO!" but the
-///     stopwatch had already been running for a fraction of a
-///     second, breaking their internal sense of when zero was.
+///   * **Falsa cuenta atrás 3-2-1-GO!** at the start of the play —
+///     the digits count 3, 2, 1, GO! in 1s while the real stopwatch
+///     is already running underneath. The instant the GO! step
+///     finishes the stopwatch is RESET to 0 and a bright white
+///     "GO!" flash lights the whole screen for 200ms. The player
+///     presses the button thinking "GO!" is the start, but by
+///     the time the flash settles and the real chronograph is
+///     visible the clock is already counting again from 0 — they
+///     have no anchor for when the timer "really" started.
 ///   * **Mensajes de aliento / chantaje** rotating every ~2 s while
 ///     the stopwatch runs: "¡DALE!", "¡APURATE!", "¡CASI CASI!",
 ///     "¡YA!", "¡APRIETA!". The text is small and dim so it
-///     doesn't pull focus from the digits, but it adds an
-///     arcade-carnival atmosphere that pressures the player to act.
+///     doesn't pull focus from the digits.
 ///   * **Truco near-miss al pasar 9.999s** — a bright green flash
-///     on the digits for 200ms, suggesting "you were right there!
-///     one more try!" even though the real victory is at 10.000s.
-///     The flash creates a false sense of closeness so the player
-///     presses a few ms too early on the next attempt.
+///     on the digits for 200ms, suggesting "you were right there!"
+///     even though the real victory is at 10.000s.
 ///   * **Color rotation** — digits start black, drift through a
 ///     5-color palette, return to black, every 3s.
 ///   * **Format** — `SS` (seconds, biggest), `.mmm` (millis, mid),
 ///     `.uu` (centimicros, smallest). 2-digit microseconds at
 ///     10us resolution is plenty for the 1.9 ms victory window.
-///
-/// The stopwatch itself starts on PLAYING entry; the fake countdown
-/// sits ON TOP of the first ~0.8s of the real elapsed time.
 library;
 
 import 'dart:async';
@@ -48,30 +46,23 @@ class PlayingScreen extends StatefulWidget {
   State<PlayingScreen> createState() => _PlayingScreenState();
 }
 
-class _PlayingScreenState extends State<PlayingScreen> {
+class _PlayingScreenState extends State<PlayingScreen>
+    with TickerProviderStateMixin {
   Timer? _ticker;
   Timer? _timeoutGuard;
   Timer? _colorTimer;
   Timer? _cheerTimer;
+  Timer? _countdownTimer;
   Duration _rendered = Duration.zero;
   int _colorIndex = 0;
   int _cheerIndex = 0;
-
-  /// Tracks whether the near-miss green flash has already fired
-  /// for the current play (we only want to fire it once per play).
   bool _nearMissFlashed = false;
-
-  /// The moment the screen mounted — reserved for future use
-  /// (debug overlays). Currently unused but kept so the field
-  /// doesn't get removed by the linter; remove if no overlay
-  /// ever lands.
-  // ignore: unused_field
-  late final DateTime _mountedAt;
-  Timer? _countdownTimer;
-
-  /// The current "fake countdown" value: 3, 2, 1, GO, or null
-  /// (null = countdown finished, show the real chronograph).
   int? _countdownValue;
+
+  /// Drives the GO! flash. Filled 1.0 -> 0.0 over 200ms when the
+  /// countdown finishes. White screen at value 1.0 (full opacity).
+  late final AnimationController _goFlashController;
+  late final Animation<double> _goFlashAnim;
 
   static const List<String> _cheerMessages = <String>[
     '¡DALE!',
@@ -86,8 +77,16 @@ class _PlayingScreenState extends State<PlayingScreen> {
   @override
   void initState() {
     super.initState();
-    _mountedAt = DateTime.now();
     _countdownValue = 3;
+    _goFlashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _goFlashAnim = CurvedAnimation(
+      parent: _goFlashController,
+      curve: Curves.easeOut,
+    );
+
     // The fake countdown: 3 (250ms) -> 2 (250ms) -> 1 (250ms) -> GO
     // (250ms) -> null. Total ~1.0s. The real stopwatch is already
     // running in the background.
@@ -106,6 +105,10 @@ class _PlayingScreenState extends State<PlayingScreen> {
         } else {
           _countdownValue = null;
           t.cancel();
+          // Trigger the GO! flash and reset the stopwatch so the
+          // real chronograph starts cleanly from 0.
+          _goFlashController.forward(from: 1.0);
+          widget.controller.reset();
         }
       });
     });
@@ -137,9 +140,6 @@ class _PlayingScreenState extends State<PlayingScreen> {
     setState(() {
       _rendered = elapsed;
     });
-    // Near-miss flash: fire once per play when the stopwatch crosses
-    // 9.999s. The flash lasts ~200ms and is layered on top of the
-    // normal color rotation.
     if (!_nearMissFlashed && elapsed >= const Duration(milliseconds: 9999)) {
       _nearMissFlashed = true;
     }
@@ -152,6 +152,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
     _colorTimer?.cancel();
     _cheerTimer?.cancel();
     _countdownTimer?.cancel();
+    _goFlashController.dispose();
     super.dispose();
   }
 
@@ -174,8 +175,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
     return centimicros.toString().padLeft(2, '0');
   }
 
-  /// Whether the near-miss flash is currently visible. Fades out
-  /// over 200ms after firing.
+  /// Whether the near-miss flash is currently visible.
   bool get _nearMissActive {
     if (!_nearMissFlashed) return false;
     final Duration sinceMiss =
@@ -196,8 +196,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
       backgroundColor: const Color(kPlayingBackgroundColorHex),
       body: Stack(
         children: <Widget>[
-          // Cheer message — small, dim, bottom-right. Pulls some
-          // attention without competing with the digits.
+          // Cheer message — small, dim, bottom-right.
           Positioned(
             right: 32,
             bottom: 32,
@@ -290,16 +289,30 @@ class _PlayingScreenState extends State<PlayingScreen> {
               ),
             ),
           ),
+          // GO! flash overlay — a white screen that fades out
+          // over 200ms when the fake countdown finishes. It sells
+          // the GO! transition and also acts as a visual reset cue.
+          IgnorePointer(
+            child: AnimatedBuilder(
+              animation: _goFlashAnim,
+              builder: (BuildContext context, Widget? _) {
+                return Container(
+                  color: const Color(0xFFFFFFFF)
+                      .withValues(alpha: _goFlashAnim.value),
+                );
+              },
+            ),
+          ),
           // Fake countdown overlay (3 - 2 - 1 - GO!). Sits on top
-          // of the digits for the first ~1s of play.
+          // of the flash and the digits.
           if (_countdownValue != null)
             Positioned.fill(
               child: IgnorePointer(
                 child: Center(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
-                      child: Text(
-                        _countdownValue == 0 ? '¡GO!' : '$_countdownValue',
+                    child: Text(
+                      _countdownValue == 0 ? '¡GO!' : '$_countdownValue',
                       key: ValueKey<int?>(_countdownValue),
                       style: TextStyle(
                         color: _countdownValue == 0
