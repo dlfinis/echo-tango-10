@@ -1,0 +1,181 @@
+/// Typed `shared_preferences` wrapper for the arcade timer.
+///
+/// Centralizes every pref key, every default, and the JSON shape used to
+/// serialize the leaderboard. The rest of the app should never call
+/// `SharedPreferences.getInstance()` directly — go through this class so
+/// keys and shapes stay in one place.
+///
+/// The class is **lazy**: the [SharedPreferences] instance is loaded once
+/// on first use and cached. All read methods are sync (after the initial
+/// load). All write methods are `async` because the underlying plugin
+/// writes to disk asynchronously.
+library;
+
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../models/leaderboard_entry.dart';
+import '../utils/constants.dart';
+
+/// Default invitation messages shown during the WAITING loop.
+///
+/// Spanish (es-AR) — the brief and tech_specs hardcode this locale; no
+/// i18n is in scope. Order is the default rotation order.
+const List<String> kDefaultInvitationMessages = <String>[
+  '¡Presioná el botón para jugar!',
+  '¿Te animás a los 10 segundos exactos?',
+  '¡El que pega en 10.000s gana!',
+];
+
+/// Typed wrapper around [SharedPreferences].
+///
+/// Instantiate once at app start (e.g. in `AppRoot.initState` via
+/// `WidgetsBinding.instance.addPostFrameCallback`) and pass it down to
+/// the screens that need to read or write config.
+class ConfigStore {
+  ConfigStore._(this._prefs);
+
+  /// Future returned by [load] — resolve it before reading any value.
+  static Future<ConfigStore> load() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return ConfigStore._(prefs);
+  }
+
+  final SharedPreferences _prefs;
+
+  // ---------------------------------------------------------------------------
+  // Keys — keep all string literals here, never inline them at call sites.
+  // ---------------------------------------------------------------------------
+  static const String kKeyInvitationMessages = 'invitation_messages';
+  static const String kKeyMessageRotationSeconds = 'message_rotation_seconds';
+  static const String kKeyLeaderboardRotationSeconds =
+      'leaderboard_rotation_seconds';
+  static const String kKeyBgColorArgb = 'bg_color_argb';
+  static const String kKeyTextColorArgb = 'text_color_argb';
+  static const String kKeyAccentColorArgb = 'accent_color_argb';
+  static const String kKeyLeaderboard = 'leaderboard';
+
+  // ---------------------------------------------------------------------------
+  // Invitation messages
+  // ---------------------------------------------------------------------------
+
+  /// Returns the configured invitation message list, falling back to
+  /// [kDefaultInvitationMessages] when the pref is missing or corrupted.
+  List<String> invitationMessages() {
+    final String? raw = _prefs.getString(kKeyInvitationMessages);
+    if (raw == null || raw.isEmpty) {
+      return List<String>.unmodifiable(kDefaultInvitationMessages);
+    }
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is List) {
+        final List<String> out = decoded
+            .whereType<String>()
+            .map((String s) => s.trim())
+            .where((String s) => s.isNotEmpty)
+            .toList();
+        if (out.isNotEmpty) return List<String>.unmodifiable(out);
+      }
+    } on FormatException {
+      // Corrupt JSON — fall through to defaults.
+    }
+    return List<String>.unmodifiable(kDefaultInvitationMessages);
+  }
+
+  Future<void> setInvitationMessages(List<String> messages) async {
+    final List<String> cleaned = messages
+        .map((String s) => s.trim())
+        .where((String s) => s.isNotEmpty)
+        .toList();
+    await _prefs.setString(
+      kKeyInvitationMessages,
+      jsonEncode(cleaned.isEmpty ? kDefaultInvitationMessages : cleaned),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rotation intervals (seconds)
+  // ---------------------------------------------------------------------------
+
+  int messageRotationSeconds() =>
+      _prefs.getInt(kKeyMessageRotationSeconds) ?? 30;
+
+  Future<void> setMessageRotationSeconds(int seconds) =>
+      _prefs.setInt(kKeyMessageRotationSeconds, seconds);
+
+  int leaderboardRotationSeconds() =>
+      _prefs.getInt(kKeyLeaderboardRotationSeconds) ?? 300;
+
+  Future<void> setLeaderboardRotationSeconds(int seconds) =>
+      _prefs.setInt(kKeyLeaderboardRotationSeconds, seconds);
+
+  // ---------------------------------------------------------------------------
+  // Colors (ARGB ints — `Color(0xAARRGGBB)`-compatible)
+  // ---------------------------------------------------------------------------
+
+  int bgColorArgb() =>
+      _prefs.getInt(kKeyBgColorArgb) ?? kDefaultBgColorHex;
+  int textColorArgb() =>
+      _prefs.getInt(kKeyTextColorArgb) ?? kDefaultTextColorHex;
+  int accentColorArgb() =>
+      _prefs.getInt(kKeyAccentColorArgb) ?? kDefaultAccentColorHex;
+
+  Future<void> setBgColorArgb(int argb) =>
+      _prefs.setInt(kKeyBgColorArgb, argb);
+  Future<void> setTextColorArgb(int argb) =>
+      _prefs.setInt(kKeyTextColorArgb, argb);
+  Future<void> setAccentColorArgb(int argb) =>
+      _prefs.setInt(kKeyAccentColorArgb, argb);
+
+  // ---------------------------------------------------------------------------
+  // Leaderboard JSON
+  // ---------------------------------------------------------------------------
+
+  /// Returns the persisted leaderboard, falling back to an empty list
+  /// when the pref is missing or JSON is corrupted.
+  ///
+  /// Errors are swallowed by design (spec requirement 4: "leaderboard
+  /// JSON corruption → empty fallback"). The caller should not need to
+  /// handle a try/catch at the UI layer.
+  List<LeaderboardEntry> leaderboard() {
+    final String? raw = _prefs.getString(kKeyLeaderboard);
+    if (raw == null || raw.isEmpty) {
+      return const <LeaderboardEntry>[];
+    }
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is List) {
+        final List<LeaderboardEntry> out = <LeaderboardEntry>[];
+        for (final Object? item in decoded) {
+          if (item is Map<String, dynamic>) {
+            out.add(LeaderboardEntry.fromJson(item));
+          } else if (item is Map) {
+            // `jsonDecode` returns `Map<String, dynamic>` on web but
+            // may return `Map<dynamic, dynamic>` on some VMs — coerce.
+            out.add(LeaderboardEntry.fromJson(
+                item.cast<String, dynamic>()));
+          }
+        }
+        return out;
+      }
+    } on FormatException {
+      // Corrupt JSON — fall through to empty.
+    } on TypeError {
+      // Bad shape — fall through to empty.
+    }
+    return const <LeaderboardEntry>[];
+  }
+
+  Future<void> setLeaderboard(List<LeaderboardEntry> entries) async {
+    final List<Map<String, dynamic>> payload =
+        entries.map((LeaderboardEntry e) => e.toJson()).toList();
+    await _prefs.setString(kKeyLeaderboard, jsonEncode(payload));
+  }
+
+  /// Wipes EVERY pref key. Used by the admin "Borrar base de datos"
+  /// action. After this returns, the next read on any key returns the
+  /// default (because the keys are gone).
+  Future<void> clearAll() => _prefs.clear();
+}
