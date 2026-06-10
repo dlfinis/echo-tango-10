@@ -271,38 +271,68 @@ class _ResultScreenState extends State<ResultScreen>
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
+        // SizedBox.expand + FittedBox(BoxFit.contain) so the WHOLE
+        // result block (chronograph + delta + verdict) grows or
+        // shrinks together to fill the viewport. The natural
+        // fontSize is large enough that FittedBox always scales
+        // down, but the content scales up on big screens. This
+        // is the same pattern used in WaitingScreen and
+        // PlayingScreen.
+        child: SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
               // The big chronograph row — clipped horizontally when
               // TE PASASTE so the scroll effect can play without
-              // affecting layout.
+              // affecting layout. The ClipRect + FractionalTranslation
+              // are wrapped AROUND the FittedBox so the FittedBox
+              // itself never sees infinite-width constraints (those
+              // would throw 'BoxConstraints forces an infinite width').
               ClipRect(
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FractionalTranslation(
-                    translation: Offset(scrollOffset, 0),
-                    child: Opacity(
-                      opacity: opacity,
-                      child: Transform.translate(
-                        offset: Offset(shakeX, shakeY),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: <Widget>[
-                              Text(
-                                _bigSecondsLabel,
+                child: FractionalTranslation(
+                  translation: Offset(scrollOffset, 0),
+                  child: Opacity(
+                    opacity: opacity,
+                    child: Transform.translate(
+                      offset: Offset(shakeX, shakeY),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: <Widget>[
+                            Text(
+                              _bigSecondsLabel,
+                              style: TextStyle(
+                                color: digitColor,
+                                fontSize: 880,
+                                fontWeight: FontWeight.w900,
+                                height: 1.0,
+                                letterSpacing: -28,
+                                fontFamily: 'DSEG7Modern-Regular',
+                                fontFamilyFallback: const <String>[
+                                  'DSEG7Modern-Bold',
+                                  'DSEG7Classic-Bold',
+                                  'monospace',
+                                ],
+                              ),
+                            ),
+                            Transform.translate(
+                              offset: const Offset(0, 36),
+                              child: Text(
+                                '.$_millisLabel',
                                 style: TextStyle(
                                   color: digitColor,
-                                  fontSize: 880,
+                                  fontSize: 420,
                                   fontWeight: FontWeight.w900,
                                   height: 1.0,
-                                  letterSpacing: -28,
+                                  letterSpacing: -12,
                                   fontFamily: 'DSEG7Modern-Regular',
                                   fontFamilyFallback: const <String>[
                                     'DSEG7Modern-Bold',
@@ -311,46 +341,27 @@ class _ResultScreenState extends State<ResultScreen>
                                   ],
                                 ),
                               ),
-                              Transform.translate(
-                                offset: const Offset(0, 36),
-                                child: Text(
-                                  '.$_millisLabel',
-                                  style: TextStyle(
-                                    color: digitColor,
-                                    fontSize: 420,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.0,
-                                    letterSpacing: -12,
-                                    fontFamily: 'DSEG7Modern-Regular',
-                                    fontFamilyFallback: const <String>[
-                                      'DSEG7Modern-Bold',
-                                      'DSEG7Classic-Bold',
-                                      'monospace',
-                                    ],
-                                  ),
+                            ),
+                            Transform.translate(
+                              offset: const Offset(0, 64),
+                              child: Text(
+                                '.$_centimicrosLabel',
+                                style: TextStyle(
+                                  color: digitColor,
+                                  fontSize: 240,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.0,
+                                  letterSpacing: -6,
+                                  fontFamily: 'DSEG7Modern-Regular',
+                                  fontFamilyFallback: const <String>[
+                                    'DSEG7Modern-Bold',
+                                    'DSEG7Classic-Bold',
+                                    'monospace',
+                                  ],
                                 ),
                               ),
-                              Transform.translate(
-                                offset: const Offset(0, 64),
-                                child: Text(
-                                  '.$_centimicrosLabel',
-                                  style: TextStyle(
-                                    color: digitColor,
-                                    fontSize: 240,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.0,
-                                    letterSpacing: -6,
-                                    fontFamily: 'DSEG7Modern-Regular',
-                                    fontFamilyFallback: const <String>[
-                                      'DSEG7Modern-Bold',
-                                      'DSEG7Classic-Bold',
-                                      'monospace',
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -401,6 +412,13 @@ class _ResultScreenState extends State<ResultScreen>
           ),
         ),
       ),
-    );
+    ));
   }
 }
+
+
+
+
+
+
+

@@ -3,6 +3,8 @@
 // Coverage:
 //   * WaitingScreen: first invitation message renders + admin long-press
 //     fires onAdminGesture after kAdminLongPressDuration (not before).
+//   * ResultScreen: renders all 4 verdict branches without overflow at
+//     a small viewport (Fire HD 8 1280x800 portrait-aware test size).
 //   * WinnerNameScreen: Aceptar writes an entry; default name is ANONIMO;
 //     easter-egg flag toggles UI between "VICTORIA" and "¡EXACTO!".
 //   * AdminScreen: confirm dialog, Borrar todo wipes prefs + leaderboard
@@ -13,6 +15,7 @@ import 'package:arcade_timer_10s/models/leaderboard_entry.dart';
 import 'package:arcade_timer_10s/services/config_store.dart';
 import 'package:arcade_timer_10s/services/leaderboard.dart';
 import 'package:arcade_timer_10s/utils/constants.dart';
+import 'package:arcade_timer_10s/widgets/result_screen.dart';
 import 'package:arcade_timer_10s/widgets/admin_screen.dart';
 import 'package:arcade_timer_10s/widgets/confetti_painter.dart';
 import 'package:arcade_timer_10s/widgets/waiting_screen.dart';
@@ -314,6 +317,87 @@ void main() {
       final a = ConfettiPainter(value: 0.5, seed: 1, intensity: 1.0);
       final e = ConfettiPainter(value: 0.5, seed: 1, intensity: 2.0);
       expect(a.shouldRepaint(e), isTrue);
+    });
+  });
+
+  group('ResultScreen', () {
+    // Each test sets a viewport and checks that the chronograph
+    // (big seconds digits) is present in the widget tree. The
+    // FittedBox at the outer level absorbs any layout overflow
+    // so these should all pass without 'RenderFlex overflowed'
+    // exceptions.
+    Future<void> pumpResult(
+      WidgetTester tester, {
+      required double elapsed,
+      required Size viewport,
+    }) async {
+      tester.view.physicalSize = viewport;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      bool tapped = false;
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: elapsed,
+        onNext: () => tapped = true,
+      )));
+      // Let the verdict animation finish (1.5s is the longest).
+      await tester.pump(const Duration(seconds: 2));
+      expect(tapped, isFalse);
+    }
+
+    testWidgets('renders VICTORIA branch with no overflow at 1280x720',
+        (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 10.0005,
+        viewport: const Size(1280, 720),
+      );
+      // The verdict label is the most reliable widget to assert on.
+      expect(find.text('¡GANASTE!'), findsOneWidget);
+    });
+
+    testWidgets('renders CASI branch with no overflow at 1280x720',
+        (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 10.005,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('¡CASI, CASI!'), findsOneWidget);
+    });
+
+    testWidgets('renders NI POR ASOMO branch with no overflow at 1280x720',
+        (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 8.5,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('¡NI POR ASOMO!'), findsOneWidget);
+    });
+
+    testWidgets('renders TE PASASTE branch with no overflow at 1280x720',
+        (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 11.0,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('¡TE PASASTE!'), findsOneWidget);
+    });
+
+    testWidgets('renders at small viewport (800x480) without overflow',
+        (WidgetTester tester) async {
+      // The viewport the original failure occurred at — if the
+      // outer FittedBox fix works, this passes. If it doesn't,
+      // the test fails with 'RenderFlex overflowed by N pixels'.
+      await pumpResult(
+        tester,
+        elapsed: 10.0005,
+        viewport: const Size(800, 480),
+      );
+      expect(find.text('¡GANASTE!'), findsOneWidget);
     });
   });
 }
