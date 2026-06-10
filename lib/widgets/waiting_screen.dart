@@ -8,12 +8,18 @@
 /// The intervals are re-read from the store on every tick so admin
 /// changes apply live without restarting the loop.
 ///
+/// Background: an [ArcadeBackdropPainter] draws scanlines + twinkling
+/// stars in a dim palette to give the screen the 'CRT/Atari/Neo Geo'
+/// atmosphere the operator wants. The mesh is repainted on a 60ms
+/// timer so the stars feel alive without burning cycles.
+///
 /// The bottom-right gear icon accepts a 3 s long-press to open the
 /// admin panel. On Web, Spacebar reaches the state machine through
 /// the [KeyboardInputWidget] layer in `AppRoot` — not this screen.
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -40,7 +46,8 @@ class WaitingScreen extends StatefulWidget {
   State<WaitingScreen> createState() => _WaitingScreenState();
 }
 
-class _WaitingScreenState extends State<WaitingScreen> {
+class _WaitingScreenState extends State<WaitingScreen>
+    with SingleTickerProviderStateMixin {
   /// Drives the rotation: -1 means "leaderboard view", otherwise the
   /// index into the message list.
   int _index = 0;
@@ -66,6 +73,12 @@ class _WaitingScreenState extends State<WaitingScreen> {
   /// Frame ticker for the long-press progress (10 fps is plenty).
   Timer? _adminHoldTicker;
 
+  /// Drives the arcade backdrop repaint. 16fps is enough to make the
+  /// stars twinkle without burning cycles.
+  int _backdropTick = 0;
+
+  late final AnimationController _backdropTicker;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +86,14 @@ class _WaitingScreenState extends State<WaitingScreen> {
       _elapsedSeconds += 1;
       _onTick();
     });
+    _backdropTicker = AnimationController(
+      vsync: this,
+      duration: const Duration(days: 365), // long enough to never end
+    )..addListener(() {
+        if (!mounted) return;
+        setState(() => _backdropTick = (_backdropTick + 1) % 100000);
+      });
+    _backdropTicker.repeat(period: const Duration(milliseconds: 60));
   }
 
   @override
@@ -80,6 +101,7 @@ class _WaitingScreenState extends State<WaitingScreen> {
     _ticker?.cancel();
     _adminHoldTimer?.cancel();
     _adminHoldTicker?.cancel();
+    _backdropTicker.dispose();
     super.dispose();
   }
 
@@ -180,12 +202,28 @@ class _WaitingScreenState extends State<WaitingScreen> {
 
     return Scaffold(
       backgroundColor: const Color(kDefaultBgColorHex),
-      body: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            // Center content — either the current message or the
-            // leaderboard panel.
-            Center(
+      body: Stack(
+        children: <Widget>[
+          // Animated arcade backdrop: scanlines + twinkling stars.
+          // Repaints on a 60ms ticker driven by the _backdropTick
+          // counter; full re-layout only when the message swaps.
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _backdropTicker,
+              builder: (BuildContext context, Widget? _) {
+                return CustomPaint(
+                  painter: ArcadeBackdropPainter(
+                    tick: _backdropTick,
+                    seed: 1337,
+                  ),
+                );
+              },
+            ),
+          ),
+          // Center content — either the current message or the
+          // leaderboard panel.
+          SafeArea(
+            child: Center(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 350),
                 child: _showingLeaderboard
@@ -193,62 +231,62 @@ class _WaitingScreenState extends State<WaitingScreen> {
                     : _buildMessagePanel(messages),
               ),
             ),
+          ),
 
-            // Gear icon — bottom-right, 3 s long-press → admin.
-            // Visually obvious: circular container with accent border,
-            // a clear "config" tooltip, and a progress arc that fills
-            // during the 3s hold so the operator knows the press is
-            // being detected.
-            Positioned(
-              right: 24,
-              bottom: 24,
-              child: Tooltip(
-                message: 'Mantener 3s para configurar',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onLongPressStart: (_) => _startAdminHold(),
-                  onLongPressEnd: (_) => _cancelAdminHold(),
-                  onLongPressCancel: _cancelAdminHold,
-                  child: SizedBox(
-                    width: 80,
-                    height: 80,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: <Widget>[
-                        SizedBox.expand(
-                          child: CircularProgressIndicator(
-                            value: _adminHoldProgress,
-                            strokeWidth: 4,
-                            backgroundColor: const Color(0xFF1E1E1E),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(kDefaultAccentColorHex),
-                            ),
+          // Gear icon — bottom-right, 3 s long-press → admin.
+          // Visually obvious: circular container with accent border,
+          // a clear "config" tooltip, and a progress arc that fills
+          // during the 3s hold so the operator knows the press is
+          // being detected.
+          Positioned(
+            right: 24,
+            bottom: 24,
+            child: Tooltip(
+              message: 'Mantener 3s para configurar',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPressStart: (_) => _startAdminHold(),
+                onLongPressEnd: (_) => _cancelAdminHold(),
+                onLongPressCancel: _cancelAdminHold,
+                child: SizedBox(
+                  width: 80,
+                  height: 80,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: <Widget>[
+                      SizedBox.expand(
+                        child: CircularProgressIndicator(
+                          value: _adminHoldProgress,
+                          strokeWidth: 4,
+                          backgroundColor: const Color(0xFF1E1E1E),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(kDefaultAccentColorHex),
                           ),
                         ),
-                        Container(
-                          margin: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(kDefaultAccentColorHex),
-                              width: 2,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.settings,
-                            color: Color(kDefaultAccentColorHex),
-                            size: 40,
+                      ),
+                      Container(
+                        margin: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E1E),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(kDefaultAccentColorHex),
+                            width: 2,
                           ),
                         ),
-                      ],
-                    ),
+                        child: const Icon(
+                          Icons.settings,
+                          color: Color(kDefaultAccentColorHex),
+                          size: 40,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -270,16 +308,12 @@ class _WaitingScreenState extends State<WaitingScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Color(kDefaultTextColorHex),
-              fontSize: 180,
+              fontSize: 140,
               fontWeight: FontWeight.w900,
-              letterSpacing: -2,
+              letterSpacing: 2,
               height: 1.05,
-              fontFamily: 'DSEG7Classic-Bold',
-              fontFamilyFallback: <String>[
-                'DSEG7Classic-Light',
-                'DSEG7Modern-Bold',
-                'monospace',
-              ],
+              fontFamily: 'BungeeInline',
+              fontFamilyFallback: <String>['Bungee'],
             ),
           ),
         ),
@@ -300,12 +334,14 @@ class _WaitingScreenState extends State<WaitingScreen> {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                'Últimos ganadores',
+                'ÚLTIMOS GANADORES',
                 style: TextStyle(
                   color: Color(kDefaultAccentColorHex),
-                  fontSize: 64,
+                  fontSize: 80,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
+                  letterSpacing: 4,
+                  fontFamily: 'BungeeInline',
+                  fontFamilyFallback: <String>['Bungee'],
                 ),
               ),
             ),
@@ -315,11 +351,14 @@ class _WaitingScreenState extends State<WaitingScreen> {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Todavía no hay ganadores. ¡Sé el primero!',
+                  'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
                   style: TextStyle(
                     color: Color(0xFFAAAAAA),
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                    fontFamily: 'BungeeInline',
+                    fontFamilyFallback: <String>['Bungee'],
                   ),
                 ),
               )
@@ -342,8 +381,10 @@ class _WaitingScreenState extends State<WaitingScreen> {
                             '$rank.',
                             style: const TextStyle(
                               color: Color(0xFFAAAAAA),
-                              fontSize: 44,
+                              fontSize: 48,
                               fontWeight: FontWeight.w900,
+                              fontFamily: 'BungeeInline',
+                              fontFamilyFallback: <String>['Bungee'],
                             ),
                           ),
                         ),
@@ -353,8 +394,10 @@ class _WaitingScreenState extends State<WaitingScreen> {
                             entry.name,
                             style: const TextStyle(
                               color: Color(kDefaultTextColorHex),
-                              fontSize: 48,
+                              fontSize: 56,
                               fontWeight: FontWeight.w900,
+                              fontFamily: 'BungeeInline',
+                              fontFamilyFallback: <String>['Bungee'],
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -363,8 +406,13 @@ class _WaitingScreenState extends State<WaitingScreen> {
                           deltaStr,
                           style: const TextStyle(
                             color: Color(kDefaultAccentColorHex),
-                            fontSize: 44,
+                            fontSize: 48,
                             fontWeight: FontWeight.w900,
+                            fontFamily: 'DSEG7Modern-Regular',
+                            fontFamilyFallback: <String>[
+                              'DSEG7Modern-Bold',
+                              'DSEG7Classic-Bold',
+                            ],
                             fontFeatures: [FontFeature.tabularFigures()],
                           ),
                         ),
@@ -383,4 +431,84 @@ class _WaitingScreenState extends State<WaitingScreen> {
     final String sign = delta >= 0 ? '+' : '-';
     return '$sign${delta.abs().toStringAsFixed(3)}s';
   }
+}
+
+// ===========================================================================
+// ArcadeBackdropPainter — CRT/Atari/Neo Geo look for the WAITING screen.
+//
+// Two layers, both intentionally low-contrast so they read as
+// "atmosphere" and never compete with the foreground text or the
+// leaderboard panel:
+//
+//   * Scanlines — thin horizontal lines every ~3 px, alpha 0.05.
+//     The classical CRT effect.
+//   * Stars — ~50 dim points at fixed positions (seeded so the layout
+//     is deterministic across rebuilds). Each star has its own phase
+//     and twinkle rate, derived from its index. The Painter is told
+//     the current [tick] by the AnimatedBuilder so the twinkle reads
+//     as continuous motion without a Controller of its own.
+// ===========================================================================
+
+class ArcadeBackdropPainter extends CustomPainter {
+  ArcadeBackdropPainter({required this.tick, this.seed = 1337});
+
+  /// Monotonically increasing frame counter from the parent ticker.
+  final int tick;
+  final int seed;
+
+  static const int _starCount = 60;
+  static const double _scanlineSpacing = 3.0;
+  static const double _scanlineAlpha = 0.05;
+  static const double _starBaseAlpha = 0.18;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Fill the background with a near-black tint so the scanlines have
+    // something to draw against; the Scaffold already paints
+    // kDefaultBgColorHex but we want a uniform surface for the painter
+    // to operate on independently of theme changes.
+    final Paint bgPaint = Paint()..color = const Color(0xFF0A0A0A);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    // 1) Scanlines.
+    final Paint scanPaint = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: _scanlineAlpha)
+      ..strokeWidth = 1.0;
+    for (double y = 0; y < size.height; y += _scanlineSpacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), scanPaint);
+    }
+
+    // 2) Stars — seeded layout so the screen is deterministic.
+    final Paint starPaint = Paint();
+    for (int i = 0; i < _starCount; i++) {
+      final double fx = _hash01(seed + i * 7919);
+      final double fy = _hash01(seed + i * 7901 + 13);
+      final double ph = _hash01(seed + i * 7793 + 31) * 6.28;
+      final double rate = 0.04 + _hash01(seed + i * 7727 + 51) * 0.10;
+      final double twinkle =
+          0.5 + 0.5 * ((tick * rate) + ph).remainder(6.28).sinToOne();
+      final double alpha = _starBaseAlpha * (0.3 + 0.7 * twinkle);
+      starPaint.color = const Color(0xFF80DEEA).withValues(alpha: alpha);
+      final Offset pos = Offset(fx * size.width, fy * size.height);
+      final double r = 1.2 + twinkle * 1.4;
+      canvas.drawCircle(pos, r, starPaint);
+    }
+  }
+
+  /// Cheap deterministic hash returning a value in [0, 1).
+  double _hash01(int n) {
+    int x = n;
+    x = ((x >> 16) ^ x) * 0x45D9F3B;
+    x = ((x >> 16) ^ x) * 0x45D9F3B;
+    x = (x >> 16) ^ x;
+    return (x & 0xFFFFFF) / 0x1000000;
+  }
+
+  @override
+  bool shouldRepaint(ArcadeBackdropPainter old) => old.tick != tick;
+}
+
+extension on double {
+  /// Map a radians value to a 0..1 sine wave.
+  double sinToOne() => 0.5 + 0.5 * math.sin(this);
 }

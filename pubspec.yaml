@@ -22,12 +22,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Bundled 7-segment LCD fonts (https://www.keshikan.net/fonts-e.html,
-  # SIL Open Font License 1.1). The Classic Bold variant gives the
-  # chronograph look the kiosk wants for the playing/result/waiting
-  # screens. Material Icons stays for the operator-facing chrome
-  # (gear, close, power, back, add, delete) since DSEGWeather only
-  # ships weather glyphs.
+  # 7-segment LCD fonts (DSEG family, https://www.keshikan.net/fonts-e.html,
+  # SIL Open Font License 1.1). Used for the chronograph digits on
+  # the playing/result/waiting screens.
   fonts:
     - family: DSEG7Classic-Bold
       fonts:
@@ -38,3 +35,12 @@ flutter:
     - family: DSEG7Modern-Bold
       fonts:
         - asset: fonts/DSEG7-Modern/DSEG7Modern-Bold.ttf
+    - family: DSEG7Modern-Regular
+      fonts:
+        - asset: fonts/DSEG7-Modern/DSEG7Modern-Regular.ttf
+    - family: BungeeInline
+      fonts:
+        - asset: assets/fonts/BungeeInline-Regular.ttf
+    - family: Bungee
+      fonts:
+        - asset: assets/fonts/Bungee-Regular.ttf

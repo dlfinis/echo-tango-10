@@ -102,7 +102,10 @@ void main() {
       await tester.pump(kAdminLongPressDuration);
       expect(adminCalls, 1, reason: 'long-press fired at 3s');
       await gesture.up();
-      await tester.pumpAndSettle();
+      // The backdrop ticker never stops in production, so pumpAndSettle
+      // would time out. A bounded pump is enough to verify the gesture
+      // was released.
+      await tester.pump(const Duration(milliseconds: 200));
     });
   });
 
