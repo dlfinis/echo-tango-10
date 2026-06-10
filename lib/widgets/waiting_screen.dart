@@ -26,7 +26,6 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/leaderboard_entry.dart';
@@ -61,15 +60,6 @@ class _WaitingScreenState extends State<WaitingScreen>
   Timer? _adminHoldTicker;
   double _adminHoldProgress = 0.0;
   int _backdropTick = 0;
-  int _bgIndex = 0;
-
-  /// The painter increments this on every 'landing' event. The
-  /// parent wraps the CustomPaint in a [ValueListenableBuilder]
-  /// that reads it and updates [_bgIndex]. This indirection
-  /// keeps the painter free of any callback that would have to
-  /// fire setState inside the render frame.
-  final ValueNotifier<int> _landingCount = ValueNotifier<int>(0);
-
   late final AnimationController _backdropTicker;
 
   static const Duration _adminHoldTickInterval =
@@ -98,7 +88,6 @@ class _WaitingScreenState extends State<WaitingScreen>
     _adminHoldTimer?.cancel();
     _adminHoldTicker?.cancel();
     _backdropTicker.dispose();
-    _landingCount.dispose();
     super.dispose();
   }
 
@@ -186,58 +175,31 @@ class _WaitingScreenState extends State<WaitingScreen>
     final String tagline = taglines.isEmpty
         ? ''
         : taglines[_subTaglineIndex.clamp(0, taglines.length - 1)];
-    final Color bg = _kBgPalette[_bgIndex];
 
     return Scaffold(
-      // The AnimatedContainer color is the result of the invader
-      // formation touching the bottom edge — see the painter.
-      body: AnimatedContainer(
-        duration: const Duration(seconds: 3),
-        curve: Curves.easeInOut,
-        color: bg,
-        child: Stack(
-          children: <Widget>[
-            // Full-screen Space Invaders march. The painter takes care
-            // of advancing its own internal state and updating the
-            // background palette when the formation lands.
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _backdropTicker,
-                builder: (BuildContext context, Widget? _) {
-                  return ValueListenableBuilder<int>(
-                    valueListenable: _landingCount,
-                    builder: (BuildContext context, int landings, Widget? _) {
-                      // The builder runs in a normal build pass, not
-                      // in a paint callback, so updating the
-                      // bg index here is legal. We pick the
-                      // palette entry from the running landings
-                      // count so each new landing advances the
-                      // background color.
-                      final int next = landings % _kBgPalette.length;
-                      if (next != _bgIndex) {
-                        // Schedule the update for after this
-                        // build completes via a microtask so we
-                        // don't mutate state during build.
-                        WidgetsBinding.instance.addPostFrameCallback(
-                          (_) {
-                            if (mounted) {
-                              setState(() => _bgIndex = next);
-                            }
-                          },
-                        );
-                      }
-                      return CustomPaint(
-                        painter: InvaderMarchPainter(
-                          tick: _backdropTick,
-                          seed: 1337,
-                          landingCount: _landingCount,
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+      // The painter draws the background color as its first layer
+      // (it animates between palette entries internally as the
+      // formation lands). This avoids any setState cross-talk
+      // between the painter and the parent widget.
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: Stack(
+        children: <Widget>[
+          // Full-screen Space Invaders march. The painter draws
+          // everything (background + invaders + scanlines + stars)
+          // so there's no painter -> widget communication at all.
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _backdropTicker,
+              builder: (BuildContext context, Widget? _) {
+                return CustomPaint(
+                  painter: InvaderMarchPainter(
+                    tick: _backdropTick,
+                    seed: 1337,
+                  ),
+                );
+              },
             ),
+          ),
             // Foreground: invitation message + sub-tagline on top,
             // leaderboard when in leaderboard phase.
             SafeArea(
@@ -296,7 +258,6 @@ class _WaitingScreenState extends State<WaitingScreen>
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -465,89 +426,78 @@ class _WaitingScreenState extends State<WaitingScreen>
   }
 }
 
-// Background palette: dim arcade tints, cycled every time the
-// invader formation lands on the bottom edge.
-const List<Color> _kBgPalette = <Color>[
-  Color(0xFF0A0A0A), // near-black
-  Color(0xFF0E0A1A), // deep purple
-  Color(0xFF0A1419), // deep teal
-  Color(0xFF150A0A), // deep maroon
-  Color(0xFF0A0F1A), // deep navy
-];
-
 // ===========================================================================
-// InvaderMarchPainter — full-screen Space Invaders march that sweeps
-// the entire viewport and triggers a soft background-color shift each
-// time the formation touches the bottom edge.
-//
-// The formation is 4 rows x 10 cols. Each row is a different colored
-// invader (green / cyan / magenta / amber). The formation marches
-// left/right across the screen, stepping down by one row each time it
-// hits an edge. After enough steps the formation has descended through
-// the whole playfield and the bottom row reaches the bottom of the
-// screen — at that point the painter fires [onFormationLanded] with
-// the next palette index and the screen's AnimatedContainer
-// crossfades to the new background color.
+// InvaderMarchPainter — full-screen Space Invaders march that draws
+// EVERYTHING (background + scanlines + stars + invaders) and
+// internally animates the background color when the formation
+// lands. Zero painter -> widget communication: the painter is a
+// pure render function, the parent just supplies a tick.
 //
 // The painter is the only place that knows the march state — the
 // parent widget just supplies a monotonically increasing [tick] and
-// gets a callback when a 'landing' event happens. No timers, no
-// AnimationController, no extra state in the parent.
+// never has to rebuild for color changes because the painter
+// animates them itself.
 // ===========================================================================
 
 class InvaderMarchPainter extends CustomPainter {
   InvaderMarchPainter({
     required this.tick,
     required this.seed,
-    required ValueNotifier<int> landingCount,
-  }) : _landingCount = landingCount;
+  });
 
   final int tick;
   final int seed;
 
-  /// The painter increments this counter every time the bottom
-  /// row of the formation touches the bottom edge of the
-  /// playfield. The parent widget reads it through a
-  /// [ValueListenableBuilder] and updates the background color
-  /// accordingly. This is the canonical Flutter pattern for
-  /// "non-widget object emits events to a widget" — listeners
-  /// fire on the microtask queue, outside the render frame,
-  /// so setState is legal from the listener.
-  ///
-  /// We type this as [ValueNotifier] (not [ValueListenable])
-  /// because the painter is the side that *writes* to it; the
-  /// parent only reads through the listenable interface.
-  final ValueNotifier<int> _landingCount;
-
   static const int _invaderCols = 10;
   static const int _invaderRows = 4;
-  // March + step animation tuned so one full screen traversal takes
-  // ~10 seconds. The formation steps down every half-period, and the
-  // bottom row reaches the bottom of the screen after
-  // _stepDownsPerTraversal steps.
   static const double _invaderColsSpacing = 70.0;
   static const double _invaderRowsSpacing = 58.0;
   static const double _invaderPixelSize = 3.0;
   static const double _invaderMarchPeriodFrames = 220.0;
 
-  // The formation has to step down _rowsPerTraversal * (rows-1) times
   // The formation descends _stepsBetweenHalfMarches rows every
-  // half-march. With 4 rows and 1 step per half-march, the bottom
-  // row reaches the bottom of the playfield in a few seconds of
-  // march + descent time. After that the formation respawns at the
-  // top (we use modulo arithmetic against the playfield height).
+  // half-march.
   static const int _stepsBetweenHalfMarches = 1;
 
   // Stars + scanlines — CRT backdrop behind the invaders.
   static const int _starCount = 60;
-  // Diego wanted the scanlines more visible / further apart.
   static const double _scanlineSpacing = 8.0;
   static const double _scanlineAlpha = 0.10;
 
+  /// Background-color crossfade duration in frames (~50ms each).
+  static const int _bgCrossfadeFrames = 60;
+
+  // Painter-local state. These are mutated by paint() which is
+  // technically called on the render thread, but in Flutter the
+  // render thread and the UI thread are the same for the canvas
+  // commands — the CustomPainter is a UI-thread object whose
+  // paint() runs on every frame from the engine. Mutating ints
+  // is safe (no widget rebuilds are scheduled) and avoids any
+  // cross-thread notification.
   int? _lastLandingTick;
+  int _bgColorIndex = 0;
+  int _bgCrossfadeStartTick = 0;
+  Color _currentBg = _kBgPalette[0];
+
+  /// Soft arcade-tint background palette. Cycled every time the
+  /// invader formation reaches the bottom edge.
+  static const List<Color> _kBgPalette = <Color>[
+    Color(0xFF0A0A0A), // near-black
+    Color(0xFF0E0A1A), // deep purple
+    Color(0xFF0A1419), // deep teal
+    Color(0xFF150A0A), // deep maroon
+    Color(0xFF0A0F1A), // deep navy
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 0) Background. Either the current palette entry (during the
+    //    crossfade) or a linear interpolation between two
+    //    adjacent palette entries.
+    final Color bg = _computeCurrentBg(tick);
+    final Paint bgPaint = Paint()..color = bg;
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
     // 1) Scanlines — CRT backdrop.
     final Paint scanPaint = Paint()
       ..color = const Color(0xFFFFFFFF).withValues(alpha: _scanlineAlpha)
@@ -568,41 +518,31 @@ class InvaderMarchPainter extends CustomPainter {
     final double horizontalTravel = size.width - formationW - 80;
     final double originX = 40 + arc * horizontalTravel;
 
-    // Number of half-marches (each edge bounce = 1 half-march).
     final int halfMarches = (tick ~/ (_invaderMarchPeriodFrames / 2)) % 100000;
-    // The formation descends _stepsBetweenHalfMarches rows every
-    // half-march. After enough half-marches the bottom row reaches
-    // the bottom of the playfield. The formation then 'respawns' by
-    // jumping the row offset back to 0 (we use modulo against the
-    // height of the playfield, measured in row-spacings).
-    final int playfieldHeightRows = (size.height / _invaderRowsSpacing).floor();
+    final int playfieldHeightRows =
+        (size.height / _invaderRowsSpacing).floor();
     final int totalRowOffset = halfMarches * _stepsBetweenHalfMarches;
-    // Modulo so the formation keeps cycling: 0 -> playfieldHeightRows-1.
     final int visibleRowOffset =
         totalRowOffset % (playfieldHeightRows + _invaderRows);
     final double descentOriginY =
         (size.height * 0.05) + visibleRowOffset * _invaderRowsSpacing;
-    // The formation has reached the bottom when the bottom row's
-    // Y exceeds the screen height minus one row spacing.
     final double bottomRowY = descentOriginY +
         (_invaderRows - 1) * _invaderRowsSpacing;
     final bool landed = bottomRowY > size.height - 80;
     if (landed && _lastLandingTick != tick) {
       _lastLandingTick = tick;
-      // Bumping a ValueNotifier inside paint() is legal — its
-      // listeners are scheduled on the microtask queue, not
-      // invoked synchronously, so no widget is marked dirty
-      // until the current frame is fully painted. The parent
-      // listens via ValueListenableBuilder and updates its
-      // background color index on the next build.
-      _landingCount.value = _landingCount.value + 1;
+      // Advance the palette index and start the crossfade.
+      // No setState, no ValueNotifier — the painter is
+      // responsible for its own visual state from this point on.
+      _bgColorIndex = (_bgColorIndex + 1) % _kBgPalette.length;
+      _bgCrossfadeStartTick = tick;
     }
 
     final double originY = landed
         ? size.height - 80 - (_invaderRows - 1) * _invaderRowsSpacing
         : descentOriginY;
 
-    // Per-row color and shape (different invader types per row).
+    // Per-row color and shape.
     const List<Color> rowColors = <Color>[
       Color(0xFF00FF66), // green
       Color(0xFF00E5FF), // cyan
@@ -649,6 +589,30 @@ class InvaderMarchPainter extends CustomPainter {
         _drawSprite(canvas, pixel, xBase, yBase, shape, legFrame);
       }
     }
+  }
+
+  /// Linear interpolation between the previous palette entry and
+  /// the new one, over [_bgCrossfadeFrames] frames after a landing.
+  /// Falls back to the current entry once the crossfade is done.
+  Color _computeCurrentBg(int currentTick) {
+    if (_bgCrossfadeStartTick == 0) {
+      // First paint ever, no crossfade pending.
+      _currentBg = _kBgPalette[_bgColorIndex];
+      return _currentBg;
+    }
+    final int elapsed = currentTick - _bgCrossfadeStartTick;
+    if (elapsed >= _bgCrossfadeFrames) {
+      _currentBg = _kBgPalette[_bgColorIndex];
+      return _currentBg;
+    }
+    final int fromIndex = (_bgColorIndex - 1 + _kBgPalette.length) %
+        _kBgPalette.length;
+    final Color from = _kBgPalette[fromIndex];
+    final Color to = _kBgPalette[_bgColorIndex];
+    final double t = (elapsed / _bgCrossfadeFrames).clamp(0.0, 1.0);
+    final Color lerped = Color.lerp(from, to, t) ?? to;
+    _currentBg = lerped;
+    return lerped;
   }
 
   void _drawSprite(Canvas canvas, Paint paint, double xBase, double yBase,
