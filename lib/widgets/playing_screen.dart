@@ -243,14 +243,21 @@ class _PlayingScreenState extends State<PlayingScreen>
           // appear already at 00.000.00 and start counting up.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Center(
+            // SizedBox.expand + FittedBox(BoxFit.contain) so the
+            // whole row grows to fill the available space and
+            // only shrinks on overflow. scaleDown was NOT
+            // shrinking the row in practice because the inner
+            // Text widgets used letterSpacing/Transform that
+            // reported a measured width that exceeded the
+            // viewport without triggering the scale path.
+            child: SizedBox.expand(
               child: FittedBox(
-                fit: BoxFit.scaleDown,
+                fit: BoxFit.contain,
                 alignment: Alignment.center,
                 child: Opacity(
                   opacity: _countdownValue == null ? 1.0 : 0.0,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize: MainAxisSize.max,
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: <Widget>[
