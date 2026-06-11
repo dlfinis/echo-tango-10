@@ -30,6 +30,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../utils/constants.dart';
+import 'invader_sprite.dart';
 
 enum _Verdict { victory, casi, niPorAsomo, tePasaste }
 
@@ -208,78 +209,76 @@ class _ResultScreenState extends State<ResultScreen>
     }
   }
 
-  String get _emoji {
+  /// Map the internal verdict to the public [InvaderExpression] enum
+  InvaderExpression get _expression {
     switch (_verdict) {
       case _Verdict.victory:
-        return '😀';
+        return InvaderExpression.victoria;
       case _Verdict.casi:
-        return '😐';
+        return InvaderExpression.casi;
       case _Verdict.niPorAsomo:
-        return '😢';
+        return InvaderExpression.niPorAsomo;
       case _Verdict.tePasaste:
-        return '🤦';
+        return InvaderExpression.tePasaste;
     }
   }
 
+  /// Body / cavity colour pair fed to the painter. We use the
+  /// per-verdict accent colour for the body and the screen
+  /// background tint for the cavity so the eyes / mouth read as
+  /// "carved out" of the sprite.
+  List<Color> get _spriteColors {
+    final Color body = _verdictColor;
+    final Color cavity = _verdictBg;
+    return <Color>[body, cavity];
+  }
+
+  /// Replaces the old emoji widget. The animation controllers
+  /// (spin / drop / teShake) are still owned by the parent — they
+  /// just feed `t` into the painter instead of driving a Transform.
   Widget _buildEmoji() {
-    final Widget emoji = FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.center,
-      child: Text(
-        _emoji,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 120,
-          fontFamily: 'AppleColorEmoji',
-          fontFamilyFallback: <String>['NotoColorEmoji', 'Segoe UI Emoji'],
-        ),
+    // 128 logical px tall sprite; the painter scales the 11x8 grid
+    // to fit via pixelSize = 128/8 = 16. Width is 11*16 = 176.
+    const double height = 128.0;
+    const double pixelSize = height / 8.0;
+
+    return SizedBox(
+      height: height,
+      width: 11.0 * pixelSize,
+      child: AnimatedBuilder(
+        animation: Listenable.merge(<Listenable>[
+          _spinController ?? const AlwaysStoppedAnimation<double>(0.0),
+          _dropController ?? const AlwaysStoppedAnimation<double>(0.0),
+          _teShakeController ?? const AlwaysStoppedAnimation<double>(0.0),
+        ]),
+        builder: (BuildContext context, Widget? _) {
+          final double t;
+          final List<Color> colors = _spriteColors;
+          switch (_verdict) {
+            case _Verdict.victory:
+              t = Curves.easeInOut.transform(_spinController!.value);
+              break;
+            case _Verdict.casi:
+              t = 0.0; // static
+              break;
+            case _Verdict.niPorAsomo:
+              t = Curves.easeIn.transform(_dropController!.value);
+              break;
+            case _Verdict.tePasaste:
+              t = Curves.easeIn.transform(_teShakeController!.value);
+              break;
+          }
+          return CustomPaint(
+            painter: InvaderSpritePainter(
+              expression: _expression,
+              pixelSize: pixelSize,
+              t: t,
+              colors: colors,
+            ),
+          );
+        },
       ),
     );
-
-    switch (_verdict) {
-      case _Verdict.victory:
-        return AnimatedBuilder(
-          animation: _spinController!,
-          builder: (BuildContext context, Widget? child) {
-            final double t = _spinController!.value;
-            return Transform.rotate(
-              angle: t * 2 * math.pi,
-              child: child,
-            );
-          },
-          child: emoji,
-        );
-
-      case _Verdict.casi:
-        return emoji;
-
-      case _Verdict.niPorAsomo:
-        return AnimatedBuilder(
-          animation: _dropController!,
-          builder: (BuildContext context, Widget? child) {
-            final double t = Curves.easeIn.transform(_dropController!.value);
-            return Transform.translate(
-              offset: Offset(0, -80 * (1 - t)),
-              child: child,
-            );
-          },
-          child: emoji,
-        );
-
-      case _Verdict.tePasaste:
-        return AnimatedBuilder(
-          animation: _teShakeController!,
-          builder: (BuildContext context, Widget? child) {
-            final double t = _teShakeController!.value;
-            final double decay = 1 - t;
-            return Transform.translate(
-              offset: Offset(math.sin(t * 2 * math.pi * 12) * 8 * decay, 0),
-              child: child,
-            );
-          },
-          child: emoji,
-        );
-    }
   }
 
   /// Background color tinted by the verdict. The first ~50ms of

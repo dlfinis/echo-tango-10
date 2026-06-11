@@ -18,6 +18,7 @@ import 'package:arcade_timer_10s/utils/constants.dart';
 import 'package:arcade_timer_10s/widgets/result_screen.dart';
 import 'package:arcade_timer_10s/widgets/admin_screen.dart';
 import 'package:arcade_timer_10s/widgets/confetti_painter.dart';
+import 'package:arcade_timer_10s/widgets/invader_sprite.dart';
 import 'package:arcade_timer_10s/widgets/waiting_screen.dart';
 import 'package:arcade_timer_10s/widgets/winner_name_screen.dart';
 import 'package:flutter/material.dart';
@@ -472,42 +473,114 @@ void main() {
       expect(taps, 1, reason: 'should have auto-returned exactly once');
     });
 
-    testWidgets('VICTORIA branch renders a 😀 emoji', (WidgetTester tester) async {
+    testWidgets('VICTORIA branch renders an InvaderSpritePainter',
+        (WidgetTester tester) async {
       await pumpResult(
         tester,
         elapsed: 10.0005,
         viewport: const Size(1280, 720),
       );
-      expect(find.text('😀'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('CASI branch renders a 😐 emoji', (WidgetTester tester) async {
+    testWidgets('CASI branch renders an InvaderSpritePainter',
+        (WidgetTester tester) async {
       await pumpResult(
         tester,
         elapsed: 10.005,
         viewport: const Size(1280, 720),
       );
-      expect(find.text('😐'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('NI POR ASOMO branch renders a 😢 emoji',
+    testWidgets('NI POR ASOMO branch renders an InvaderSpritePainter',
         (WidgetTester tester) async {
       await pumpResult(
         tester,
         elapsed: 8.5,
         viewport: const Size(1280, 720),
       );
-      expect(find.text('😢'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('TE PASASTE branch renders a 🤦 emoji',
+    testWidgets('TE PASASTE branch renders an InvaderSpritePainter',
         (WidgetTester tester) async {
       await pumpResult(
         tester,
         elapsed: 11.0,
         viewport: const Size(1280, 720),
       );
-      expect(find.text('🤦'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('InvaderSpritePainter', () {
+    test('shouldRepaint is true when t changes', () {
+      final InvaderSpritePainter a = InvaderSpritePainter(
+        expression: InvaderExpression.victoria,
+        pixelSize: 8.0,
+        t: 0.0,
+        colors: const <Color>[Color(0xFF00FF66), Color(0xFF000000)],
+      );
+      final InvaderSpritePainter b = InvaderSpritePainter(
+        expression: InvaderExpression.victoria,
+        pixelSize: 8.0,
+        t: 0.5,
+        colors: const <Color>[Color(0xFF00FF66), Color(0xFF000000)],
+      );
+      expect(a.shouldRepaint(b), isTrue);
+    });
+
+    test('shouldRepaint is true when expression changes', () {
+      final InvaderSpritePainter a = InvaderSpritePainter(
+        expression: InvaderExpression.casi,
+        pixelSize: 8.0,
+        t: 0.0,
+        colors: const <Color>[Color(0xFFFFC107), Color(0xFF000000)],
+      );
+      final InvaderSpritePainter b = InvaderSpritePainter(
+        expression: InvaderExpression.victoria,
+        pixelSize: 8.0,
+        t: 0.0,
+        colors: const <Color>[Color(0xFF00FF66), Color(0xFF000000)],
+      );
+      expect(a.shouldRepaint(b), isTrue);
+    });
+
+    test('shouldRepaint is true when pixelSize changes', () {
+      final InvaderSpritePainter a = InvaderSpritePainter(
+        expression: InvaderExpression.casi,
+        pixelSize: 8.0,
+        t: 0.0,
+        colors: const <Color>[Color(0xFFFFC107), Color(0xFF000000)],
+      );
+      final InvaderSpritePainter b = InvaderSpritePainter(
+        expression: InvaderExpression.casi,
+        pixelSize: 12.0,
+        t: 0.0,
+        colors: const <Color>[Color(0xFFFFC107), Color(0xFF000000)],
+      );
+      expect(a.shouldRepaint(b), isTrue);
     });
   });
 }
