@@ -317,8 +317,8 @@ class _ResultScreenState extends State<ResultScreen>
                               ],
                             ),
                           ),
-                          Transform.translate(
-                            offset: const Offset(0, 30),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 30),
                             child: Text(
                               '.$_millisLabel',
                               style: TextStyle(
@@ -336,8 +336,8 @@ class _ResultScreenState extends State<ResultScreen>
                               ),
                             ),
                           ),
-                          Transform.translate(
-                            offset: const Offset(0, 50),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 50),
                             child: Text(
                               '.$_centimicrosLabel',
                               style: TextStyle(

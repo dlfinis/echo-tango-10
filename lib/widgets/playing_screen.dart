@@ -96,6 +96,13 @@ class _PlayingScreenState extends State<PlayingScreen>
           t.cancel();
           _goFlashController.forward(from: 0.5);
           widget.controller.reset();
+          // Start the visible stopwatch. When kShowCountdown is
+          // true this runs at GO!. When false, _countdownValue
+          // is already null on entry, so the timer callback
+          // lands here immediately and starts the clock.
+          _visibleStopwatch
+            ..reset()
+            ..start();
         }
       });
     });
@@ -235,8 +242,8 @@ class _PlayingScreenState extends State<PlayingScreen>
                           ],
                         ),
                       ),
-                      Transform.translate(
-                        offset: const Offset(0, 36),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 36),
                         child: Text(
                           '.$_millis',
                           style: TextStyle(
@@ -254,8 +261,8 @@ class _PlayingScreenState extends State<PlayingScreen>
                           ),
                         ),
                       ),
-                      Transform.translate(
-                        offset: const Offset(0, 64),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 64),
                         child: Text(
                           '.$_centimicros',
                           style: TextStyle(
