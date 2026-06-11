@@ -58,15 +58,15 @@ class _PlayingScreenState extends State<PlayingScreen> {
   /// deliberate: a "PREPARATE" while the player is at 9.7s
   /// would be confusing; an "APURATE" at 3.0s would be premature.
   static const List<String> _preparationMessages = <String>[
-    'PREPARATE',
+    'PREPARATÉ',
     'YA VIENE',
     'PODRÁS',
-    'FOCO',
-    'CONCENTRATE',
+    'ENFOQUE',
+    'CONCENTRACIÓN',
   ];
   static const List<String> _urgencyMessages = <String>[
     '¡YA!',
-    '¡APURATE!',
+    '¡APURATÉ!',
     '¡PRESIONA!',
     '¡AHORA!',
     '¡DALE YA!',
