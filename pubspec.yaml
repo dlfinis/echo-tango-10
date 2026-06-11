@@ -22,22 +22,19 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # 7-segment LCD fonts (DSEG family, https://www.keshikan.net/fonts-e.html,
-  # SIL Open Font License 1.1). Used for the chronograph digits on
-  # the playing/result/waiting screens.
   fonts:
     - family: DSEG7Classic-Bold
       fonts:
-        - asset: fonts/DSEG7-Classic/DSEG7Classic-Bold.ttf
+        - asset: assets/fonts/DSEG7Classic-Bold.ttf
     - family: DSEG7Classic-Light
       fonts:
-        - asset: fonts/DSEG7-Classic/DSEG7Classic-Light.ttf
+        - asset: assets/fonts/DSEG7Classic-Light.ttf
     - family: DSEG7Modern-Bold
       fonts:
-        - asset: fonts/DSEG7-Modern/DSEG7Modern-Bold.ttf
+        - asset: assets/fonts/DSEG7Modern-Bold.ttf
     - family: DSEG7Modern-Regular
       fonts:
-        - asset: fonts/DSEG7-Modern/DSEG7Modern-Regular.ttf
+        - asset: assets/fonts/DSEG7Modern-Regular.ttf
     - family: BungeeInline
       fonts:
         - asset: assets/fonts/BungeeInline-Regular.ttf
