@@ -109,6 +109,12 @@ const bool kShowCountdown = false;
 // PLAYING screen visual rhythm
 // ---------------------------------------------------------------------------
 
+/// Elapsed seconds at which the cheer-message tone flips from
+/// "preparation" (calm, encouraging) to "urgency" (push, press now).
+/// The switch happens at 8.9s — well before the 10s target so
+/// the player has ~1.1s of urgency messaging to react.
+const double kCheerPhaseSwitchSeconds = 8.9;
+
 /// How often the playing-screen timer color cycles through the palette.
 const Duration kPlayingColorShiftInterval = Duration(seconds: 3);
 

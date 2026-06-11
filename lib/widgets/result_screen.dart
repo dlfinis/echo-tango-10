@@ -146,8 +146,7 @@ class _ResultScreenState extends State<ResultScreen>
   String get _deltaText {
     final d = _delta;
     final String sign = d >= 0 ? '+' : '-';
-    final double absMs = d.abs() * 1000;
-    return '$sign${absMs.toStringAsFixed(2)}ms';
+    return '$sign${d.abs().toStringAsFixed(4)}';
   }
 
   String get _verdictLabel {

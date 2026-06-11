@@ -51,14 +51,25 @@ class _PlayingScreenState extends State<PlayingScreen> {
   bool _nearMissFlashed = false;
   int? _countdownValue;
 
-  static const List<String> _cheerMessages = <String>[
-    '¡DALE!',
-    '¡APURATE!',
-    '¡CASI CASI!',
+  /// Cheer / taunt messages shown below the chronograph. Two sets:
+  /// [preparation] runs while the chronograph is still far from 10
+  /// (calm, encouraging), [urgency] runs once we cross
+  /// [kCheerPhaseSwitchSeconds] (push, press now). The split is
+  /// deliberate: a "PREPARATE" while the player is at 9.7s
+  /// would be confusing; an "APURATE" at 3.0s would be premature.
+  static const List<String> _preparationMessages = <String>[
+    'PREPARATE',
+    'YA VIENE',
+    'PODRÁS',
+    'FOCO',
+    'CONCENTRATE',
+  ];
+  static const List<String> _urgencyMessages = <String>[
     '¡YA!',
-    '¡APRIETA!',
-    '¡NO PIERDAS!',
-    '¡TUS 10!',
+    '¡APURATE!',
+    '¡PRESIONA!',
+    '¡AHORA!',
+    '¡DALE YA!',
   ];
 
   @override
@@ -111,7 +122,17 @@ class _PlayingScreenState extends State<PlayingScreen> {
     });
     _cheerTimer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
       if (!mounted) return;
-      setState(() => _cheerIndex = (_cheerIndex + 1) % _cheerMessages.length);
+      // Cycle within the currently-active list. If the list
+      // has 0 items (shouldn't happen — both have 5) we'd
+      // hit modulo-by-zero, so guard explicitly.
+      setState(() {
+        final bool urgency =
+            widget.controller.elapsed.inSeconds >= kCheerPhaseSwitchSeconds;
+        final List<String> list =
+            urgency ? _urgencyMessages : _preparationMessages;
+        if (list.isEmpty) return;
+        _cheerIndex = (_cheerIndex + 1) % list.length;
+      });
     });
   }
 
@@ -170,13 +191,25 @@ class _PlayingScreenState extends State<PlayingScreen> {
     final Color baseColor = Color(kPlayingColorPaletteHex[_colorIndex]);
     final Color digitColor =
         _nearMissActive ? const Color(kDefaultAccentColorHex) : baseColor;
-    final String cheer = _cheerMessages[_cheerIndex];
+    // Pick the right list based on the visible elapsed time.
+    // Clamp the index so a leftover index from the other list
+    // can't cause an out-of-bounds crash.
+    final bool urgency =
+        _rendered.inSeconds >= kCheerPhaseSwitchSeconds;
+    final List<String> activeList =
+        urgency ? _urgencyMessages : _preparationMessages;
+    final String cheer = activeList.isEmpty
+        ? ''
+        : activeList[_cheerIndex % activeList.length];
 
     return Scaffold(
       backgroundColor: const Color(kPlayingBackgroundColorHex),
       body: Stack(
         children: <Widget>[
-          // Cheer message — small, dim, bottom-right.
+          // Cheer message — bigger and more visible than before
+          // because the user said the dim 48sp version "didn't
+          // have much sense". During the urgency phase the
+          // color is the accent (green) so it really pops.
           Positioned(
             right: 32,
             bottom: 32,
@@ -187,10 +220,12 @@ class _PlayingScreenState extends State<PlayingScreen> {
                   cheer,
                   key: ValueKey<String>(cheer),
                   style: TextStyle(
-                    color: baseColor.withValues(alpha: 0.35),
-                    fontSize: 48,
+                    color: urgency
+                        ? const Color(kDefaultAccentColorHex)
+                        : baseColor.withValues(alpha: 0.55),
+                    fontSize: 72,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    letterSpacing: 4,
                     fontFamily: 'BungeeInline',
                     fontFamilyFallback: const <String>['Bungee'],
                   ),
