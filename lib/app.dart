@@ -22,6 +22,7 @@ import 'services/input_service.dart';
 import 'services/keyboard_input.dart';
 import 'services/leaderboard.dart';
 import 'services/web_serial.dart' as web_serial;
+import 'models/leaderboard_entry.dart';
 import 'state/app_state.dart';
 import 'state/stopwatch_controller.dart';
 import 'utils/constants.dart';
@@ -106,9 +107,15 @@ class _AppRootState extends State<AppRoot> {
         // Asymmetric victory rule (per Diego): win if you hit 10.000s
         // exactly OR overshot by at most 10ms. Coming in short always
         // counts as a miss — the game punishes hesitation, not slop.
-        final bool isVictory = _lastElapsedSeconds >= kTargetSeconds &&
+        final bool rawVictory = _lastElapsedSeconds >= kTargetSeconds &&
             _lastElapsedSeconds <=
                 kTargetSeconds + kVictoryOvershootSeconds;
+        // The leaderboard gate: a VICTORIA only advances to
+        // WINNER_NAME if the score would crack the top 10. If the
+        // leaderboard is full and this score is worse than the
+        // worst top-10 entry, the player is shown a single RESULT
+        // screen and returned to WAITING.
+        final bool isVictory = rawVictory && _qualifiesForTop10(_lastElapsedSeconds);
         nextState = next(_state, TimerEvent.pulse, isVictory: isVictory);
         break;
 
@@ -122,6 +129,22 @@ class _AppRootState extends State<AppRoot> {
 
     if (!mounted) return;
     setState(() => _state = nextState);
+  }
+
+  /// Returns true if [elapsedSeconds] would land in the top 10 of the
+  /// persisted leaderboard. Empty / short leaderboards always qualify;
+  /// a full top-10 only accepts scores better (lower |delta|) than the
+  /// 10th-best entry. When the leaderboard is not yet loaded (e.g. a
+  /// pulse arriving in the first frame), returns false — i.e. the
+  /// player gets a regular RESULT→WAITING cycle, never a missing
+  /// name-entry screen.
+  bool _qualifiesForTop10(double elapsedSeconds) {
+    final Leaderboard? lb = _leaderboard;
+    if (lb == null) return false;
+    final List<LeaderboardEntry> top = lb.top(10);
+    if (top.length < 10) return true;
+    final double newDeltaAbs = (elapsedSeconds - kTargetSeconds).abs();
+    return newDeltaAbs < top.last.deltaAbs;
   }
 
   void _handlePlayingTimeout() {
@@ -228,6 +251,7 @@ class _AppRootState extends State<AppRoot> {
       case AppState.result:
         return ResultScreen(
           elapsedSeconds: _lastElapsedSeconds,
+          resultTimeoutSeconds: _configStore!.resultAutoReturnSeconds(),
           onNext: _handlePulse,
         );
 

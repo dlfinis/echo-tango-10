@@ -14,6 +14,8 @@
 ///   * call [onAccept] to return to WAITING
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -52,11 +54,13 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
     with TickerProviderStateMixin {
   static const String _defaultName = 'ANONIMO';
   static const int _maxNameLength = 16;
+  static const Duration _autoSkipTimeout = Duration(seconds: 15);
 
   final TextEditingController _nameController = TextEditingController();
   final FocusNode _nameFocus = FocusNode();
   late final AnimationController _confettiController;
   late final AnimationController _flashController;
+  Timer? _autoSkipTimer;
 
   @override
   void initState() {
@@ -76,10 +80,19 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _nameFocus.requestFocus();
     });
+
+    // 15s auto-skip: if the user does not press ACEPTAR or SALTAR
+    // within the window, treat it as Saltar (return to WAITING
+    // without saving). Cancelled by Aceptar/Saltar or dispose.
+    _autoSkipTimer = Timer(_autoSkipTimeout, () {
+      if (!mounted) return;
+      widget.onAccept();
+    });
   }
 
   @override
   void dispose() {
+    _autoSkipTimer?.cancel();
     _confettiController.dispose();
     _flashController.dispose();
     _nameController.dispose();
@@ -97,6 +110,7 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
   }
 
   Future<void> _handleAccept() async {
+    _autoSkipTimer?.cancel();
     final String name = _resolveName();
     final double delta = widget.elapsedSeconds - kTargetSeconds;
     final LeaderboardEntry entry = LeaderboardEntry(
@@ -106,6 +120,12 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
       delta: delta,
     );
     await widget.leaderboard.add(entry);
+    if (!mounted) return;
+    widget.onAccept();
+  }
+
+  void _handleSkip() {
+    _autoSkipTimer?.cancel();
     if (!mounted) return;
     widget.onAccept();
   }
@@ -186,6 +206,19 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
+                    const Text(
+                      '😀',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 96,
+                        fontFamily: 'AppleColorEmoji',
+                        fontFamilyFallback: <String>[
+                          'NotoColorEmoji',
+                          'Segoe UI Emoji',
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       widget.isEasterEgg ? '¡EXACTO!' : 'VICTORIA',
                       textAlign: TextAlign.center,
@@ -204,7 +237,18 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                             : null,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '¡INGRESÁ TU NOMBRE!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(kDefaultTextColorHex),
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       _formattedRaw(),
                       style: const TextStyle(
@@ -271,23 +315,49 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _handleAccept,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(kDefaultAccentColorHex),
-                        foregroundColor:
-                            const Color(kDefaultBgColorHex),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 48,
-                          vertical: 16,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        ElevatedButton(
+                          onPressed: _handleAccept,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color(kDefaultAccentColorHex),
+                            foregroundColor:
+                                const Color(kDefaultBgColorHex),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          child: const Text('Aceptar'),
                         ),
-                        textStyle: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
+                        const SizedBox(width: 16),
+                        OutlinedButton(
+                          onPressed: _handleSkip,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor:
+                                const Color(kDefaultTextColorHex),
+                            side: const BorderSide(
+                              color: Color(kDefaultTextColorHex),
+                              width: 2,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          child: const Text('SALTAR'),
                         ),
-                      ),
-                      child: const Text('Aceptar'),
+                      ],
                     ),
                   ],
                 ),

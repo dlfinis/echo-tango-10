@@ -199,6 +199,53 @@ void main() {
       // The autofocus request is scheduled via addPostFrameCallback —
       // we just verify the wiring is in place.
     });
+
+    testWidgets('SALTAR button is rendered and skips without saving',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      bool accepted = false;
+      await tester.pumpWidget(_wrap(WinnerNameScreen(
+        elapsedSeconds: 10.0,
+        leaderboard: pair.lb,
+        onAccept: () => accepted = true,
+      )));
+      await tester.pump();
+      expect(find.text('SALTAR'), findsOneWidget);
+      await tester.tap(find.text('SALTAR'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(accepted, isTrue);
+      expect(pair.lb.length, 0, reason: 'skip must not write an entry');
+    });
+
+    testWidgets('auto-skips to onAccept after the 15s timeout',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      bool accepted = false;
+      await tester.pumpWidget(_wrap(WinnerNameScreen(
+        elapsedSeconds: 10.0,
+        leaderboard: pair.lb,
+        onAccept: () => accepted = true,
+      )));
+      await tester.pump();
+      // 14s — within the 15s window, should not have fired.
+      await tester.pump(const Duration(seconds: 14));
+      expect(accepted, isFalse);
+      // Cross the 15s boundary.
+      await tester.pump(const Duration(seconds: 2));
+      expect(accepted, isTrue);
+      expect(pair.lb.length, 0, reason: 'auto-skip must not save');
+    });
   });
 
   group('AdminScreen', () {
@@ -423,6 +470,44 @@ void main() {
       // Advance past the timeout — should have fired once.
       await tester.pump(const Duration(seconds: 2));
       expect(taps, 1, reason: 'should have auto-returned exactly once');
+    });
+
+    testWidgets('VICTORIA branch renders a 😀 emoji', (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 10.0005,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('😀'), findsOneWidget);
+    });
+
+    testWidgets('CASI branch renders a 😐 emoji', (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 10.005,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('😐'), findsOneWidget);
+    });
+
+    testWidgets('NI POR ASOMO branch renders a 😢 emoji',
+        (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 8.5,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('😢'), findsOneWidget);
+    });
+
+    testWidgets('TE PASASTE branch renders a 🤦 emoji',
+        (WidgetTester tester) async {
+      await pumpResult(
+        tester,
+        elapsed: 11.0,
+        viewport: const Size(1280, 720),
+      );
+      expect(find.text('🤦'), findsOneWidget);
     });
   });
 }

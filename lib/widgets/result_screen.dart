@@ -62,6 +62,9 @@ class _ResultScreenState extends State<ResultScreen>
   late final AnimationController _scrollController;
   late final Animation<double> _scrollAnim;
   late final _Verdict _verdict;
+  AnimationController? _spinController;
+  AnimationController? _dropController;
+  AnimationController? _teShakeController;
 
   _Verdict _classifyVerdict(double elapsed) {
     if (elapsed < kFarShortThresholdSeconds) return _Verdict.niPorAsomo;
@@ -116,6 +119,28 @@ class _ResultScreenState extends State<ResultScreen>
       _scrollController.forward();
     }
 
+    // Per-verdict emoji animation controllers. CASI has no controller
+    // (the emoji renders static, centered).
+    if (_verdict == _Verdict.victory) {
+      _spinController = AnimationController(
+        vsync: this,
+        duration: const Duration(seconds: 4),
+      )..repeat(reverse: true);
+    } else if (_verdict == _Verdict.niPorAsomo) {
+      _dropController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 600),
+      );
+      CurvedAnimation(parent: _dropController!, curve: Curves.easeIn)
+          .addListener(() {});
+      _dropController!.forward();
+    } else if (_verdict == _Verdict.tePasaste) {
+      _teShakeController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 800),
+      )..forward();
+    }
+
     // Auto-return to WAITING after the configured timeout. Tap
     // on the screen calls onNext immediately, which cancels
     // the timer in dispose.
@@ -133,6 +158,9 @@ class _ResultScreenState extends State<ResultScreen>
     _glitchController.dispose();
     _shakeController.dispose();
     _scrollController.dispose();
+    _spinController?.dispose();
+    _dropController?.dispose();
+    _teShakeController?.dispose();
     super.dispose();
   }
 
@@ -177,6 +205,80 @@ class _ResultScreenState extends State<ResultScreen>
         return '¡NI POR ASOMO!';
       case _Verdict.tePasaste:
         return '¡TE PASASTE!';
+    }
+  }
+
+  String get _emoji {
+    switch (_verdict) {
+      case _Verdict.victory:
+        return '😀';
+      case _Verdict.casi:
+        return '😐';
+      case _Verdict.niPorAsomo:
+        return '😢';
+      case _Verdict.tePasaste:
+        return '🤦';
+    }
+  }
+
+  Widget _buildEmoji() {
+    final Widget emoji = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.center,
+      child: Text(
+        _emoji,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 120,
+          fontFamily: 'AppleColorEmoji',
+          fontFamilyFallback: <String>['NotoColorEmoji', 'Segoe UI Emoji'],
+        ),
+      ),
+    );
+
+    switch (_verdict) {
+      case _Verdict.victory:
+        return AnimatedBuilder(
+          animation: _spinController!,
+          builder: (BuildContext context, Widget? child) {
+            final double t = _spinController!.value;
+            return Transform.rotate(
+              angle: t * 2 * math.pi,
+              child: child,
+            );
+          },
+          child: emoji,
+        );
+
+      case _Verdict.casi:
+        return emoji;
+
+      case _Verdict.niPorAsomo:
+        return AnimatedBuilder(
+          animation: _dropController!,
+          builder: (BuildContext context, Widget? child) {
+            final double t = Curves.easeIn.transform(_dropController!.value);
+            return Transform.translate(
+              offset: Offset(0, -80 * (1 - t)),
+              child: child,
+            );
+          },
+          child: emoji,
+        );
+
+      case _Verdict.tePasaste:
+        return AnimatedBuilder(
+          animation: _teShakeController!,
+          builder: (BuildContext context, Widget? child) {
+            final double t = _teShakeController!.value;
+            final double decay = 1 - t;
+            return Transform.translate(
+              offset: Offset(math.sin(t * 2 * math.pi * 12) * 8 * decay, 0),
+              child: child,
+            );
+          },
+          child: emoji,
+        );
     }
   }
 
@@ -378,6 +480,8 @@ class _ResultScreenState extends State<ResultScreen>
                 ),
               ),
               const SizedBox(height: 16),
+              _buildEmoji(),
+              const SizedBox(height: 8),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.center,
