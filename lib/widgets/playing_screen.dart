@@ -209,20 +209,19 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
           ),
-          // Main chronograph. SizedBox.expand + FittedBox(BoxFit.contain)
-          // so the row scales to fill the viewport and only shrinks on
-          // overflow. Hidden during the fake countdown (Opacity 0)
-          // when kShowCountdown is true.
+          // Main chronograph — TWO text widgets in a simple Row
+          // (no Transforms, no Paddings, no multi-font-size
+          // wizardry). The FittedBox scales the whole Row to
+          // fit the viewport. Hidden during countdown via Opacity.
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: SizedBox.expand(
+            padding: const EdgeInsets.all(24),
+            child: Center(
               child: FittedBox(
-                fit: BoxFit.contain,
-                alignment: Alignment.center,
+                fit: BoxFit.scaleDown,
                 child: Opacity(
                   opacity: _countdownValue == null ? 1.0 : 0.0,
                   child: Row(
-                    mainAxisSize: MainAxisSize.max,
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: <Widget>[
@@ -233,51 +232,25 @@ class _PlayingScreenState extends State<PlayingScreen>
                           fontSize: 880,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
-                          letterSpacing: -28,
                           fontFamily: 'DSEG7Modern-Regular',
                           fontFamilyFallback: const <String>[
                             'DSEG7Modern-Bold',
-                            'DSEG7Classic-Bold',
                             'monospace',
                           ],
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 36),
-                        child: Text(
-                          '.$_millis',
-                          style: TextStyle(
-                            color: digitColor,
-                            fontSize: 420,
-                            fontWeight: FontWeight.w900,
-                            height: 1.0,
-                            letterSpacing: -12,
-                            fontFamily: 'DSEG7Modern-Regular',
-                            fontFamilyFallback: const <String>[
-                              'DSEG7Modern-Bold',
-                              'DSEG7Classic-Bold',
-                              'monospace',
-                            ],
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 64),
-                        child: Text(
-                          '.$_centimicros',
-                          style: TextStyle(
-                            color: digitColor,
-                            fontSize: 240,
-                            fontWeight: FontWeight.w900,
-                            height: 1.0,
-                            letterSpacing: -6,
-                            fontFamily: 'DSEG7Modern-Regular',
-                            fontFamilyFallback: const <String>[
-                              'DSEG7Modern-Bold',
-                              'DSEG7Classic-Bold',
-                              'monospace',
-                            ],
-                          ),
+                      Text(
+                        '.$_millis$_centimicros',
+                        style: TextStyle(
+                          color: digitColor,
+                          fontSize: 320,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          fontFamily: 'DSEG7Modern-Regular',
+                          fontFamilyFallback: const <String>[
+                            'DSEG7Modern-Bold',
+                            'monospace',
+                          ],
                         ),
                       ),
                     ],
