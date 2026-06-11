@@ -201,7 +201,10 @@ class InvaderSpritePainter extends CustomPainter {
     // Parent: AnimationController(duration: 4s, repeat(reverse: true))
     // → t goes 0→1→0→1... over 8s. We use the *unsigned* phase
     // (always 0..1) to pick a frame.
-    final double frame = (tClamped * 12.0) % 2.0; // 12 frame switches across one sweep
+    // 2-frame dance loop at 6 Hz: with the parent controller at
+    // 1s repeat (t goes 0→1 in 1s), t*6 goes 0→6 over 1s, % 2
+    // gives 6 swaps/sec.
+    final double frame = (tClamped * 6.0) % 2.0;
     final int frameIndex = frame < 1.0 ? 0 : 1;
     final List<List<int>> grid =
         frameIndex == 0 ? _victoriaFrame0 : _victoriaFrame1;

@@ -123,10 +123,14 @@ class _ResultScreenState extends State<ResultScreen>
     // Per-verdict emoji animation controllers. CASI has no controller
     // (the emoji renders static, centered).
     if (_verdict == _Verdict.victory) {
+      // 1s repeat (NOT reverse): the painter derives a 3 Hz bounce
+      // and a 4 Hz rotation from the linear 0→1 t. A 4s
+      // repeat-reverse would make those 0.75 Hz and 1 Hz — too
+      // slow to read as motion.
       _spinController = AnimationController(
         vsync: this,
-        duration: const Duration(seconds: 4),
-      )..repeat(reverse: true);
+        duration: const Duration(seconds: 1),
+      )..repeat();
     } else if (_verdict == _Verdict.niPorAsomo) {
       _dropController = AnimationController(
         vsync: this,
@@ -256,7 +260,10 @@ class _ResultScreenState extends State<ResultScreen>
           final List<Color> colors = _spriteColors;
           switch (_verdict) {
             case _Verdict.victory:
-              t = Curves.easeInOut.transform(_spinController!.value);
+              // Linear t — the bounce/rotation are sin waves so
+              // they read as constant motion; an easeInOut curve
+              // would make the speed non-uniform and feel stuttery.
+              t = _spinController!.value;
               break;
             case _Verdict.casi:
               t = 0.0; // static
