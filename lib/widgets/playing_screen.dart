@@ -94,7 +94,7 @@ class _PlayingScreenState extends State<PlayingScreen>
         } else {
           _countdownValue = null;
           t.cancel();
-          _goFlashController.forward(from: 0.5);
+          _goFlashController.reverse(from: 0.5);
           widget.controller.reset();
           // Start the visible stopwatch. When kShowCountdown is
           // true this runs at GO!. When false, _countdownValue
@@ -161,11 +161,15 @@ class _PlayingScreenState extends State<PlayingScreen>
     return (microInsideSecond ~/ 1000).toString().padLeft(3, '0');
   }
 
-  String get _centimicros {
+  /// `u` — 1-digit (tenths of a centimicro) inside the current
+  /// millisecond. 1 digit = 100µs resolution, 5x finer than the
+  /// 1.9ms victory window. Maximizes horizontal space for the main
+  /// digits.
+  String get _micros {
     final int microInsideSecond =
         _rendered.inMicroseconds.remainder(1000000);
-    final int centimicros = (microInsideSecond % 1000) ~/ 10;
-    return centimicros.toString().padLeft(2, '0');
+    final int decimicros = (microInsideSecond % 1000) ~/ 100;
+    return decimicros.toString(); // 1 digit: 0..9
   }
 
   bool get _nearMissActive {
@@ -229,7 +233,7 @@ class _PlayingScreenState extends State<PlayingScreen>
                         _seconds,
                         style: TextStyle(
                           color: digitColor,
-                          fontSize: 880,
+                          fontSize: 900,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
                           fontFamily: 'DSEG7Modern-Regular',
@@ -240,10 +244,10 @@ class _PlayingScreenState extends State<PlayingScreen>
                         ),
                       ),
                       Text(
-                        '.$_millis$_centimicros',
+                        '.$_millis$_micros',
                         style: TextStyle(
                           color: digitColor,
-                          fontSize: 320,
+                          fontSize: 400,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
                           fontFamily: 'DSEG7Modern-Regular',

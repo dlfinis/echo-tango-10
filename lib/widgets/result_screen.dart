@@ -132,12 +132,13 @@ class _ResultScreenState extends State<ResultScreen>
     return (microInsideSecond ~/ 1000).toString().padLeft(3, '0');
   }
 
-  /// `uu` — 2-digit centimicros inside the current millisecond.
-  String get _centimicrosLabel {
+  /// `u` — 1-digit micros (100µs resolution). 1 digit maximizes
+  /// horizontal space for the main digits.
+  String get _microsLabel {
     final int microInsideSecond =
         _renderedSeconds.inMicroseconds.remainder(1000000);
-    final int centimicros = (microInsideSecond % 1000) ~/ 10;
-    return centimicros.toString().padLeft(2, '0');
+    final int decimicros = (microInsideSecond % 1000) ~/ 100;
+    return decimicros.toString(); // 1 digit: 0..9
   }
 
   double get _delta => widget.elapsedSeconds - kTargetSeconds;
@@ -306,7 +307,7 @@ class _ResultScreenState extends State<ResultScreen>
                             _bigSecondsLabel,
                             style: TextStyle(
                               color: digitColor,
-                              fontSize: 600,
+                              fontSize: 720,
                               fontWeight: FontWeight.w900,
                               height: 1.0,
                               fontFamily: 'DSEG7Modern-Regular',
@@ -317,10 +318,10 @@ class _ResultScreenState extends State<ResultScreen>
                             ),
                           ),
                           Text(
-                            '.$_millisLabel$_centimicrosLabel',
+                            '.$_millisLabel$_microsLabel',
                             style: TextStyle(
                               color: digitColor,
-                              fontSize: 220,
+                              fontSize: 300,
                               fontWeight: FontWeight.w900,
                               height: 1.0,
                               fontFamily: 'DSEG7Modern-Regular',
