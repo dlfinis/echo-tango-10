@@ -146,7 +146,8 @@ class _ResultScreenState extends State<ResultScreen>
   String get _deltaText {
     final d = _delta;
     final String sign = d >= 0 ? '+' : '-';
-    return '$sign${d.abs().toStringAsFixed(4)}s';
+    final double absMs = d.abs() * 1000;
+    return '$sign${absMs.toStringAsFixed(2)}ms';
   }
 
   String get _verdictLabel {
@@ -348,13 +349,12 @@ class _ResultScreenState extends State<ResultScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _verdict == _Verdict.victory ? accent : white,
-                      fontSize: 120,
+                      fontSize: 96,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
                       fontFamily: 'DSEG7Modern-Regular',
                       fontFamilyFallback: const <String>[
                         'DSEG7Modern-Bold',
-                        'DSEG7Classic-Bold',
+                        'monospace',
                       ],
                     ),
                   ),

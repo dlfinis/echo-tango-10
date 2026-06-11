@@ -32,27 +32,24 @@ class PlayingScreen extends StatefulWidget {
   State<PlayingScreen> createState() => _PlayingScreenState();
 }
 
-class _PlayingScreenState extends State<PlayingScreen>
-    with TickerProviderStateMixin {
+class _PlayingScreenState extends State<PlayingScreen> {
   Timer? _ticker;
   Timer? _timeoutGuard;
   Timer? _colorTimer;
   Timer? _cheerTimer;
   Timer? _countdownTimer;
 
-  /// The stopwatch the visible chronograph reads. Owned by this
-  /// widget (not the parent's controller) so we can start it
-  /// exactly when the GO! flash ends.
-  final Stopwatch _visibleStopwatch = Stopwatch();
+  /// The stopwatch the visible chronograph reads. This is the
+  /// parent's [StopwatchController] — the same one the [AppRoot]
+  /// uses to read the elapsed time on the WAITING→PLAYING and
+  /// PLAYING→RESULT transitions. We no longer own a private
+  /// Stopwatch; the parent controller IS the source of truth.
 
   Duration _rendered = Duration.zero;
   int _colorIndex = 0;
   int _cheerIndex = 0;
   bool _nearMissFlashed = false;
   int? _countdownValue;
-
-  late final AnimationController _goFlashController;
-  late final Animation<double> _goFlashAnim;
 
   static const List<String> _cheerMessages = <String>[
     '¡DALE!',
@@ -70,14 +67,12 @@ class _PlayingScreenState extends State<PlayingScreen>
     // Default behaviour: chronograph visible immediately.
     // Set kShowCountdown to true to re-enable 3-2-1-GO!.
     _countdownValue = kShowCountdown ? 3 : null;
-    _goFlashController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 80),
-    );
-    _goFlashAnim = CurvedAnimation(
-      parent: _goFlashController,
-      curve: Curves.easeOut,
-    );
+    // When the countdown is disabled, start the parent's
+    // controller now so the AppRoot can read the elapsed
+    // time on the PLAYING→RESULT transition.
+    if (!kShowCountdown) {
+      widget.controller.start();
+    }
 
     _countdownTimer = Timer.periodic(const Duration(milliseconds: 250), (t) {
       if (!mounted) {
@@ -94,15 +89,7 @@ class _PlayingScreenState extends State<PlayingScreen>
         } else {
           _countdownValue = null;
           t.cancel();
-          _goFlashController.reverse(from: 0.5);
-          widget.controller.reset();
-          // Start the visible stopwatch. When kShowCountdown is
-          // true this runs at GO!. When false, _countdownValue
-          // is already null on entry, so the timer callback
-          // lands here immediately and starts the clock.
-          _visibleStopwatch
-            ..reset()
-            ..start();
+          widget.controller.start();
         }
       });
     });
@@ -130,8 +117,8 @@ class _PlayingScreenState extends State<PlayingScreen>
 
   void _onTick() {
     if (!mounted) return;
-    if (!_visibleStopwatch.isRunning) return;
-    final Duration elapsed = _visibleStopwatch.elapsed;
+    if (!widget.controller.isRunning) return;
+    final Duration elapsed = widget.controller.elapsed;
     setState(() {
       _rendered = elapsed;
     });
@@ -147,8 +134,6 @@ class _PlayingScreenState extends State<PlayingScreen>
     _colorTimer?.cancel();
     _cheerTimer?.cancel();
     _countdownTimer?.cancel();
-    _goFlashController.dispose();
-    _visibleStopwatch.stop();
     super.dispose();
   }
 
@@ -263,18 +248,10 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
           ),
-          // GO! flash overlay.
-          IgnorePointer(
-            child: AnimatedBuilder(
-              animation: _goFlashAnim,
-              builder: (BuildContext context, Widget? _) {
-                return Container(
-                  color: const Color(0xFFFFFFFF)
-                      .withValues(alpha: _goFlashAnim.value),
-                );
-              },
-            ),
-          ),
+          // (Flash overlay removed in iteration #22 — it was
+          // causing a visible white flash on entry. The
+          // countdown already provides enough visual
+          // transition when kShowCountdown is true.)
           // Fake countdown overlay. Only shown if kShowCountdown is
           // true AND the countdown is still running.
           if (_countdownValue != null)
