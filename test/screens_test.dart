@@ -532,6 +532,51 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('honors custom victory range from constructor',
+        (WidgetTester tester) async {
+      // Range is offset from the default so the test is meaningful.
+      // The custom window is [9.4, 9.6] (above the 9.0s NI threshold
+      // so the verdict really is VICTORIA, not NI). 9.5 sits in the
+      // middle.
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      bool tapped = false;
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 9.5,
+        victoryRangeStart: 9.4,
+        victoryRangeEnd: 9.6,
+        onNext: () => tapped = true,
+      )));
+      await tester.pump(const Duration(seconds: 2));
+      expect(tapped, isFalse);
+      expect(find.text('¡GANASTE!'), findsOneWidget,
+          reason: 'with custom range 9.4..9.6, 9.5s should be VICTORIA');
+    });
+
+    testWidgets('moves 10.0005 out of VICTORIA when range is shifted',
+        (WidgetTester tester) async {
+      // 10.0005 is VICTORIA with the default range but falls inside
+      // CASI territory when the window is moved up to [9.4, 9.6].
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      bool tapped = false;
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 10.0005,
+        victoryRangeStart: 9.4,
+        victoryRangeEnd: 9.6,
+        onNext: () => tapped = true,
+      )));
+      await tester.pump(const Duration(seconds: 2));
+      expect(tapped, isFalse);
+      expect(find.text('¡CASI, CASI!'), findsOneWidget);
+    });
   });
 
   group('InvaderSpritePainter', () {

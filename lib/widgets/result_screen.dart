@@ -40,6 +40,8 @@ class ResultScreen extends StatefulWidget {
     required this.elapsedSeconds,
     required this.onNext,
     this.resultTimeoutSeconds = 5,
+    this.victoryRangeStart = 9.9990,
+    this.victoryRangeEnd = 10.0010,
   });
 
   final double elapsedSeconds;
@@ -48,6 +50,16 @@ class ResultScreen extends StatefulWidget {
   /// How many seconds the screen stays visible before
   /// auto-calling [onNext]. Configurable in the admin panel.
   final int resultTimeoutSeconds;
+
+  /// Inclusive lower bound of the VICTORY window, in seconds.
+  /// Defaults to [kDefaultVictoryRangeStart]; passed in by [AppRoot]
+  /// from the live [ConfigStore] so the operator can tune the range
+  /// from the admin panel without recompiling.
+  final double victoryRangeStart;
+
+  /// Inclusive upper bound of the VICTORY window, in seconds.
+  /// Defaults to [kDefaultVictoryRangeEnd].
+  final double victoryRangeEnd;
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -70,8 +82,8 @@ class _ResultScreenState extends State<ResultScreen>
   _Verdict _classifyVerdict(double elapsed) {
     if (elapsed < kFarShortThresholdSeconds) return _Verdict.niPorAsomo;
     if (elapsed > kFarOvershootThresholdSeconds) return _Verdict.tePasaste;
-    if (elapsed >= kTargetSeconds &&
-        elapsed <= kTargetSeconds + kVictoryOvershootSeconds) {
+    if (elapsed >= widget.victoryRangeStart &&
+        elapsed <= widget.victoryRangeEnd) {
       return _Verdict.victory;
     }
     return _Verdict.casi;

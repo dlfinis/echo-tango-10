@@ -104,12 +104,14 @@ class _AppRootState extends State<AppRoot> {
 
       case AppState.result:
         _stopwatch.reset();
-        // Asymmetric victory rule (per Diego): win if you hit 10.000s
-        // exactly OR overshot by at most 10ms. Coming in short always
-        // counts as a miss — the game punishes hesitation, not slop.
-        final bool rawVictory = _lastElapsedSeconds >= kTargetSeconds &&
-            _lastElapsedSeconds <=
-                kTargetSeconds + kVictoryOvershootSeconds;
+        // Victory is decided against the operator-configured range in
+        // SharedPreferences (admin panel). The same range is passed
+        // to the ResultScreen widget so the verdict label and the
+        // leaderboard gate stay in lockstep.
+        final ConfigStore? store = _configStore;
+        final bool rawVictory = store != null &&
+            _lastElapsedSeconds >= store.victoryRangeStart() &&
+            _lastElapsedSeconds <= store.victoryRangeEnd();
         // The leaderboard gate: a VICTORIA only advances to
         // WINNER_NAME if the score would crack the top 10. If the
         // leaderboard is full and this score is worse than the
@@ -252,6 +254,8 @@ class _AppRootState extends State<AppRoot> {
         return ResultScreen(
           elapsedSeconds: _lastElapsedSeconds,
           resultTimeoutSeconds: _configStore!.resultAutoReturnSeconds(),
+          victoryRangeStart: _configStore!.victoryRangeStart(),
+          victoryRangeEnd: _configStore!.victoryRangeEnd(),
           onNext: _handlePulse,
         );
 

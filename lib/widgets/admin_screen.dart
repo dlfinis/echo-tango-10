@@ -9,8 +9,10 @@
 ///      overkill for PR2; Diego can pick from a curated palette).
 ///   5. Result timeout — how long the RESULT screen stays before
 ///      auto-returning to WAITING (1..60 seconds).
-///   6. Zona peligrosa — "Borrar base de datos" with confirm dialog.
-///   7. Salir — returns to WAITING.
+///   6. Rango de victoria — two numeric fields (start, end) defining
+///      the inclusive window that fires the VICTORIA verdict.
+///   7. Zona peligrosa — "Borrar base de datos" with confirm dialog.
+///   8. Salir — returns to WAITING.
 ///
 /// Edits save on blur (or on a "Guardar" tap for numeric fields). The
 /// caller passes the [ConfigStore] and [Leaderboard] in; this widget
@@ -55,6 +57,8 @@ class _AdminScreenState extends State<AdminScreen> {
   late TextEditingController _subTaglineIntervalController;
   late TextEditingController _leaderboardIntervalController;
   late TextEditingController _resultTimeoutController;
+  late TextEditingController _victoryStartController;
+  late TextEditingController _victoryEndController;
 
   // Working copy of the current color indices into the preset palette.
   int _bgIndex = 0;
@@ -109,6 +113,12 @@ class _AdminScreenState extends State<AdminScreen> {
     _resultTimeoutController = TextEditingController(
       text: widget.configStore.resultAutoReturnSeconds().toString(),
     );
+    _victoryStartController = TextEditingController(
+      text: widget.configStore.victoryRangeStart().toStringAsFixed(4),
+    );
+    _victoryEndController = TextEditingController(
+      text: widget.configStore.victoryRangeEnd().toStringAsFixed(4),
+    );
     _bgIndex = _findClosest(widget.configStore.bgColorArgb(), _bgPalette);
     _textIndex =
         _findClosest(widget.configStore.textColorArgb(), _textPalette);
@@ -143,6 +153,8 @@ class _AdminScreenState extends State<AdminScreen> {
     _subTaglineIntervalController.dispose();
     _leaderboardIntervalController.dispose();
     _resultTimeoutController.dispose();
+    _victoryStartController.dispose();
+    _victoryEndController.dispose();
     super.dispose();
   }
 
@@ -182,6 +194,63 @@ class _AdminScreenState extends State<AdminScreen> {
     if (v != null && v >= 1 && v <= 60) {
       await widget.configStore.setResultAutoReturnSeconds(v);
     }
+  }
+
+  /// Reads both victory-range fields, validates the bounds, and persists
+  /// them atomically. The validator runs in the UI (cheap, sync) so a
+  /// bad input never reaches the store — the [ArgumentError] inside
+  /// [ConfigStore.setVictoryRange] is a defense-in-depth backstop.
+  Future<void> _saveVictoryRange() async {
+    final String startRaw = _victoryStartController.text.trim();
+    final String endRaw = _victoryEndController.text.trim();
+    final double? start = double.tryParse(startRaw);
+    final double? end = double.tryParse(endRaw);
+
+    final bool invalid = start == null ||
+        end == null ||
+        start <= 0 ||
+        end <= 0 ||
+        start >= end;
+
+    if (!mounted) return;
+    if (invalid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFB71C1C),
+          content: Text(
+            'Victoria desde debe ser menor que Victoria hasta '
+            '(ambos positivos)',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await widget.configStore.setVictoryRange(
+        start: start,
+        end: end,
+      );
+    } on ArgumentError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB71C1C),
+          content: Text('Rango de victoria inválido: ${e.message}'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Rango de victoria guardado'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _cycleBg() async {
@@ -359,6 +428,54 @@ class _AdminScreenState extends State<AdminScreen> {
                 controller: _resultTimeoutController,
                 onSave: _saveResultTimeout,
                 helperText: 'Entre 1 y 60. Tap acelera el retorno.',
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeader('Rango de victoria'),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: _decimalNumericField(
+                      label: 'Victoria desde',
+                      controller: _victoryStartController,
+                      onSave: _saveVictoryRange,
+                      helperText: 'En segundos. Ej: 9.9990',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _decimalNumericField(
+                      label: 'Victoria hasta',
+                      controller: _victoryEndController,
+                      onSave: _saveVictoryRange,
+                      helperText: 'En segundos. Ej: 10.0010',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _saveVictoryRange,
+                  icon: const Icon(
+                    Icons.save_outlined,
+                    color: Color(kDefaultAccentColorHex),
+                  ),
+                  label: const Text(
+                    'Guardar rango',
+                    style: TextStyle(color: Color(kDefaultAccentColorHex)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(
+                      color: Color(kDefaultAccentColorHex),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -687,6 +804,34 @@ class _AdminScreenState extends State<AdminScreen> {
       keyboardType: TextInputType.number,
       inputFormatters: <TextInputFormatter>[
         FilteringTextInputFormatter.digitsOnly,
+      ],
+      style: const TextStyle(color: Color(kDefaultTextColorHex)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
+        border: const OutlineInputBorder(),
+        helperText: helperText,
+        helperStyle: const TextStyle(color: Color(0xFFAAAAAA)),
+      ),
+      onFieldSubmitted: (_) => onSave(),
+      onEditingComplete: onSave,
+    );
+  }
+
+  /// Same as [_numericField] but allows a single decimal point so the
+  /// operator can enter fractional seconds (e.g. 9.9990) for the
+  /// victory range.
+  Widget _decimalNumericField({
+    required String label,
+    required TextEditingController controller,
+    required Future<void> Function() onSave,
+    required String helperText,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
       ],
       style: const TextStyle(color: Color(kDefaultTextColorHex)),
       decoration: InputDecoration(

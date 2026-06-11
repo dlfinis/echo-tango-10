@@ -73,6 +73,8 @@ class ConfigStore {
   static const String kKeyLeaderboard = 'leaderboard';
   static const String kKeyResultAutoReturnSeconds =
       'result_auto_return_seconds';
+  static const String kKeyVictoryRangeStart = 'victory_range_start';
+  static const String kKeyVictoryRangeEnd = 'victory_range_end';
 
   // ---------------------------------------------------------------------------
   // Invitation messages
@@ -182,6 +184,40 @@ class ConfigStore {
 
   Future<void> setResultAutoReturnSeconds(int seconds) =>
       _prefs.setInt(kKeyResultAutoReturnSeconds, seconds);
+
+  // ---------------------------------------------------------------------------
+  // VICTORY verdict range — operator-tunable so the kiosk can be tested
+  // with different windows without recompiling. Both bounds are inclusive;
+  // `start` must be strictly less than `end` and both must be positive.
+  // ---------------------------------------------------------------------------
+
+  double victoryRangeStart() =>
+      _prefs.getDouble(kKeyVictoryRangeStart) ?? kDefaultVictoryRangeStart;
+
+  double victoryRangeEnd() =>
+      _prefs.getDouble(kKeyVictoryRangeEnd) ?? kDefaultVictoryRangeEnd;
+
+  /// Persists a new VICTORY verdict range. Throws [ArgumentError] when
+  /// the bounds are not strictly ordered or are not strictly positive.
+  /// Both writes go through; on validation failure no pref is mutated.
+  Future<void> setVictoryRange({
+    required double start,
+    required double end,
+  }) async {
+    if (start <= 0 || end <= 0) {
+      throw ArgumentError(
+        'victory range bounds must be positive (got start=$start, end=$end)',
+      );
+    }
+    if (start >= end) {
+      throw ArgumentError(
+        'victory range start must be strictly less than end '
+        '(got start=$start, end=$end)',
+      );
+    }
+    await _prefs.setDouble(kKeyVictoryRangeStart, start);
+    await _prefs.setDouble(kKeyVictoryRangeEnd, end);
+  }
 
   // ---------------------------------------------------------------------------
   // Colors (ARGB ints — `Color(0xAARRGGBB)`-compatible)

@@ -99,6 +99,18 @@ const int kMaxLeaderboardEntries = 20;
 /// tap the screen to return early.
 const int kDefaultResultAutoReturnSeconds = 5;
 
+/// Inclusive lower bound of the VICTORY verdict range, in seconds.
+/// A `ResultScreen` whose `elapsedSeconds` falls within
+/// `[kDefaultVictoryRangeStart, kDefaultVictoryRangeEnd]`
+/// (inclusive on both ends) renders as VICTORIA. Configurable in
+/// the admin panel via the `victory_range_start` /
+/// `victory_range_end` prefs — these constants are the
+/// factory-default values when no override has been saved.
+const double kDefaultVictoryRangeStart = 9.9990;
+
+/// Inclusive upper bound of the VICTORY verdict range, in seconds.
+const double kDefaultVictoryRangeEnd = 10.0010;
+
 // ---------------------------------------------------------------------------
 // PLAYING screen debug flag — toggle the fake 3-2-1-GO countdown.
 // ---------------------------------------------------------------------------
