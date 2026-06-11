@@ -2,11 +2,15 @@
 ///
 /// Sections (top-to-bottom):
 ///   1. Mensajes de invitación — editable TextField list, add/remove.
-///   2. Intervalos de rotación — two numeric fields (1..3600).
-///   3. Colores — three "siguiente color preset" cycles (full picker is
+///   2. Sub-frases (sub-taglines) — same pattern as mensajes.
+///   3. Intervalos de rotación — three numeric fields (1..3600):
+///      mensajes, sub-frases, leaderboard.
+///   4. Colores — three "siguiente color preset" cycles (full picker is
 ///      overkill for PR2; Diego can pick from a curated palette).
-///   4. Zona peligrosa — "Borrar base de datos" with confirm dialog.
-///   5. Salir — returns to WAITING.
+///   5. Result timeout — how long the RESULT screen stays before
+///      auto-returning to WAITING (1..60 seconds).
+///   6. Zona peligrosa — "Borrar base de datos" with confirm dialog.
+///   7. Salir — returns to WAITING.
 ///
 /// Edits save on blur (or on a "Guardar" tap for numeric fields). The
 /// caller passes the [ConfigStore] and [Leaderboard] in; this widget
@@ -46,8 +50,11 @@ class _AdminScreenState extends State<AdminScreen> {
   // Text controllers — recreated on every build from the store so the
   // form always reflects the persisted truth.
   late List<TextEditingController> _messageControllers;
+  late List<TextEditingController> _subTaglineControllers;
   late TextEditingController _messageIntervalController;
+  late TextEditingController _subTaglineIntervalController;
   late TextEditingController _leaderboardIntervalController;
+  late TextEditingController _resultTimeoutController;
 
   // Working copy of the current color indices into the preset palette.
   int _bgIndex = 0;
@@ -86,11 +93,21 @@ class _AdminScreenState extends State<AdminScreen> {
         .invitationMessages()
         .map((String s) => TextEditingController(text: s))
         .toList();
+    _subTaglineControllers = widget.configStore
+        .subTaglines()
+        .map((String s) => TextEditingController(text: s))
+        .toList();
     _messageIntervalController = TextEditingController(
       text: widget.configStore.messageRotationSeconds().toString(),
     );
+    _subTaglineIntervalController = TextEditingController(
+      text: widget.configStore.subTaglineRotationSeconds().toString(),
+    );
     _leaderboardIntervalController = TextEditingController(
       text: widget.configStore.leaderboardRotationSeconds().toString(),
+    );
+    _resultTimeoutController = TextEditingController(
+      text: widget.configStore.resultAutoReturnSeconds().toString(),
     );
     _bgIndex = _findClosest(widget.configStore.bgColorArgb(), _bgPalette);
     _textIndex =
@@ -119,8 +136,13 @@ class _AdminScreenState extends State<AdminScreen> {
     for (final TextEditingController c in _messageControllers) {
       c.dispose();
     }
+    for (final TextEditingController c in _subTaglineControllers) {
+      c.dispose();
+    }
     _messageIntervalController.dispose();
+    _subTaglineIntervalController.dispose();
     _leaderboardIntervalController.dispose();
+    _resultTimeoutController.dispose();
     super.dispose();
   }
 
@@ -134,14 +156,31 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  Future<void> _saveSubTaglines() async {
+    await widget.configStore.setSubTaglines(
+      _subTaglineControllers.map((TextEditingController c) => c.text).toList(),
+    );
+  }
+
   Future<void> _saveIntervals() async {
     final int? msg = int.tryParse(_messageIntervalController.text.trim());
+    final int? sub = int.tryParse(_subTaglineIntervalController.text.trim());
     final int? lb = int.tryParse(_leaderboardIntervalController.text.trim());
     if (msg != null && msg >= 1 && msg <= 3600) {
       await widget.configStore.setMessageRotationSeconds(msg);
     }
+    if (sub != null && sub >= 1 && sub <= 3600) {
+      await widget.configStore.setSubTaglineRotationSeconds(sub);
+    }
     if (lb != null && lb >= 1 && lb <= 3600) {
       await widget.configStore.setLeaderboardRotationSeconds(lb);
+    }
+  }
+
+  Future<void> _saveResultTimeout() async {
+    final int? v = int.tryParse(_resultTimeoutController.text.trim());
+    if (v != null && v >= 1 && v <= 60) {
+      await widget.configStore.setResultAutoReturnSeconds(v);
     }
   }
 
@@ -210,6 +249,9 @@ class _AdminScreenState extends State<AdminScreen> {
     if (!mounted) return;
     setState(() {
       for (final TextEditingController c in _messageControllers) {
+        c.dispose();
+      }
+      for (final TextEditingController c in _subTaglineControllers) {
         c.dispose();
       }
       _hydrate();
@@ -287,6 +329,10 @@ class _AdminScreenState extends State<AdminScreen> {
               ..._buildMessagesSection(),
               const SizedBox(height: 24),
 
+              _sectionHeader('Sub-frases (call to action)'),
+              ..._buildSubTaglinesSection(),
+              const SizedBox(height: 24),
+
               _sectionHeader('Intervalos de rotación (segundos)'),
               _numericField(
                 label: 'Rotación de mensajes',
@@ -295,9 +341,24 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
               const SizedBox(height: 12),
               _numericField(
+                label: 'Rotación de sub-frases',
+                controller: _subTaglineIntervalController,
+                onSave: _saveIntervals,
+              ),
+              const SizedBox(height: 12),
+              _numericField(
                 label: 'Rotación de leaderboard',
                 controller: _leaderboardIntervalController,
                 onSave: _saveIntervals,
+              ),
+              const SizedBox(height: 24),
+
+              _sectionHeader('Tiempo en pantalla de resultado'),
+              _numericField(
+                label: 'Auto-retorno a waiting (segundos)',
+                controller: _resultTimeoutController,
+                onSave: _saveResultTimeout,
+                helperText: 'Entre 1 y 60. Tap acelera el retorno.',
               ),
               const SizedBox(height: 24),
 
@@ -553,10 +614,73 @@ class _AdminScreenState extends State<AdminScreen> {
     return out;
   }
 
+  /// Same pattern as [_buildMessagesSection] but for the
+  /// sub-tagline list (the "call to action" text that appears
+  /// under the main message on the WAITING screen).
+  List<Widget> _buildSubTaglinesSection() {
+    final List<Widget> out = <Widget>[];
+    for (int i = 0; i < _subTaglineControllers.length; i++) {
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  controller: _subTaglineControllers[i],
+                  style: const TextStyle(color: Color(kDefaultAccentColorHex)),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                    labelText: 'Sub-frase ${i + 1}',
+                    labelStyle:
+                        const TextStyle(color: Color(0xFFAAAAAA)),
+                  ),
+                  onChanged: (_) => _saveSubTaglines(),
+                ),
+              ),
+              IconButton(
+                onPressed: _subTaglineControllers.length <= 1
+                    ? null
+                    : () {
+                        setState(() {
+                          _subTaglineControllers[i].dispose();
+                          _subTaglineControllers.removeAt(i);
+                        });
+                        _saveSubTaglines();
+                      },
+                icon: const Icon(Icons.remove_circle_outline,
+                    color: Color(0xFFFF1744)),
+                tooltip: 'Eliminar',
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    out.add(
+      TextButton.icon(
+        onPressed: () {
+          setState(() {
+            _subTaglineControllers.add(TextEditingController());
+          });
+        },
+        icon: const Icon(Icons.add_circle_outline,
+            color: Color(kDefaultAccentColorHex)),
+        label: const Text(
+          'Agregar sub-frase',
+          style: TextStyle(color: Color(kDefaultAccentColorHex)),
+        ),
+      ),
+    );
+    return out;
+  }
+
   Widget _numericField({
     required String label,
     required TextEditingController controller,
     required Future<void> Function() onSave,
+    String helperText = 'Entre 1 y 3600 segundos',
   }) {
     return TextFormField(
       controller: controller,
@@ -569,7 +693,7 @@ class _AdminScreenState extends State<AdminScreen> {
         labelText: label,
         labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
         border: const OutlineInputBorder(),
-        helperText: 'Entre 1 y 3600 segundos',
+        helperText: helperText,
         helperStyle: const TextStyle(color: Color(0xFFAAAAAA)),
       ),
       onFieldSubmitted: (_) => onSave(),

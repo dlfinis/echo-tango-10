@@ -71,6 +71,8 @@ class ConfigStore {
   static const String kKeyTextColorArgb = 'text_color_argb';
   static const String kKeyAccentColorArgb = 'accent_color_argb';
   static const String kKeyLeaderboard = 'leaderboard';
+  static const String kKeyResultAutoReturnSeconds =
+      'result_auto_return_seconds';
 
   // ---------------------------------------------------------------------------
   // Invitation messages
@@ -169,6 +171,17 @@ class ConfigStore {
 
   Future<void> setLeaderboardRotationSeconds(int seconds) =>
       _prefs.setInt(kKeyLeaderboardRotationSeconds, seconds);
+
+  // ---------------------------------------------------------------------------
+  // RESULT screen auto-return
+  // ---------------------------------------------------------------------------
+
+  int resultAutoReturnSeconds() =>
+      _prefs.getInt(kKeyResultAutoReturnSeconds) ??
+      kDefaultResultAutoReturnSeconds;
+
+  Future<void> setResultAutoReturnSeconds(int seconds) =>
+      _prefs.setInt(kKeyResultAutoReturnSeconds, seconds);
 
   // ---------------------------------------------------------------------------
   // Colors (ARGB ints — `Color(0xAARRGGBB)`-compatible)

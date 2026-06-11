@@ -90,6 +90,16 @@ const Duration kAdminLongPressDuration = Duration(seconds: 3);
 const int kMaxLeaderboardEntries = 20;
 
 // ---------------------------------------------------------------------------
+// RESULT screen auto-return
+// ---------------------------------------------------------------------------
+
+/// How many seconds the RESULT screen stays visible before
+/// auto-returning to WAITING. Configurable in the admin panel
+/// (see kKeyResultAutoReturnSeconds). The player can always
+/// tap the screen to return early.
+const int kDefaultResultAutoReturnSeconds = 5;
+
+// ---------------------------------------------------------------------------
 // PLAYING screen debug flag — toggle the fake 3-2-1-GO countdown.
 // ---------------------------------------------------------------------------
 

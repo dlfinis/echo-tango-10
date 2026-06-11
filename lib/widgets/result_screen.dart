@@ -24,6 +24,7 @@
 /// a clean two-segment time.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -37,10 +38,15 @@ class ResultScreen extends StatefulWidget {
     super.key,
     required this.elapsedSeconds,
     required this.onNext,
+    this.resultTimeoutSeconds = 5,
   });
 
   final double elapsedSeconds;
   final VoidCallback onNext;
+
+  /// How many seconds the screen stays visible before
+  /// auto-calling [onNext]. Configurable in the admin panel.
+  final int resultTimeoutSeconds;
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -49,6 +55,7 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen>
     with TickerProviderStateMixin {
   late final AnimationController _glitchController;
+  Timer? _autoReturnTimer;
   late final Animation<double> _glitchAnim;
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnim;
@@ -108,10 +115,21 @@ class _ResultScreenState extends State<ResultScreen>
     if (_verdict == _Verdict.tePasaste) {
       _scrollController.forward();
     }
+
+    // Auto-return to WAITING after the configured timeout. Tap
+    // on the screen calls onNext immediately, which cancels
+    // the timer in dispose.
+    _autoReturnTimer = Timer(
+      Duration(seconds: widget.resultTimeoutSeconds),
+      () {
+        if (mounted) widget.onNext();
+      },
+    );
   }
 
   @override
   void dispose() {
+    _autoReturnTimer?.cancel();
     _glitchController.dispose();
     _shakeController.dispose();
     _scrollController.dispose();

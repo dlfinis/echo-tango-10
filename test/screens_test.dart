@@ -282,9 +282,13 @@ void main() {
         leaderboard: pair.lb,
         onExit: () {},
       )));
+      // Taller viewport so the messages rotation field is in
+      // bounds without scrolling (more sections were added).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pump();
-      // The "Rotación de mensajes" field is the first numeric field,
-      // visible in the default viewport (no scroll needed).
       final Finder field = find.widgetWithText(TextFormField, 'Rotación de mensajes');
       expect(field, findsOneWidget);
       await tester.enterText(field, '45');
@@ -398,6 +402,27 @@ void main() {
         viewport: const Size(800, 480),
       );
       expect(find.text('¡GANASTE!'), findsOneWidget);
+    });
+
+    testWidgets('auto-returns to onNext after the configured timeout',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 480);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      var taps = 0;
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 10.0005,
+        resultTimeoutSeconds: 3,
+        onNext: () => taps++,
+      )));
+      // Advance less than the timeout — should not have fired.
+      await tester.pump(const Duration(seconds: 2));
+      expect(taps, 0, reason: 'should not have auto-returned yet');
+      // Advance past the timeout — should have fired once.
+      await tester.pump(const Duration(seconds: 2));
+      expect(taps, 1, reason: 'should have auto-returned exactly once');
     });
   });
 }
