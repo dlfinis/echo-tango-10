@@ -286,12 +286,9 @@ class _ResultScreenState extends State<ResultScreen>
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-              // The big chronograph row — clipped horizontally when
-              // TE PASASTE so the scroll effect can play without
-              // affecting layout. The ClipRect + FractionalTranslation
-              // are wrapped AROUND the FittedBox so the FittedBox
-              // itself never sees infinite-width constraints (those
-              // would throw 'BoxConstraints forces an infinite width').
+              // The big chronograph row. The outer FittedBox
+              // (BoxFit.contain) handles scaling the WHOLE row to
+              // fit the viewport; we don't need an inner FittedBox.
               ClipRect(
                 child: FractionalTranslation(
                   translation: Offset(scrollOffset, 0),
@@ -299,22 +296,37 @@ class _ResultScreenState extends State<ResultScreen>
                     opacity: opacity,
                     child: Transform.translate(
                       offset: Offset(shakeX, shakeY),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: <Widget>[
-                            Text(
-                              _bigSecondsLabel,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.max,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: <Widget>[
+                          Text(
+                            _bigSecondsLabel,
+                            style: TextStyle(
+                              color: digitColor,
+                              fontSize: 600,
+                              fontWeight: FontWeight.w900,
+                              height: 1.0,
+                              letterSpacing: -16,
+                              fontFamily: 'DSEG7Modern-Regular',
+                              fontFamilyFallback: const <String>[
+                                'DSEG7Modern-Bold',
+                                'DSEG7Classic-Bold',
+                                'monospace',
+                              ],
+                            ),
+                          ),
+                          Transform.translate(
+                            offset: const Offset(0, 30),
+                            child: Text(
+                              '.$_millisLabel',
                               style: TextStyle(
                                 color: digitColor,
-                                fontSize: 880,
+                                fontSize: 300,
                                 fontWeight: FontWeight.w900,
                                 height: 1.0,
-                                letterSpacing: -28,
+                                letterSpacing: -8,
                                 fontFamily: 'DSEG7Modern-Regular',
                                 fontFamilyFallback: const <String>[
                                   'DSEG7Modern-Bold',
@@ -323,46 +335,27 @@ class _ResultScreenState extends State<ResultScreen>
                                 ],
                               ),
                             ),
-                            Transform.translate(
-                              offset: const Offset(0, 36),
-                              child: Text(
-                                '.$_millisLabel',
-                                style: TextStyle(
-                                  color: digitColor,
-                                  fontSize: 420,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.0,
-                                  letterSpacing: -12,
-                                  fontFamily: 'DSEG7Modern-Regular',
-                                  fontFamilyFallback: const <String>[
-                                    'DSEG7Modern-Bold',
-                                    'DSEG7Classic-Bold',
-                                    'monospace',
-                                  ],
-                                ),
+                          ),
+                          Transform.translate(
+                            offset: const Offset(0, 50),
+                            child: Text(
+                              '.$_centimicrosLabel',
+                              style: TextStyle(
+                                color: digitColor,
+                                fontSize: 180,
+                                fontWeight: FontWeight.w900,
+                                height: 1.0,
+                                letterSpacing: -4,
+                                fontFamily: 'DSEG7Modern-Regular',
+                                fontFamilyFallback: const <String>[
+                                  'DSEG7Modern-Bold',
+                                  'DSEG7Classic-Bold',
+                                  'monospace',
+                                ],
                               ),
                             ),
-                            Transform.translate(
-                              offset: const Offset(0, 64),
-                              child: Text(
-                                '.$_centimicrosLabel',
-                                style: TextStyle(
-                                  color: digitColor,
-                                  fontSize: 240,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.0,
-                                  letterSpacing: -6,
-                                  fontFamily: 'DSEG7Modern-Regular',
-                                  fontFamilyFallback: const <String>[
-                                    'DSEG7Modern-Bold',
-                                    'DSEG7Classic-Bold',
-                                    'monospace',
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

@@ -1,30 +1,14 @@
 /// PLAYING screen — chronograph-style stopwatch in three resolution
 /// segments (seconds, milliseconds, centimicros) on a pure-white
-/// background, with arcade-style psychological pressure mechanisms:
+/// background, with optional arcade-style countdown.
 ///
-///   * **Fake 3-2-1-GO countdown** at the start of the play — the
-///     overlay counts 3, 2, 1, GO! in 1s while the actual stopwatch
-///     is hidden. When the GO! step finishes the real stopwatch
-///     starts from 0 and a brief white pulse (80ms @ 0.5 alpha)
-///     lights the screen. The player presses the button thinking
-///     'GO!' is the start signal; by the time the flash settles
-///     the real chronograph is already counting from 0, breaking
-///     their internal anchor for when the timer 'really' began.
-///   * **Mensajes de aliento / chantaje** rotating every ~2 s while
-///     the stopwatch runs.
-///   * **Truco near-miss al pasar 9.999s** — bright green flash
-///     for 200ms suggesting 'you were right there!'.
-///   * **Color rotation** — digits start black, drift through a
-///     5-color palette, return to black, every 3s.
-///   * **Format** — `SS` (880sp) / `.mmm` (420sp) / `.uu` (240sp).
-///   * **Self-contained stopwatch** — the screen owns its own
-///     [Stopwatch] instance so the countdown can run while the
-///     visible chronograph is hidden, then start the real count
-///     at the flash without any 'head start' that would skew
-///     the player's timing. The [widget.controller] from the
-///     parent AppRoot is only consulted for the 60s timeout
-///     guard so the orchestration layer can still enforce
-///     'no game longer than a minute'.
+/// Toggle [kShowCountdown] in `lib/utils/constants.dart` to
+/// enable/disable the 3-2-1-GO! countdown overlay. Default is
+/// `false` (chronograph visible immediately). When enabled, the
+/// chronograph is hidden behind `Opacity 0` during the 1s countdown
+/// and a short white pulse (80ms @ 0.5 alpha) flashes at the GO!
+/// transition. The visible stopwatch is owned by this widget so the
+/// countdown and the real count are independent.
 library;
 
 import 'dart:async';
@@ -56,24 +40,17 @@ class _PlayingScreenState extends State<PlayingScreen>
   Timer? _cheerTimer;
   Timer? _countdownTimer;
 
-  /// The stopwatch that the visible chronograph reads. Owned by
-  /// this widget (not the parent's controller) so we can start
-  /// it exactly when the GO! flash ends, not when the screen
-  /// mounts.
+  /// The stopwatch the visible chronograph reads. Owned by this
+  /// widget (not the parent's controller) so we can start it
+  /// exactly when the GO! flash ends.
   final Stopwatch _visibleStopwatch = Stopwatch();
 
-  /// Mirror of the visible stopwatch's elapsed time, updated by
-  /// the per-frame ticker.
   Duration _rendered = Duration.zero;
-
   int _colorIndex = 0;
   int _cheerIndex = 0;
   bool _nearMissFlashed = false;
   int? _countdownValue;
 
-  /// Drives the GO! flash. Filled 1.0 -> 0.0 over 80ms when the
-  /// countdown finishes. Peak alpha 0.5 so the digits stay
-  /// visible underneath.
   late final AnimationController _goFlashController;
   late final Animation<double> _goFlashAnim;
 
@@ -90,7 +67,9 @@ class _PlayingScreenState extends State<PlayingScreen>
   @override
   void initState() {
     super.initState();
-    _countdownValue = 3;
+    // Default behaviour: chronograph visible immediately.
+    // Set kShowCountdown to true to re-enable 3-2-1-GO!.
+    _countdownValue = kShowCountdown ? 3 : null;
     _goFlashController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 80),
@@ -111,20 +90,12 @@ class _PlayingScreenState extends State<PlayingScreen>
         } else if (_countdownValue == 2) {
           _countdownValue = 1;
         } else if (_countdownValue == 1) {
-          _countdownValue = 0; // "GO!"
+          _countdownValue = 0;
         } else {
           _countdownValue = null;
           t.cancel();
-          // Trigger a short flash and start the VISIBLE stopwatch
-          // from 0 — that's the one the player reads. The
-          // parent's StopwatchController is the one the AppRoot
-          // uses to enforce the 60s timeout, and that one is
-          // already running because AppRoot called start() on
-          // the WAITING -> PLAYING transition.
           _goFlashController.forward(from: 0.5);
-          _visibleStopwatch
-            ..reset()
-            ..start();
+          widget.controller.reset();
         }
       });
     });
@@ -174,18 +145,15 @@ class _PlayingScreenState extends State<PlayingScreen>
     super.dispose();
   }
 
-  /// `SS` — integer second inside the current minute. "00".."59".
   String get _seconds =>
       _rendered.inSeconds.remainder(60).toString().padLeft(2, '0');
 
-  /// `mmm` — milliseconds inside the current second. "000".."999".
   String get _millis {
     final int microInsideSecond =
         _rendered.inMicroseconds.remainder(1000000);
     return (microInsideSecond ~/ 1000).toString().padLeft(3, '0');
   }
 
-  /// `uu` — 2-digit centimicros inside the current millisecond.
   String get _centimicros {
     final int microInsideSecond =
         _rendered.inMicroseconds.remainder(1000000);
@@ -193,7 +161,6 @@ class _PlayingScreenState extends State<PlayingScreen>
     return centimicros.toString().padLeft(2, '0');
   }
 
-  /// Whether the near-miss flash is currently visible.
   bool get _nearMissActive {
     if (!_nearMissFlashed) return false;
     final Duration sinceMiss =
@@ -205,9 +172,8 @@ class _PlayingScreenState extends State<PlayingScreen>
   @override
   Widget build(BuildContext context) {
     final Color baseColor = Color(kPlayingColorPaletteHex[_colorIndex]);
-    final Color digitColor = _nearMissActive
-        ? const Color(kDefaultAccentColorHex)
-        : baseColor;
+    final Color digitColor =
+        _nearMissActive ? const Color(kDefaultAccentColorHex) : baseColor;
     final String cheer = _cheerMessages[_cheerIndex];
 
     return Scaffold(
@@ -236,20 +202,12 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
           ),
-          // Main chronograph. Hidden during the fake countdown
-          // (Opacity 0) so the player only sees the countdown
-          // digit; the visible stopwatch is started at the
-          // moment the countdown finishes, so the digits
-          // appear already at 00.000.00 and start counting up.
+          // Main chronograph. SizedBox.expand + FittedBox(BoxFit.contain)
+          // so the row scales to fill the viewport and only shrinks on
+          // overflow. Hidden during the fake countdown (Opacity 0)
+          // when kShowCountdown is true.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            // SizedBox.expand + FittedBox(BoxFit.contain) so the
-            // whole row grows to fill the available space and
-            // only shrinks on overflow. scaleDown was NOT
-            // shrinking the row in practice because the inner
-            // Text widgets used letterSpacing/Transform that
-            // reported a measured width that exceeded the
-            // viewport without triggering the scale path.
             child: SizedBox.expand(
               child: FittedBox(
                 fit: BoxFit.contain,
@@ -321,9 +279,7 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
           ),
-          // GO! flash overlay — a short white pulse (80ms) that
-          // sells the GO! transition. Max alpha 0.5 so the player
-          // can still see the digits starting at 00.000.00.
+          // GO! flash overlay.
           IgnorePointer(
             child: AnimatedBuilder(
               animation: _goFlashAnim,
@@ -335,8 +291,8 @@ class _PlayingScreenState extends State<PlayingScreen>
               },
             ),
           ),
-          // Fake countdown overlay (3 - 2 - 1 - GO!). Sits on top
-          // of the flash and the digits.
+          // Fake countdown overlay. Only shown if kShowCountdown is
+          // true AND the countdown is still running.
           if (_countdownValue != null)
             Positioned.fill(
               child: IgnorePointer(

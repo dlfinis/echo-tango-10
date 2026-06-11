@@ -90,6 +90,22 @@ const Duration kAdminLongPressDuration = Duration(seconds: 3);
 const int kMaxLeaderboardEntries = 20;
 
 // ---------------------------------------------------------------------------
+// PLAYING screen debug flag — toggle the fake 3-2-1-GO countdown.
+// ---------------------------------------------------------------------------
+
+/// When true, the PlayingScreen shows a 3-2-1-GO! countdown overlay
+/// for ~1s before revealing the chronograph. When false (the
+/// default), the chronograph is visible immediately on entry.
+///
+/// The default is false so the chronograph is ALWAYS visible from
+/// the moment the user presses the button. The countdown was
+/// hiding the digits during its 1s lifetime and causing
+/// 'chronograph not visible' reports in the field. The countdown
+/// can be re-enabled for arcade psychology once the layout
+/// issues are resolved.
+const bool kShowCountdown = false;
+
+// ---------------------------------------------------------------------------
 // PLAYING screen visual rhythm
 // ---------------------------------------------------------------------------
 
