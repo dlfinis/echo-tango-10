@@ -247,6 +247,49 @@ void main() {
       expect(accepted, isTrue);
       expect(pair.lb.length, 0, reason: 'auto-skip must not save');
     });
+
+    testWidgets('input is capped at 5 chars, A-Z only, and forced uppercase',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      await tester.pumpWidget(_wrap(WinnerNameScreen(
+        elapsedSeconds: 9.5,
+        leaderboard: pair.lb,
+        onAccept: () {},
+      )));
+      await tester.pump();
+      final Finder field = find.byType(TextField);
+      expect(field, findsOneWidget);
+
+      // 1) maxLength 5 — the 6th character must be rejected.
+      await tester.enterText(field, 'ABCDE');
+      await tester.pump();
+      expect(find.text('ABCDE'), findsOneWidget,
+          reason: 'first 5 chars accepted');
+      await tester.enterText(field, 'ABCDEF');
+      await tester.pump();
+      expect(find.text('ABCDE'), findsOneWidget,
+          reason: '6th char is rejected by LengthLimitingTextInputFormatter');
+      expect(find.text('ABCDEF'), findsNothing);
+
+      // 2) Lowercase input is forced uppercase by the controller
+      // listener (TextCapitalization alone only affects the soft
+      // keyboard suggestion).
+      await tester.enterText(field, 'abc');
+      await tester.pump();
+      expect(find.text('ABC'), findsOneWidget,
+          reason: 'lowercase letters are uppercased before render');
+
+      // 3) Non A-Z characters are stripped by FilteringTextInputFormatter.
+      await tester.enterText(field, 'A1B2');
+      await tester.pump();
+      expect(find.text('AB'), findsOneWidget,
+          reason: 'digits are stripped, only A-Z survives');
+    });
   });
 
   group('AdminScreen', () {

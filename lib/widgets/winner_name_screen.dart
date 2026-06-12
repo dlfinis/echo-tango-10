@@ -75,6 +75,13 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
       value: 1.0,
     )..reverse();
 
+    // Force the typed text to uppercase. TextCapitalization only
+    // suggests uppercase on the soft keyboard — the actual stored
+    // value respects what the user types, so we listen and rewrite
+    // the value to its upper-case form. This keeps the visual in
+    // sync with the input formatters (which only allow A-Z).
+    _nameController.addListener(_forceUppercase);
+
     // Autofocus the name field on the next frame so the soft keyboard
     // appears without stealing the initial paint.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,9 +102,23 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
     _autoSkipTimer?.cancel();
     _confettiController.dispose();
     _flashController.dispose();
+    _nameController.removeListener(_forceUppercase);
     _nameController.dispose();
     _nameFocus.dispose();
     super.dispose();
+  }
+
+  /// Force the controller's text to its upper-case form. The
+  /// `inputFormatters` already strip anything that is not A-Z, so
+  /// this listener only has to upper-case the surviving letters.
+  void _forceUppercase() {
+    final String current = _nameController.text;
+    final String upper = current.toUpperCase();
+    if (upper == current) return;
+    _nameController.value = TextEditingValue(
+      text: upper,
+      selection: TextSelection.collapsed(offset: upper.length),
+    );
   }
 
   String _resolveName() {
@@ -275,12 +296,14 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                         focusNode: _nameFocus,
                         textCapitalization: TextCapitalization.characters,
                         textInputAction: TextInputAction.done,
-                        maxLength: _maxNameLength,
+                        maxLength: 5,
+                        maxLines: 1,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color: Color(kDefaultTextColorHex),
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                          color: Color(kDefaultAccentColorHex),
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 4,
                         ),
                         cursorColor: const Color(kDefaultAccentColorHex),
                         decoration: const InputDecoration(
@@ -306,10 +329,15 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                         ),
                         onSubmitted: (_) => _handleAccept(),
                         inputFormatters: <TextInputFormatter>[
-                          // Block newline + control chars; allow unicode
-                          // letters/digits/punct so es-AR names work.
-                          FilteringTextInputFormatter.deny(
-                            RegExp(r'[\r\n\t]'),
+                          // Solo letras A-Z y máximo 5 caracteres.
+                          // Aceptamos A-Z y a-z para que el listener
+                          // [_forceUppercase] pueda convertir minúsculas
+                          // a mayúsculas antes de renderizar; el
+                          // resultado visible siempre es A-Z.
+                          LengthLimitingTextInputFormatter(5),
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[A-Za-z]'),
+                            replacementString: '',
                           ),
                         ],
                       ),

@@ -146,11 +146,8 @@ class _ResultScreenState extends State<ResultScreen>
     } else if (_verdict == _Verdict.niPorAsomo) {
       _dropController = AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 600),
-      );
-      CurvedAnimation(parent: _dropController!, curve: Curves.easeIn)
-          .addListener(() {});
-      _dropController!.forward();
+        duration: const Duration(milliseconds: 2500),
+      )..repeat();
     } else if (_verdict == _Verdict.tePasaste) {
       _teShakeController = AnimationController(
         vsync: this,
@@ -281,7 +278,9 @@ class _ResultScreenState extends State<ResultScreen>
               t = 0.0; // static
               break;
             case _Verdict.niPorAsomo:
-              t = Curves.easeIn.transform(_dropController!.value);
+              // Linear 0..1..0..1 in 2.5s — the painter handles its
+              // own fall/rise curve internally.
+              t = _dropController!.value;
               break;
             case _Verdict.tePasaste:
               t = Curves.easeIn.transform(_teShakeController!.value);

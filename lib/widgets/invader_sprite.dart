@@ -15,10 +15,15 @@
 ///   * `casi`        — static. Flat-line eyes, one arm half-raised,
 ///                     a "..." bubble above the head. `t` is ignored
 ///                     (rendering is identical at t=0 and t=1).
-///   * `niPorAsomo`  — one-shot "fall apart". Each of the 8 rows
-///                     separates and falls downward (translateY),
-///                     alternating rows rotate ±15°. Eyes are X-shapes.
-///                     `t=0` → assembled, `t=1` → fully spread debris.
+///   * `niPorAsomo`  — looping "fall apart → reassemble" sequence
+///                     driven by a 2.5s repeat controller. Each of
+///                     the 8 rows separates downward (translateY)
+///                     with a per-row stagger (bottom lands first,
+///                     top lands last) and alternating rows rotate
+///                     ±15°. After a brief rest, the rows rise back
+///                     to the assembled body with the same stagger
+///                     (bottom rises first). Eyes are X-shapes.
+///                     `t=0` and `t=1` → assembled (loop is seamless).
 ///   * `tePasaste`   — one-shot explosion. t<0.3: 4 colored squares
 ///                     pulse outward in a cross pattern. t>=0.3:
 ///                     squares fly outward and fade. `t=1` → nothing.
@@ -306,35 +311,99 @@ class InvaderSpritePainter extends CustomPainter {
 
   // -------------------------------------------------------------------------
   // NI POR ASOMO — fall apart, X eyes
+  //
+  // The parent controller is a 2.5s repeat, so t goes 0→1 over 2.5s
+  // and then loops back to 0. We map the global t to four phases:
+  //
+  //   [0.00, 0.40) — fall:        rows separate downward (offset 0 → -120)
+  //   [0.40, 0.50) — rest:        debris at the bottom, no motion
+  //   [0.50, 0.90) — reassemble:  rows rise back (offset -120 → 0)
+  //   [0.90, 1.00] — rest:        body whole, no motion (loops into t=0)
+  //
+  // At t=0 the body is whole (offset=0) and at t=1 the body is whole
+  // (offset=0), so the controller loop is seamless.
+  //
+  // Each row has a stagger factor (bottom row = 1, top row = 0) so
+  // the bottom row lands first on the way down and rises first on
+  // the way up. Alternating rows rotate ±15° and unwind with the
+  // same stagger.
   // -------------------------------------------------------------------------
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
     final double tClamped = t.clamp(0.0, 1.0);
-    final double easeIn = Curves.easeIn.transform(tClamped);
 
     final double spriteW = _cols * pixelSize;
     final double spriteH = _rows * pixelSize;
     final double originX = (size.width - spriteW) / 2.0;
     final double originY = (size.height - spriteH) / 2.0;
 
-    // Per-row fall distance. The spec says rows translate down by
-    // (1 - t) * -120 to (1 - t) * 0 — i.e. at t=0 each row is
-    // shifted up by 120 px (collected off-screen above), at t=1
-    // the shift is 0 (rows at rest at the sprite's natural originY).
-    // As t increases, rows descend into their final position.
+    // Per-row progress, derived from global t. Each row has a
+    // stagger window of `staggerSpan` within the fall / rise phases.
+    // Bottom row stagger is 1.0 (lands first), top row is 0.0
+    // (lands last).
     const double maxShift = 120.0;
-    final double shift = (1.0 - tClamped) * -maxShift;
-    // Use easeIn to make the descent accelerate as it settles.
+    const double fallEnd = 0.4;
+    const double restEnd = 0.5;
+    const double riseEnd = 0.9;
+    // Stagger window: how much of the fall/rise phase each row
+    // "owns". 0.6 means the bottom row starts at t=0, the top row
+    // starts at t=0.4*0.6 = 0.24 of the global fall phase.
+    const double staggerSpan = 0.6;
 
     for (int r = 0; r < _rows; r++) {
-      final double rowOffset = shift * Curves.easeIn.transform(1 - r / (_rows - 1));
-      // The bottom row (r=7) gets the smallest shift (rests in place
-      // first), the top row (r=0) shifts the most and arrives last.
+      final double stagger = r / (_rows - 1); // 0 (top) .. 1 (bottom)
+
+      // Per-row fall progress (0..1): 0 = not yet falling, 1 = fully
+      // spread at -120. The bottom row reaches 1 first; the top
+      // row reaches 1 last.
+      final double fallStart = (1.0 - stagger) * staggerSpan * fallEnd;
+      double fallRowT = 0.0;
+      if (tClamped < fallStart) {
+        fallRowT = 0.0;
+      } else if (tClamped >= fallEnd) {
+        fallRowT = 1.0;
+      } else {
+        fallRowT = (tClamped - fallStart) /
+            (fallEnd - fallStart).clamp(1e-9, double.infinity);
+      }
+      fallRowT = fallRowT.clamp(0.0, 1.0);
+
+      // Per-row rise progress (0..1): 0 = still at -120, 1 = back
+      // to 0. The bottom row starts rising first; the top row
+      // starts last.
+      final double riseStart = restEnd + (1.0 - stagger) * staggerSpan * (riseEnd - restEnd);
+      double riseRowT = 0.0;
+      if (tClamped < restEnd) {
+        riseRowT = 0.0;
+      } else if (tClamped >= riseEnd) {
+        riseRowT = 1.0;
+      } else {
+        riseRowT = (tClamped - riseStart) /
+            (riseEnd - riseStart).clamp(1e-9, double.infinity);
+      }
+      riseRowT = riseRowT.clamp(0.0, 1.0);
+
+      // Combined progress for the row: 0 = whole, 1 = fully spread.
+      // During the rest at the end (t >= 0.9) the progress is 0.
+      final double spreadT;
+      if (tClamped >= riseEnd) {
+        spreadT = 0.0; // body whole, ready for the loop
+      } else if (tClamped >= restEnd) {
+        // Reassembling.
+        spreadT = 1.0 - Curves.easeInOut.transform(riseRowT);
+      } else if (tClamped >= fallEnd) {
+        spreadT = 1.0; // debris at rest
+      } else {
+        // Falling.
+        spreadT = Curves.easeIn.transform(fallRowT);
+      }
+
+      final double rowOffset = -maxShift * spreadT;
       final double rowY = originY + r * pixelSize + rowOffset;
       final double rot = (r.isEven ? 1.0 : -1.0) *
           15.0 *
           math.pi /
           180.0 *
-          easeIn;
+          spreadT;
 
       canvas.save();
       canvas.translate(
