@@ -233,12 +233,16 @@ class _PlayingScreenState extends State<PlayingScreen> {
               ),
             ),
           ),
-          // Main chronograph — TWO text widgets in a simple Row
-          // (no Transforms, no Paddings, no multi-font-size
-          // wizardry). The FittedBox scales the whole Row to
-          // fit the viewport. Hidden during countdown via Opacity.
+          // Main chronograph — THREE text widgets in a simple Row
+          // (no Transforms, no multi-font-size wizardry other than
+          // the final decimicro digit). The FittedBox scales the
+          // whole Row to fit the viewport. Hidden during countdown
+          // via Opacity. Format: `SS.mmm` (full size) + `u`
+          // (60% size + 0.6 alpha) so the last digit reads as a
+          // secondary "advancing" hint instead of competing with
+          // the main digits.
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 32),
             child: Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
@@ -264,10 +268,24 @@ class _PlayingScreenState extends State<PlayingScreen> {
                         ),
                       ),
                       Text(
-                        '.$_millis$_micros',
+                        '.$_millis',
                         style: TextStyle(
                           color: digitColor,
                           fontSize: 400,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          fontFamily: 'DSEG7Modern-Regular',
+                          fontFamilyFallback: const <String>[
+                            'DSEG7Modern-Bold',
+                            'monospace',
+                          ],
+                        ),
+                      ),
+                      Text(
+                        _micros,
+                        style: TextStyle(
+                          color: digitColor.withValues(alpha: 0.6),
+                          fontSize: 240,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
                           fontFamily: 'DSEG7Modern-Regular',

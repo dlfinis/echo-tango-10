@@ -227,16 +227,19 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    const Text(
-                      '😀',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 96,
-                        fontFamily: 'AppleColorEmoji',
-                        fontFamilyFallback: <String>[
-                          'NotoColorEmoji',
-                          'Segoe UI Emoji',
-                        ],
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '😀',
+                        textAlign: TextAlign.left,
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontFamily: 'AppleColorEmoji',
+                          fontFamilyFallback: <String>[
+                            'NotoColorEmoji',
+                            'Segoe UI Emoji',
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),

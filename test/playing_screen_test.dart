@@ -41,11 +41,19 @@ void main() {
       // Find the countdown Text. After 1.5s it should be gone
       // (the widget tree should not contain a Text with '3', '2',
       // '1', or 'GO!').
+      // The countdown is wrapped in an AnimatedSwitcher with a
+      // ValueKey<int?>; the chronograph is not. We also restrict
+      // to ValueKey-bearing Texts to disambiguate from the new
+      // 1-digit micros Text on the chronograph (which is just
+      // a plain Text, no ValueKey).
       final Finder countdownFinder = find.byWidgetPredicate(
         (Widget w) {
           if (w is! Text) return false;
           final String? data = w.data;
-          return data == '3' || data == '2' || data == '1' || data == '¡GO!';
+          if (data != '3' && data != '2' && data != '1' && data != '¡GO!') {
+            return false;
+          }
+          return w.key is ValueKey;
         },
       );
       final int countdownCount = countdownFinder.evaluate().length;

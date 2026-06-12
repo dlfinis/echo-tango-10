@@ -14,7 +14,9 @@
 import 'package:arcade_timer_10s/models/leaderboard_entry.dart';
 import 'package:arcade_timer_10s/services/config_store.dart';
 import 'package:arcade_timer_10s/services/leaderboard.dart';
+import 'package:arcade_timer_10s/state/stopwatch_controller.dart';
 import 'package:arcade_timer_10s/utils/constants.dart';
+import 'package:arcade_timer_10s/widgets/playing_screen.dart';
 import 'package:arcade_timer_10s/widgets/result_screen.dart';
 import 'package:arcade_timer_10s/widgets/admin_screen.dart';
 import 'package:arcade_timer_10s/widgets/confetti_painter.dart';
@@ -892,6 +894,103 @@ void main() {
         colors: const <Color>[Color(0xFFFFC107), Color(0xFF000000)],
       );
       expect(a.shouldRepaint(b), isTrue);
+    });
+  });
+
+  group('PlayingScreen — chronograph format SS.mmmu at Fire HD 8 viewport', () {
+    // The Fire HD 8 in landscape reports 1280x800 physical px.
+    // The kiosk target is that viewport — chronograph must be
+    // visible and the format must be SS.mmmu (4 digits after the
+    // dot, with the last digit in its own smaller Text widget so
+    // it reads as "secondary, advancing").
+    Future<void> setFireHd8Viewport(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+    }
+
+    testWidgets(
+        'chronograph is present and no overflow at 1280x800 with padding=8',
+        (WidgetTester tester) async {
+      await setFireHd8Viewport(tester);
+      final StopwatchController controller = StopwatchController();
+      await tester.pumpWidget(_wrap(PlayingScreen(
+        controller: controller,
+        onTimeout: () {},
+      )));
+      // Cross the 1s countdown so the chronograph is at opacity 1.
+      await tester.pump(const Duration(milliseconds: 1500));
+
+      // The seconds Text is the 2-digit block (00..60). We
+      // assert at least one is in the tree.
+      final Finder secondsFinder = find.byWidgetPredicate(
+        (Widget w) {
+          if (w is! Text) return false;
+          final String? data = w.data;
+          if (data == null || data.length != 2) return false;
+          final int? n = int.tryParse(data);
+          return n != null && n >= 0 && n <= 60;
+        },
+      );
+      expect(secondsFinder, findsWidgets,
+          reason: 'chronograph seconds (SS) must be visible at 1280x800');
+      // No layout / overflow exception.
+      expect(tester.takeException(), isNull,
+          reason: 'chronograph must not overflow at 1280x800');
+    });
+
+    testWidgets(
+        'chronograph renders the .mmm block and a separate 1-digit u block',
+        (WidgetTester tester) async {
+      await setFireHd8Viewport(tester);
+      final StopwatchController controller = StopwatchController();
+      await tester.pumpWidget(_wrap(PlayingScreen(
+        controller: controller,
+        onTimeout: () {},
+      )));
+      // Cross the 1s countdown so the chronograph is visible.
+      await tester.pump(const Duration(milliseconds: 1500));
+
+      // The 3-digit fraction is now its own Text: starts with '.'
+      // and has exactly 3 digits (format: .mmm).
+      final Finder dotMillisFinder = find.byWidgetPredicate(
+        (Widget w) {
+          if (w is! Text) return false;
+          final String? data = w.data;
+          if (data == null || data.length != 4) return false;
+          if (!data.startsWith('.')) return false;
+          return RegExp(r'^\.\d{3}$').hasMatch(data);
+        },
+      );
+      expect(dotMillisFinder, findsOneWidget,
+          reason:
+              'Expected a Text widget matching the .mmm block of the '
+              'chronograph (starts with a dot and has exactly 3 digits), '
+              'but none was found. The format must be SS.mmmu with the '
+              'three millis digits in their own Text widget.');
+
+      // The 1-digit decimicro (u) is a separate Text widget.
+      final Finder lastDigitFinder = find.byWidgetPredicate(
+        (Widget w) {
+          if (w is! Text) return false;
+          final String? data = w.data;
+          if (data == null || data.length != 1) return false;
+          return int.tryParse(data) != null;
+        },
+      );
+      expect(lastDigitFinder, findsOneWidget,
+          reason:
+              'Expected a 1-digit Text widget for the trailing u (decimicro) '
+              'digit of the chronograph. The format must be SS.mmmu with the '
+              'last digit in its own (smaller) Text widget.');
+
+      // The u digit must be visually smaller than the .mmm block:
+      // 240 < 400, so its fontSize resolves to a smaller logical size.
+      final Text uText = tester.widget<Text>(lastDigitFinder);
+      final Text dotText = tester.widget<Text>(dotMillisFinder);
+      expect(uText.style!.fontSize!, lessThan(dotText.style!.fontSize!),
+          reason: 'the trailing u must be smaller than the .mmm block');
     });
   });
 }
