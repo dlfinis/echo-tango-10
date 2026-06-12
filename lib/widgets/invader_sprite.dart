@@ -17,14 +17,15 @@
 ///                     (rendering is identical at t=0 and t=1).
 ///   * `niPorAsomo`  — looping "glitch CRT" corruption effect driven
 ///                     by a 2.5s repeat controller. The body color
-///                     RGB-splits between cyan and red at 10 Hz, each
-///                     row wobbles ±3 px horizontally at 8 Hz, the
-///                     whole sprite shrinks 1.0→0.4 (easeIn), and
-///                     over the last 10% of the cycle the sprite
-///                     fades to invisible — then "respawns" full-size
-///                     at t=0 of the next cycle. X-shape eyes flicker
-///                     on/off at ~6.7 Hz. `t=0` and `t=1` → assembled,
-///                     full-scale, full-alpha (loop is seamless).
+///                     RGB-splits between cyan and red at 2 Hz, each
+///                     row wobbles ±3 px horizontally at 8 Hz and
+///                     ±1.5 px vertically at 6 Hz, and the X-shape
+///                     eyes flicker on/off at ~7 Hz. The invader is
+///                     ALWAYS at full size and full alpha — the
+///                     "glitch" reads as continuous motion (jitter +
+///                     color swap + eye flicker), not a fade.
+///                     `t=0` and `t=1` → assembled, full-scale,
+///                     full-alpha (loop is seamless).
 ///   * `tePasaste`   — one-shot explosion. t<0.3: 4 colored squares
 ///                     pulse outward in a cross pattern. t>=0.3:
 ///                     squares fly outward and fade. `t=1` → nothing.
@@ -322,21 +323,27 @@ class InvaderSpritePainter extends CustomPainter {
   //
   // Effects layered each frame:
   //   1. RGB split      — body color alternates between a +cyan
-  //                       blend and a +red blend every 0.1s
-  //                       (10 Hz square wave). Gives the chromatic
-  //                       aberration look of a broken CRT.
-  //   2. Pixel jitter   — each row shifts horizontally by
-  //                       ±3 * sin(t*2π*8 + row*1.3) px. High-
-  //                       frequency wobble per row, cheap to draw.
-  //   3. Shrink         — global scale 1.0 → 0.4, easeIn.
-  //   4. Disappear      — alpha 1.0 → 0.0 over the last 10% of
-  //                       the cycle (t > 0.9), then back to 1.0
-  //                       at t=0 of the next loop. The sprite
-  //                       "respawns" at full size, not as a
-  //                       reverse-zoom.
-  //   5. Eye flicker    — X-eyes gate visible on/off every 0.15s
-  //                       (~6.7 Hz). When "off" the body color
-  //                       fills the eye pixels.
+  //                       blend and a +red blend every 0.2s of t
+  //                       (5 swaps per 2.5s cycle = 2 Hz). Gives
+  //                       the chromatic aberration look of a
+  //                       broken CRT.
+  //   2. Per-row jitter — each row shifts horizontally (±3 px at
+  //                       8 Hz) and vertically (±1.5 px at 6 Hz),
+  //                       phased by row index so adjacent rows
+  //                       wobble out of sync. High-frequency
+  //                       wobble per row, cheap to draw.
+  //   3. Eye flicker    — X-eyes gate visible on/off every ~0.14s
+  //                       (~7 Hz). When "off" the body color fills
+  //                       the eye pixels. The flicker is a square
+  //                       wave, not an alpha fade — the eye is
+  //                       either fully there or fully replaced by
+  //                       body color.
+  //
+  // The invader is ALWAYS at full size and full alpha. The
+  // "glitch" reads as continuous motion (jitter + color swap +
+  // eye flicker) rather than a fade-in / fade-out — that was the
+  // previous behavior, which made the sprite look static after
+  // the first 200ms of each cycle.
   // -------------------------------------------------------------------------
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
     final double tClamped = t.clamp(0.0, 1.0);
@@ -346,89 +353,59 @@ class InvaderSpritePainter extends CustomPainter {
     final double originX = (size.width - spriteW) / 2.0;
     final double originY = (size.height - spriteH) / 2.0;
 
-    // (1) RGB split — 10 Hz square wave. (t * 10) % 2 < 1 selects
-    // the cyan half of the cycle, else red.
-    final Color shiftedBody =
-        (tClamped * 10.0) % 2.0 < 1.0
-            ? (Color.lerp(body, Colors.cyan, 0.6) ?? body)
-            : (Color.lerp(body, Colors.red, 0.6) ?? body);
+    // (1) RGB split — 2 Hz square wave (5 swaps per 2.5s cycle).
+    final Color glitchBody =
+        (tClamped * 5.0) % 2.0 < 1.0
+            ? (Color.lerp(body, Colors.cyan, 0.55) ?? body)
+            : (Color.lerp(body, Colors.red, 0.55) ?? body);
 
-    // (3) Shrink — 1.0 → 0.4, easeIn.
-    final double scale = 1.0 - 0.6 * Curves.easeIn.transform(tClamped);
+    // (3) Eye flicker — 7 Hz square wave. When "off" the eye
+    // pixels are covered with the body color so the face is
+    // featureless for that frame.
+    final bool eyesVisible = (tClamped * 7.0) % 2.0 < 1.5;
 
-    // (4) Disappear — alpha 1.0 → 0.0 over the last 10% of the
-    // cycle. At t > 0.9 the sprite fades to invisible; at t=0
-    // (loop start) it is full-alpha again.
-    final double alpha = tClamped > 0.9
-        ? (1.0 - (tClamped - 0.9) / 0.1).clamp(0.0, 1.0)
-        : 1.0;
-
-    // (5) Eye flicker — every 0.15s the eyes turn off and on. At
-    // `(t*6.67) % 2 < 1` the eyes are ON; otherwise the body
-    // color fills the eye pixels (no cavity is drawn).
-    final bool eyesVisible = (tClamped * 6.67) % 2.0 < 1.0;
-
-    canvas.save();
-    // Apply the global shrink first (around the canvas center
-    // so the sprite shrinks in place rather than toward 0,0).
-    canvas.translate(size.width / 2.0, size.height / 2.0);
-    canvas.scale(scale, scale);
-    canvas.translate(-size.width / 2.0, -size.height / 2.0);
-
+    // (2) Per-row pixel jitter. dx is the horizontal offset
+    // (±3 px at 8 Hz), dy is the vertical offset (±1.5 px at
+    // 6 Hz). The phase is offset by row index so adjacent rows
+    // wobble out of sync — this is what gives the "broken CRT"
+    // look. Each row is drawn at the assembled Y plus its own
+    // dy, so the rows appear to split apart and rejoin every
+    // frame.
     for (int r = 0; r < _rows; r++) {
-      // (2) Per-row pixel jitter — ±3 px at 8 Hz, phased by row
-      // index so adjacent rows wobble out of sync.
-      final double jitterX =
-          3.0 * math.sin(tClamped * 2 * math.pi * 8.0 + r * 1.3);
+      final double rowPhase = r * 0.7;
+      final double dx =
+          math.sin(tClamped * 2 * math.pi * 8.0 + rowPhase) * 3.0;
+      final double dy =
+          math.cos(tClamped * 2 * math.pi * 6.0 + rowPhase) * 1.5;
 
-      // (4) Apply the alpha to the body paint. The eyes use
-      // `cavity` and stay full-alpha on their own pixels (we
-      // just skip drawing them when eyesVisible is false).
-      final Paint bodyPaint = Paint()..color = shiftedBody.withValues(alpha: alpha);
+      final Paint bodyPaint = Paint()..color = glitchBody;
       _drawBodyRow(
         canvas,
-        originX + jitterX,
-        originY,
+        originX + dx,
+        originY + r * pixelSize + dy,
         r,
         _niPorAsomo,
         bodyPaint,
       );
     }
 
-    // X-shape eyes, drawn at the assembled position. When
-    // eyesVisible is false, we draw the body color over the same
-    // pixels so the sprite has no carved-out eyes for that frame.
-    if (eyesVisible) {
-      final Paint eyePaint = Paint()..color = cavity.withValues(alpha: alpha);
-      _drawEyePairRaw(
-        canvas,
-        originX,
-        originY,
-        paint: eyePaint,
-        leftCol: 1,
-        rightCol: 6,
-        topRow: 3,
-        eyePattern: _niXLeftEye,
-        eyeHeightRows: 3,
-      );
-    } else {
-      // Cover the eye pixels with the (alpha'd) body color so the
-      // face is featureless for this frame.
-      final Paint coverPaint = Paint()..color = shiftedBody.withValues(alpha: alpha);
-      _drawEyePairRaw(
-        canvas,
-        originX,
-        originY,
-        paint: coverPaint,
-        leftCol: 1,
-        rightCol: 6,
-        topRow: 3,
-        eyePattern: _niXLeftEye,
-        eyeHeightRows: 3,
-      );
-    }
-
-    canvas.restore();
+    // Eyes are drawn at the assembled position (no jitter) so
+    // the Xs themselves don't smear. They toggle between cavity
+    // and body color so the face alternates "X-eyed" and
+    // featureless.
+    final Paint eyePaint = Paint()
+      ..color = eyesVisible ? cavity : glitchBody;
+    _drawEyePairRaw(
+      canvas,
+      originX,
+      originY,
+      paint: eyePaint,
+      leftCol: 1,
+      rightCol: 6,
+      topRow: 3,
+      eyePattern: _niXLeftEye,
+      eyeHeightRows: 3,
+    );
   }
 
   // -------------------------------------------------------------------------

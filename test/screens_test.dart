@@ -992,5 +992,151 @@ void main() {
       expect(uText.style!.fontSize!, lessThan(dotText.style!.fontSize!),
           reason: 'the trailing u must be smaller than the .mmm block');
     });
+
+    testWidgets(
+        'chronograph natural fontSizes are 1200/600/360 at 1280x800',
+        (WidgetTester tester) async {
+      // Pins the Fix 1 scale-up: with the new padding
+      // (vertical: 0) the chronograph should fill the 800-px
+      // height. The natural fontSizes are pinned to 1200/600/360
+      // (33% larger than 900/400/240) so the FittedBox picks the
+      // largest size that fits the viewport. If a future refactor
+      // shrinks the natural sizes the test catches it.
+      await setFireHd8Viewport(tester);
+      final StopwatchController controller = StopwatchController();
+      await tester.pumpWidget(_wrap(PlayingScreen(
+        controller: controller,
+        onTimeout: () {},
+      )));
+      await tester.pump(const Duration(milliseconds: 1500));
+
+      // Find the seconds, .mmm, and u Text widgets and assert
+      // their natural fontSize.
+      final Finder secondsFinder = find.byWidgetPredicate(
+        (Widget w) {
+          if (w is! Text) return false;
+          final String? data = w.data;
+          if (data == null || data.length != 2) return false;
+          final int? n = int.tryParse(data);
+          return n != null && n >= 0 && n <= 60;
+        },
+      );
+      final Finder dotMillisFinder = find.byWidgetPredicate(
+        (Widget w) {
+          if (w is! Text) return false;
+          final String? data = w.data;
+          if (data == null || data.length != 4) return false;
+          if (!data.startsWith('.')) return false;
+          return RegExp(r'^\.\d{3}$').hasMatch(data);
+        },
+      );
+      final Finder lastDigitFinder = find.byWidgetPredicate(
+        (Widget w) {
+          if (w is! Text) return false;
+          final String? data = w.data;
+          if (data == null || data.length != 1) return false;
+          return int.tryParse(data) != null;
+        },
+      );
+      final Text secondsText = tester.widget<Text>(secondsFinder.first);
+      final Text dotText = tester.widget<Text>(dotMillisFinder);
+      final Text uText = tester.widget<Text>(lastDigitFinder);
+      expect(secondsText.style!.fontSize, 1200.0,
+          reason: 'seconds natural fontSize should be 1200 (33% scale-up)');
+      expect(dotText.style!.fontSize, 600.0,
+          reason: '.mmm natural fontSize should be 600');
+      expect(uText.style!.fontSize, 360.0,
+          reason: 'u natural fontSize should be 360');
+      // No overflow / paint exception.
+      expect(tester.takeException(), isNull,
+          reason: 'chronograph must not overflow at 1280x800 with the '
+              'new fontSizes');
+    });
+  });
+
+  group('WaitingScreen — leaderboard empty-state height parity', () {
+    // The empty-state message used to render much smaller than
+    // the 5-row state (just a single FittedBox line), so the
+    // panel visually shrank. The fix pins the empty state to
+    // 5 * 60 px (matching the 5-row natural height) and centers
+    // the message inside that box.
+    Future<void> pumpAndPumpIntoLeaderboard(
+      WidgetTester tester,
+      _Pair pair,
+    ) async {
+      await tester.pumpWidget(_wrap(WaitingScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+      )));
+      await tester.pump();
+      // Cross the 3s message boundary so the screen is in the
+      // leaderboard phase.
+      await tester.pump(const Duration(milliseconds: 3500));
+    }
+
+    testWidgets(
+        'empty leaderboard panel and 5-row panel are visually the same height',
+        (WidgetTester tester) async {
+      final pair = await _bootstrap();
+      await pair.store.setMessageRotationSeconds(1);
+      await pair.store.setLeaderboardRotationSeconds(15);
+
+      // First: empty leaderboard. Take the size of the panel
+      // (the Column inside the SingleChildScrollView — first
+      // Column under the SafeArea in the leaderboard phase).
+      await pumpAndPumpIntoLeaderboard(tester, pair);
+      // Sanity: the empty-state message is present.
+      expect(find.text('TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!'),
+          findsOneWidget);
+      // Measure the empty-state SizedBox (5 * 60 = 300 px tall).
+      final Finder emptySizeBox = find.ancestor(
+        of: find.text('TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!'),
+        matching: find.byType(SizedBox),
+      ).first;
+      final RenderBox emptyBox =
+          tester.renderObject(emptySizeBox) as RenderBox;
+      final Size emptySize = emptyBox.size;
+
+      // Second: 5-row leaderboard. Seed 5 entries, swap the
+      // leaderboard, and pump back into the leaderboard phase.
+      for (int i = 0; i < 5; i++) {
+        await pair.lb.add(_entry(
+          name: 'P${i + 1}',
+          rawSeconds: 10.0 + i * 0.01,
+          delta: i * 0.01,
+        ));
+      }
+      await pumpAndPumpIntoLeaderboard(tester, pair);
+      // Measure one of the 5-row Padding wrappers (each row is
+      // Padding(vertical: 6) around a FittedBox).
+      final Finder rowPadding = find
+          .ancestor(
+            of: find.text('P1'),
+            matching: find.byType(Padding),
+          )
+          .first;
+      final RenderBox rowBox =
+          tester.renderObject(rowPadding) as RenderBox;
+      final Size rowSize = rowBox.size;
+
+      // Per-row height is variable (depends on viewport — the
+      // FittedBox scales the 48sp text to fit). On the kiosk
+      // target (1280x800) the rows are ~100 px tall, so the
+      // empty-state SizedBox is pinned to 5 * 100 = 500 px.
+      // The 5 rows together should be close to
+      // 5 * rowSize.height. We assert the empty state is within
+      // 50 px of the 5-row panel so the panel does not visually
+      // shrink dramatically (the bug was that the empty state
+      // collapsed to a single line, leaving hundreds of px of
+      // empty space).
+      final double fiveRows = rowSize.height * 5.0;
+      expect(
+        (emptySize.height - fiveRows).abs(),
+        lessThanOrEqualTo(50.0),
+        reason: 'empty-state panel height (${emptySize.height}px) should '
+            'match the 5-row panel height (~${fiveRows.toStringAsFixed(0)}px) '
+            'within 50px so the panel does not visually shrink',
+      );
+    });
   });
 }

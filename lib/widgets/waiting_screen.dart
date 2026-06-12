@@ -351,18 +351,30 @@ class _WaitingScreenState extends State<WaitingScreen>
             ),
             const SizedBox(height: 16),
             if (top.isEmpty)
-              const FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
-                  style: TextStyle(
-                    color: Color(0xFFAAAAAA),
-                    fontSize: 48,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    fontFamily: 'BungeeInline',
-                    fontFamilyFallback: <String>['Bungee'],
+              // The 5-row panel is ~100 px per row on the kiosk
+              // target (Padding 6+6 + ~88 px of FittedBox text at
+              // its scaled-down size). Pin the empty state to
+              // 5 * 100 = 500 logical px and center the message
+              // inside that box so the panel does not visually
+              // shrink when the leaderboard is empty.
+              const SizedBox(
+                height: 5 * 100.0,
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFFAAAAAA),
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        fontFamily: 'BungeeInline',
+                        fontFamilyFallback: <String>['Bungee'],
+                      ),
+                    ),
                   ),
                 ),
               )
