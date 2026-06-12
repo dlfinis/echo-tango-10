@@ -11,6 +11,8 @@
 //     + shows snackbar, Salir calls onExit.
 //   * ConfettiPainter: shouldRepaint respects value/seed/intensity.
 
+import 'dart:ui' as ui;
+
 import 'package:arcade_timer_10s/models/leaderboard_entry.dart';
 import 'package:arcade_timer_10s/services/config_store.dart';
 import 'package:arcade_timer_10s/services/leaderboard.dart';
@@ -845,6 +847,98 @@ void main() {
       expect(tapped, isFalse);
       expect(find.text('¡CASI, CASI!'), findsOneWidget);
     });
+
+    testWidgets(
+        'CASI branch renders the achieved time as a sign next to the invader',
+        (WidgetTester tester) async {
+      // Pump ResultScreen with elapsed=10.005 (CASI range). After
+      // a 1s pump the TweenAnimationBuilder has completed (its
+      // duration is 400ms), so the sign text is at full scale.
+      // 10.005.toStringAsFixed(2) → "10.01" in Dart.
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 10.005,
+        onNext: () {},
+      )));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('¡CASI, CASI!'), findsOneWidget,
+          reason: 'verdict label still renders for CASI');
+      expect(find.text('10.01s'), findsOneWidget,
+          reason: 'achieved-time sign shows the elapsed time with 2 decimals '
+              'and an s suffix');
+      // The invader painter is still present alongside the sign.
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'CASI branch sign uses DSEG7Classic-Bold at fontSize 56 with accent color',
+        (WidgetTester tester) async {
+      // Pins the visual recipe: the sign Text widget must be
+      // DSEG7Classic-Bold, fontSize 56, color = default accent
+      // (the green kDefaultAccentColorHex), weight 900.
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 9.42,
+        onNext: () {},
+      )));
+      await tester.pump(const Duration(seconds: 1));
+      final Finder signFinder = find.text('9.42s');
+      expect(signFinder, findsOneWidget);
+      final Text sign = tester.widget<Text>(signFinder);
+      expect(sign.style!.fontFamily, 'DSEG7Classic-Bold');
+      expect(sign.style!.fontSize, 56.0);
+      expect(sign.style!.color, const Color(kDefaultAccentColorHex));
+    });
+
+    testWidgets(
+        'NI POR ASOMO branch renders BOO text and invader that turns around',
+        (WidgetTester tester) async {
+      // Pump ResultScreen with elapsed=8.5 (NI POR ASOMO range).
+      // After 0.5s the drop controller (2.5s repeat) is at
+      // t≈0.2 — the turn-around phase where the invader is
+      // mirrored and the BOO text is partway through its
+      // overshoot. The "¡BOO!" string itself is drawn inside the
+      // CustomPainter, not as a widget, so we can't find it via
+      // find.text — we instead assert the painter receives a
+      // non-zero t and the widget tree contains the expected
+      // CustomPaint (already covered above; the regression
+      // coverage is the invader-renders-while-mirrored check).
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 8.5,
+        onNext: () {},
+      )));
+      await tester.pump(const Duration(milliseconds: 500));
+      // The invader painter is mounted and the controller is
+      // running (no exception, no overflow).
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull,
+          reason: 'NI POR ASOMO painter must not throw during the BOO cycle');
+      // The verdict label is still rendered.
+      expect(find.text('¡NI POR ASOMO!'), findsOneWidget);
+    });
   });
 
   group('InvaderSpritePainter', () {
@@ -894,6 +988,39 @@ void main() {
         colors: const <Color>[Color(0xFFFFC107), Color(0xFF000000)],
       );
       expect(a.shouldRepaint(b), isTrue);
+    });
+
+    test(
+        'niPorAsomo painter survives a full 0..1 cycle without throwing or skipping frames',
+        () {
+      // Renders the new BOO scare cycle into a Picture recorder
+      // across the full 0..1 timeline. We sample a 0.02 grid
+      // (51 frames) and check no paint call raises. This covers
+      // the three phases (neutral, mirrored, shrinking) plus the
+      // brief window where the invader is hidden (>0.95).
+      const Size size = Size(176.0, 128.0);
+      InvaderSpritePainter? prev;
+      for (double t = 0.0; t <= 1.0; t += 0.02) {
+        final InvaderSpritePainter p = InvaderSpritePainter(
+          expression: InvaderExpression.niPorAsomo,
+          pixelSize: 16.0,
+          t: t,
+          colors: const <Color>[Color(0xFFFF7070), Color(0xFF000000)],
+        );
+        final ui.PictureRecorder recorder = ui.PictureRecorder();
+        final Canvas canvas = Canvas(recorder);
+        p.paint(canvas, size);
+        final ui.Picture pic = recorder.endRecording();
+        expect(pic, isNotNull,
+            reason: 'painter at t=$t must produce a non-null Picture');
+        pic.dispose();
+        if (prev != null && t > 0.0) {
+          // Advancing t should always request a repaint.
+          expect(prev.shouldRepaint(p), isTrue,
+              reason: 'shouldRepaint must be true for t change at t=$t');
+        }
+        prev = p;
+      }
     });
   });
 

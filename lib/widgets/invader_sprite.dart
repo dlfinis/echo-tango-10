@@ -15,17 +15,21 @@
 ///   * `casi`        — static. Flat-line eyes, one arm half-raised,
 ///                     a "..." bubble above the head. `t` is ignored
 ///                     (rendering is identical at t=0 and t=1).
-///   * `niPorAsomo`  — looping "glitch CRT" corruption effect driven
-///                     by a 2.5s repeat controller. The body color
-///                     RGB-splits between cyan and red at 2 Hz, each
-///                     row wobbles ±3 px horizontally at 8 Hz and
-///                     ±1.5 px vertically at 6 Hz, and the X-shape
-///                     eyes flicker on/off at ~7 Hz. The invader is
-///                     ALWAYS at full size and full alpha — the
-///                     "glitch" reads as continuous motion (jitter +
-///                     color swap + eye flicker), not a fade.
-///                     `t=0` and `t=1` → assembled, full-scale,
-///                     full-alpha (loop is seamless).
+///   * `niPorAsomo`  — looping "¡BOO!" scare cycle driven by a
+///                     2.5s repeat controller. t<0.1: invader
+///                     faces forward (250ms neutral pose).
+///                     0.1≤t<0.4: invader is mirrored
+///                     horizontally (turn-around). 0.4≤t<0.95:
+///                     invader scales 1.0→0.0 with easeIn while
+///                     a big red "¡BOO!" text overlay bounces in
+///                     at the center (grows 0→1.2 then settles
+///                     to 1.0). t≥0.95: invader is not drawn at
+///                     all; the BOO text fades to 0. The cycle
+///                     then restarts at t=0 with the invader
+///                     facing forward — `t=0` and `t=1` both
+///                     show the assembled, full-scale,
+///                     full-alpha invader, so the loop is
+///                     seamless.
 ///   * `tePasaste`   — one-shot explosion. t<0.3: 4 colored squares
 ///                     pulse outward in a cross pattern. t>=0.3:
 ///                     squares fly outward and fade. `t=1` → nothing.
@@ -312,38 +316,37 @@ class InvaderSpritePainter extends CustomPainter {
   }
 
   // -------------------------------------------------------------------------
-  // NI POR ASOMO — glitch CRT corruption
+  // NI POR ASOMO — "¡BOO!" scare cycle
   //
   // The parent controller is a 2.5s `repeat()`, so t goes 0→1 over
-  // 2.5s and then loops back to 0. All effects are derived from
-  // t inside the painter — no Transform wrappers, no
-  // `canvas.save/translate` outside the body draw. At t=0 the
-  // sprite is assembled, full-scale, full-alpha and full-color;
-  // at t=1 it is the same. The loop is seamless.
+  // 2.5s and then loops back to 0. The cycle is split into three
+  // phases derived from t:
   //
-  // Effects layered each frame:
-  //   1. RGB split      — body color alternates between a +cyan
-  //                       blend and a +red blend every 0.2s of t
-  //                       (5 swaps per 2.5s cycle = 2 Hz). Gives
-  //                       the chromatic aberration look of a
-  //                       broken CRT.
-  //   2. Per-row jitter — each row shifts horizontally (±3 px at
-  //                       8 Hz) and vertically (±1.5 px at 6 Hz),
-  //                       phased by row index so adjacent rows
-  //                       wobble out of sync. High-frequency
-  //                       wobble per row, cheap to draw.
-  //   3. Eye flicker    — X-eyes gate visible on/off every ~0.14s
-  //                       (~7 Hz). When "off" the body color fills
-  //                       the eye pixels. The flicker is a square
-  //                       wave, not an alpha fade — the eye is
-  //                       either fully there or fully replaced by
-  //                       body color.
+  //   t in [0.0, 0.1] — neutral pose. Invader faces forward at
+  //                     full size, full alpha, full color. Gives
+  //                     a 250ms "settled" moment so the cycle
+  //                     reads as discrete beats rather than
+  //                     continuous motion.
+  //   t in [0.1, 0.4] — turn-around. Invader is mirrored
+  //                     horizontally (scaleX: -1). It literally
+  //                     turns its back on the player.
+  //   t in [0.4, 1.0] — shrink-out. Invader scales 1.0 → 0.0 with
+  //                     Curves.easeIn, vanishing into the dark
+  //                     while a big red "¡BOO!" text overlay
+  //                     bounces in at the center. At t > 0.95
+  //                     the invader is not drawn at all and the
+  //                     BOO text starts to fade.
   //
-  // The invader is ALWAYS at full size and full alpha. The
-  // "glitch" reads as continuous motion (jitter + color swap +
-  // eye flicker) rather than a fade-in / fade-out — that was the
-  // previous behavior, which made the sprite look static after
-  // the first 200ms of each cycle.
+  // The cycle then loops: at t=0 the invader is back, facing
+  // forward, full size. The "vanish → reappear" handoff at the
+  // t=1 / t=0 boundary reads as a sudden reappear; over the full
+  // 2.5s loop the user sees: pose → turn → BOO + shrink → flash
+  // → pose again.
+  //
+  // The X-shape eyes (the existing _niPorAsomo grid + the
+  // _drawEyePairRaw overlay) are still rendered using the same
+  // helpers as the previous glitch implementation — only the
+  // TRANSFORMS per t change, not the body shape or eye pattern.
   // -------------------------------------------------------------------------
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
     final double tClamped = t.clamp(0.0, 1.0);
@@ -353,59 +356,105 @@ class InvaderSpritePainter extends CustomPainter {
     final double originX = (size.width - spriteW) / 2.0;
     final double originY = (size.height - spriteH) / 2.0;
 
-    // (1) RGB split — 2 Hz square wave (5 swaps per 2.5s cycle).
-    final Color glitchBody =
-        (tClamped * 5.0) % 2.0 < 1.0
-            ? (Color.lerp(body, Colors.cyan, 0.55) ?? body)
-            : (Color.lerp(body, Colors.red, 0.55) ?? body);
+    // (1) Invader is hidden once we've shrunk past 0.95 so the
+    // "reappear" at t=0 reads as a clean reset instead of a
+    // popping sprite.
+    final double shrinkT = tClamped < 0.4
+        ? 1.0
+        : Curves.easeIn.transform((tClamped - 0.4) / 0.6);
+    final bool drawInvader = tClamped < 0.95 && shrinkT > 0.0;
 
-    // (3) Eye flicker — 7 Hz square wave. When "off" the eye
-    // pixels are covered with the body color so the face is
-    // featureless for that frame.
-    final bool eyesVisible = (tClamped * 7.0) % 2.0 < 1.5;
+    if (drawInvader) {
+      // (1a) t < 0.1 → facing forward. 0.1 ≤ t < 0.4 →
+      // mirrored horizontally (turn-around). t ≥ 0.4 → also
+      // scaled down by shrinkT.
+      final bool mirrored = tClamped >= 0.1 && tClamped < 0.4;
 
-    // (2) Per-row pixel jitter. dx is the horizontal offset
-    // (±3 px at 8 Hz), dy is the vertical offset (±1.5 px at
-    // 6 Hz). The phase is offset by row index so adjacent rows
-    // wobble out of sync — this is what gives the "broken CRT"
-    // look. Each row is drawn at the assembled Y plus its own
-    // dy, so the rows appear to split apart and rejoin every
-    // frame.
-    for (int r = 0; r < _rows; r++) {
-      final double rowPhase = r * 0.7;
-      final double dx =
-          math.sin(tClamped * 2 * math.pi * 8.0 + rowPhase) * 3.0;
-      final double dy =
-          math.cos(tClamped * 2 * math.pi * 6.0 + rowPhase) * 1.5;
+      if (mirrored) {
+        canvas.save();
+        canvas.scale(-1.0, 1.0);
+        canvas.translate(-size.width, 0.0);
+      }
 
-      final Paint bodyPaint = Paint()..color = glitchBody;
-      _drawBodyRow(
+      if (shrinkT < 1.0) {
+        canvas.save();
+        canvas.translate(size.width / 2.0, size.height / 2.0);
+        canvas.scale(shrinkT, shrinkT);
+        canvas.translate(-size.width / 2.0, -size.height / 2.0);
+      }
+
+      // Body — use the existing per-row draw helper so the
+      // invader looks identical to the previous glitch version,
+      // just at different transforms.
+      final Paint bodyPaint = Paint()..color = body;
+      for (int r = 0; r < _rows; r++) {
+        _drawBodyRow(
+          canvas,
+          originX,
+          originY + r * pixelSize,
+          r,
+          _niPorAsomo,
+          bodyPaint,
+        );
+      }
+
+      // X-shape eyes (no flicker — they're always on while the
+      // invader is visible).
+      final Paint eyePaint = Paint()..color = cavity;
+      _drawEyePairRaw(
         canvas,
-        originX + dx,
-        originY + r * pixelSize + dy,
-        r,
-        _niPorAsomo,
-        bodyPaint,
+        originX,
+        originY,
+        paint: eyePaint,
+        leftCol: 1,
+        rightCol: 6,
+        topRow: 3,
+        eyePattern: _niXLeftEye,
+        eyeHeightRows: 3,
       );
+
+      if (shrinkT < 1.0) {
+        canvas.restore();
+      }
+      if (mirrored) {
+        canvas.restore();
+      }
     }
 
-    // Eyes are drawn at the assembled position (no jitter) so
-    // the Xs themselves don't smear. They toggle between cavity
-    // and body color so the face alternates "X-eyed" and
-    // featureless.
-    final Paint eyePaint = Paint()
-      ..color = eyesVisible ? cavity : glitchBody;
-    _drawEyePairRaw(
-      canvas,
-      originX,
-      originY,
-      paint: eyePaint,
-      leftCol: 1,
-      rightCol: 6,
-      topRow: 3,
-      eyePattern: _niXLeftEye,
-      eyeHeightRows: 3,
-    );
+    // (2) "¡BOO!" text overlay. Grows 0 → 1.2 with a small
+    // overshoot during the turn-around phase (0.1 ≤ t < 0.4),
+    // then settles to 1.0 for the rest of the cycle. Fades out
+    // during the last 5% so the cycle ends on a clean dark
+    // canvas before the invader reappears.
+    final double booScale = tClamped < 0.1
+        ? 0.0
+        : (tClamped < 0.4 ? (tClamped - 0.1) / 0.3 * 1.2 : 1.0);
+    final double booAlpha = tClamped < 0.1
+        ? 0.0
+        : (tClamped < 0.95 ? 1.0 : (1.0 - (tClamped - 0.95) / 0.05));
+    if (booScale > 0.0 && booAlpha > 0.0) {
+      final TextPainter tp = TextPainter(
+        text: TextSpan(
+          text: '¡BOO!',
+          style: TextStyle(
+            color: Colors.red.withValues(alpha: booAlpha),
+            fontSize: 96,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'BungeeInline',
+            fontFamilyFallback: const <String>['Bungee'],
+          ),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout(maxWidth: size.width);
+      canvas.save();
+      canvas.translate(size.width / 2.0, size.height / 2.0);
+      canvas.scale(booScale, booScale);
+      canvas.translate(-tp.width / 2.0, -tp.height / 2.0);
+      tp.paint(canvas, Offset.zero);
+      canvas.restore();
+    }
   }
 
   // -------------------------------------------------------------------------

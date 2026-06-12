@@ -79,6 +79,12 @@ class _ResultScreenState extends State<ResultScreen>
   AnimationController? _dropController;
   AnimationController? _teShakeController;
 
+  /// Set to true on mount for the CASI branch. Gates the one-shot
+  /// scale-in of the achieved-time "sign" widget next to the
+  /// invader. The flag is read by [_buildEmoji] so the
+  /// [TweenAnimationBuilder] only runs on the first frame.
+  bool _casiSignAnimated = false;
+
   _Verdict _classifyVerdict(double elapsed) {
     if (elapsed < kFarShortThresholdSeconds) return _Verdict.niPorAsomo;
     if (elapsed > kFarOvershootThresholdSeconds) return _Verdict.tePasaste;
@@ -143,6 +149,10 @@ class _ResultScreenState extends State<ResultScreen>
         vsync: this,
         duration: const Duration(seconds: 1),
       )..repeat();
+    } else if (_verdict == _Verdict.casi) {
+      // Flip the "sign animated" flag so [_buildEmoji] mounts the
+      // TweenAnimationBuilder exactly once on the first frame.
+      _casiSignAnimated = true;
     } else if (_verdict == _Verdict.niPorAsomo) {
       _dropController = AnimationController(
         vsync: this,
@@ -250,6 +260,12 @@ class _ResultScreenState extends State<ResultScreen>
   /// (spin / drop / teShake) are still owned by the parent — they
   /// just feed `t` into the painter instead of driving a Transform.
   ///
+  /// For the CASI branch the layout becomes a [Row] with TWO
+  /// children: the invader (existing [CustomPaint]) and a
+  /// "sign" widget showing the achieved time (e.g. "9.98s") with
+  /// a one-shot scale-in. The other 3 verdicts keep the original
+  /// single-invader layout (a [Flexible] + [FittedBox] wrap).
+  ///
   /// The sprite is wrapped in [Flexible] + [FittedBox] so it
   /// shrinks to fit on the smallest kiosk viewport (800x480) but
   /// stays at the full 128x176 natural size on bigger screens.
@@ -259,7 +275,7 @@ class _ResultScreenState extends State<ResultScreen>
     const double height = 128.0;
     const double pixelSize = height / 8.0;
 
-    return Flexible(
+    final Widget invader = Flexible(
       child: FittedBox(
         fit: BoxFit.scaleDown,
         alignment: Alignment.center,
@@ -306,6 +322,69 @@ class _ResultScreenState extends State<ResultScreen>
           ),
         ),
       ),
+    );
+
+    if (_verdict != _Verdict.casi) {
+      return invader;
+    }
+
+    // CASI: a Row of [invader | sign]. The sign scales in once on
+    // mount via a TweenAnimationBuilder — the flag set in
+    // initState ensures we only run the animation on the first
+    // build. The sign's text uses DSEG7-Classic-Bold at fontSize
+    // 56 with the verdict accent colour and a dark "pixel-art
+    // sign" frame so it reads as a retro placard.
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        invader,
+        const SizedBox(width: 16),
+        if (_casiSignAnimated)
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOutBack,
+                builder: (BuildContext context, double scale, Widget? child) {
+                  return Transform.scale(
+                    scale: scale,
+                    child: child,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF000000),
+                    border: Border.all(
+                      color: const Color(kDefaultAccentColorHex),
+                      width: 4,
+                    ),
+                  ),
+                  child: Text(
+                    '${widget.elapsedSeconds.toStringAsFixed(2)}s',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(kDefaultAccentColorHex),
+                      fontSize: 56,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'DSEG7Classic-Bold',
+                      fontFamilyFallback: <String>['monospace'],
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
