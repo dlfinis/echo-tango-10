@@ -108,7 +108,14 @@ class _AdminScreenState extends State<AdminScreen> {
       text: widget.configStore.subTaglineRotationSeconds().toString(),
     );
     _leaderboardIntervalController = TextEditingController(
-      text: widget.configStore.leaderboardRotationSeconds().toString(),
+      // Clamp the persisted value to the new [3,15] range so any
+      // legacy entry above 15 (e.g. set when the upper bound was
+      // 120) is shown to the operator at 15 — the next save will
+      // then persist the clamped value back.
+      text: widget.configStore
+          .leaderboardRotationSeconds()
+          .clamp(kMinLeaderboardRotationSeconds, kMaxLeaderboardRotationSeconds)
+          .toString(),
     );
     _resultTimeoutController = TextEditingController(
       text: widget.configStore.resultAutoReturnSeconds().toString(),
@@ -197,7 +204,7 @@ class _AdminScreenState extends State<AdminScreen> {
           backgroundColor: Color(0xFFB71C1C),
           content: Text(
             'Tiempo del ranking debe estar entre '
-            '3 y 120 segundos',
+            '3 y 15 segundos',
           ),
           duration: Duration(seconds: 3),
         ),
@@ -458,7 +465,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 label: 'Tiempo del ranking',
                 controller: _leaderboardIntervalController,
                 onSave: _saveLeaderboardRotation,
-                helperText: 'Segundos. Mínimo 3, máximo 120.',
+                helperText: 'Segundos. Mínimo 3, máximo 15.',
               ),
               const SizedBox(height: 24),
 

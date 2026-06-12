@@ -33,7 +33,7 @@ const int kDefaultAccentColorHex = 0xFF00FF00;
 const Duration kMessageRotationInterval = Duration(seconds: 30);
 
 /// How long the leaderboard view is shown before rotating back to messages.
-const Duration kLeaderboardRotationInterval = Duration(seconds: 300);
+const Duration kLeaderboardRotationInterval = Duration(seconds: 15);
 
 /// Inclusive lower bound of the leaderboard rotation interval
 /// (seconds). Anything shorter than this is rejected by
@@ -43,7 +43,7 @@ const int kMinLeaderboardRotationSeconds = 3;
 /// Inclusive upper bound of the leaderboard rotation interval
 /// (seconds). Anything longer than this is rejected by
 /// `ConfigStore.setLeaderboardRotationSeconds`.
-const int kMaxLeaderboardRotationSeconds = 120;
+const int kMaxLeaderboardRotationSeconds = 15;
 
 // ---------------------------------------------------------------------------
 // Gameplay timing & tolerance (see spec requirements 1, 3, 6)

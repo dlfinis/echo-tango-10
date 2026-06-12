@@ -81,7 +81,7 @@ void main() {
       final store = await ConfigStore.load();
       expect(store.invitationMessages(), kDefaultInvitationMessages);
       expect(store.messageRotationSeconds(), 30);
-      expect(store.leaderboardRotationSeconds(), 300);
+      expect(store.leaderboardRotationSeconds(), 15);
       expect(store.bgColorArgb(), kDefaultBgColorHex);
       expect(store.textColorArgb(), kDefaultTextColorHex);
       expect(store.accentColorArgb(), kDefaultAccentColorHex);
@@ -111,9 +111,9 @@ void main() {
     test('rotation interval setters persist', () async {
       final store = await ConfigStore.load();
       await store.setMessageRotationSeconds(45);
-      await store.setLeaderboardRotationSeconds(120);
+      await store.setLeaderboardRotationSeconds(15);
       expect(store.messageRotationSeconds(), 45);
-      expect(store.leaderboardRotationSeconds(), 120);
+      expect(store.leaderboardRotationSeconds(), 15);
     });
 
     test('color setters persist', () async {

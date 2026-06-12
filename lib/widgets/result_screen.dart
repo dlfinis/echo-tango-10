@@ -249,52 +249,62 @@ class _ResultScreenState extends State<ResultScreen>
   /// Replaces the old emoji widget. The animation controllers
   /// (spin / drop / teShake) are still owned by the parent — they
   /// just feed `t` into the painter instead of driving a Transform.
+  ///
+  /// The sprite is wrapped in [Flexible] + [FittedBox] so it
+  /// shrinks to fit on the smallest kiosk viewport (800x480) but
+  /// stays at the full 128x176 natural size on bigger screens.
   Widget _buildEmoji() {
     // 128 logical px tall sprite; the painter scales the 11x8 grid
     // to fit via pixelSize = 128/8 = 16. Width is 11*16 = 176.
     const double height = 128.0;
     const double pixelSize = height / 8.0;
 
-    return SizedBox(
-      height: height,
-      width: 11.0 * pixelSize,
-      child: AnimatedBuilder(
-        animation: Listenable.merge(<Listenable>[
-          _spinController ?? const AlwaysStoppedAnimation<double>(0.0),
-          _dropController ?? const AlwaysStoppedAnimation<double>(0.0),
-          _teShakeController ?? const AlwaysStoppedAnimation<double>(0.0),
-        ]),
-        builder: (BuildContext context, Widget? _) {
-          final double t;
-          final List<Color> colors = _spriteColors;
-          switch (_verdict) {
-            case _Verdict.victory:
-              // Linear t — the bounce/rotation are sin waves so
-              // they read as constant motion; an easeInOut curve
-              // would make the speed non-uniform and feel stuttery.
-              t = _spinController!.value;
-              break;
-            case _Verdict.casi:
-              t = 0.0; // static
-              break;
-            case _Verdict.niPorAsomo:
-              // Linear 0..1..0..1 in 2.5s — the painter handles its
-              // own fall/rise curve internally.
-              t = _dropController!.value;
-              break;
-            case _Verdict.tePasaste:
-              t = Curves.easeIn.transform(_teShakeController!.value);
-              break;
-          }
-          return CustomPaint(
-            painter: InvaderSpritePainter(
-              expression: _expression,
-              pixelSize: pixelSize,
-              t: t,
-              colors: colors,
-            ),
-          );
-        },
+    return Flexible(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: SizedBox(
+          height: height,
+          width: 11.0 * pixelSize,
+          child: AnimatedBuilder(
+            animation: Listenable.merge(<Listenable>[
+              _spinController ?? const AlwaysStoppedAnimation<double>(0.0),
+              _dropController ?? const AlwaysStoppedAnimation<double>(0.0),
+              _teShakeController ?? const AlwaysStoppedAnimation<double>(0.0),
+            ]),
+            builder: (BuildContext context, Widget? _) {
+              final double t;
+              final List<Color> colors = _spriteColors;
+              switch (_verdict) {
+                case _Verdict.victory:
+                  // Linear t — the bounce/rotation are sin waves so
+                  // they read as constant motion; an easeInOut curve
+                  // would make the speed non-uniform and feel stuttery.
+                  t = _spinController!.value;
+                  break;
+                case _Verdict.casi:
+                  t = 0.0; // static
+                  break;
+                case _Verdict.niPorAsomo:
+                  // Linear 0..1..0..1 in 2.5s — the painter handles its
+                  // own fall/rise curve internally.
+                  t = _dropController!.value;
+                  break;
+                case _Verdict.tePasaste:
+                  t = Curves.easeIn.transform(_teShakeController!.value);
+                  break;
+              }
+              return CustomPaint(
+                painter: InvaderSpritePainter(
+                  expression: _expression,
+                  pixelSize: pixelSize,
+                  t: t,
+                  colors: colors,
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

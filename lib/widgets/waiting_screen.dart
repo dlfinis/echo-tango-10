@@ -59,7 +59,6 @@ class _WaitingScreenState extends State<WaitingScreen>
   Timer? _adminHoldTimer;
   Timer? _adminHoldTicker;
   double _adminHoldProgress = 0.0;
-  int _backdropTick = 0;
   late final AnimationController _backdropTicker;
 
   static const Duration _adminHoldTickInterval =
@@ -72,14 +71,19 @@ class _WaitingScreenState extends State<WaitingScreen>
       _elapsedSeconds += 1;
       _onTick();
     });
+    // The backdrop ticker is a single AnimationController whose
+    // ONLY purpose is to act as a [Listenable] for the invader-march
+    // painter. Its 10s cycle repeats forever; the painter
+    // derives its own monotonic tick from `lastElapsedDuration`,
+    // and `CustomPaint` re-paints whenever the controller ticks
+    // WITHOUT scheduling a widget rebuild. This replaces the
+    // previous 20 Hz setState that rebuilt the whole Waiting
+    // tree on every frame and produced the user-visible freeze.
     _backdropTicker = AnimationController(
       vsync: this,
-      duration: const Duration(days: 365),
-    )..addListener(() {
-        if (!mounted) return;
-        setState(() => _backdropTick = (_backdropTick + 1) % 100000);
-      });
-    _backdropTicker.repeat(period: const Duration(milliseconds: 50));
+      duration: const Duration(seconds: 10),
+    );
+    _backdropTicker.repeat();
   }
 
   @override
@@ -186,18 +190,16 @@ class _WaitingScreenState extends State<WaitingScreen>
         children: <Widget>[
           // Full-screen Space Invaders march. The painter draws
           // everything (background + invaders + scanlines + stars)
-          // so there's no painter -> widget communication at all.
+          // and re-paints on every tick of the backdrop controller
+          // — CustomPaint subscribes to the painter's `listenable`
+          // and triggers a paint WITHOUT rebuilding this widget.
+          // This is the fix for the 20 Hz setState freeze.
           Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _backdropTicker,
-              builder: (BuildContext context, Widget? _) {
-                return CustomPaint(
-                  painter: InvaderMarchPainter(
-                    tick: _backdropTick,
-                    seed: 1337,
-                  ),
-                );
-              },
+            child: CustomPaint(
+              painter: InvaderMarchPainter(
+                seed: 1337,
+                listenable: _backdropTicker,
+              ),
             ),
           ),
             // Foreground: invitation message + sub-tagline on top,
@@ -436,22 +438,30 @@ class _WaitingScreenState extends State<WaitingScreen>
 // EVERYTHING (background + scanlines + stars + invaders) and
 // internally animates the background color when the formation
 // lands. Zero painter -> widget communication: the painter is a
-// pure render function, the parent just supplies a tick.
-//
-// The painter is the only place that knows the march state — the
-// parent widget just supplies a monotonically increasing [tick] and
+// pure render function, the parent just supplies a [Listenable] and
 // never has to rebuild for color changes because the painter
 // animates them itself.
+//
+// The painter is the only place that knows the march state. The
+// tick is derived inside paint() from the listenable's elapsed
+// duration, so the widget tree never rebuilds while the march runs.
 // ===========================================================================
 
 class InvaderMarchPainter extends CustomPainter {
   InvaderMarchPainter({
-    required this.tick,
     required this.seed,
-  });
+    Listenable? listenable,
+  })  : _listenable = listenable,
+        super(repaint: listenable);
 
-  final int tick;
   final int seed;
+
+  /// Kept so [paint] can read the controller's elapsed duration
+  /// and synthesize a monotonic tick (in 50ms units, matching
+  /// the previous cadence) without any setState. The base class
+  /// also subscribes to this same listenable to schedule repaints
+  /// on every tick.
+  final Listenable? _listenable;
 
   static const int _invaderCols = 10;
   static const int _invaderRows = 4;
@@ -496,6 +506,18 @@ class InvaderMarchPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Derive a monotonic tick from the listenable's elapsed time.
+    // Each unit is 50ms (matching the previous cadence), so the
+    // march period constant (`_invaderMarchPeriodFrames = 220`)
+    // still represents 11 seconds. Because `lastElapsedDuration`
+    // grows across controller cycles, the tick is monotonic over
+    // the painter's lifetime, which is what the landing check
+    // and the star-twinkle math rely on.
+    final Listenable? l = _listenable;
+    final int tick = (l is AnimationController)
+        ? (l.lastElapsedDuration?.inMilliseconds ?? 0) ~/ 50
+        : 0;
+
     // 0) Background. Either the current palette entry (during the
     //    crossfade) or a linear interpolation between two
     //    adjacent palette entries.
@@ -512,7 +534,7 @@ class InvaderMarchPainter extends CustomPainter {
     }
 
     // 2) Twinkling stars — sit behind the invaders.
-    _drawStars(canvas, size);
+    _drawStars(canvas, size, tick);
 
     // 3) Invader formation — sweeps the entire viewport.
     const double formationW =
@@ -642,7 +664,7 @@ class InvaderMarchPainter extends CustomPainter {
     }
   }
 
-  void _drawStars(Canvas canvas, Size size) {
+  void _drawStars(Canvas canvas, Size size, int tick) {
     const double starBaseAlpha = 0.20;
     final Paint starPaint = Paint();
     for (int i = 0; i < _starCount; i++) {
@@ -669,7 +691,8 @@ class InvaderMarchPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(InvaderMarchPainter old) => old.tick != tick;
+  bool shouldRepaint(InvaderMarchPainter old) =>
+      old._listenable != _listenable;
 }
 
 extension on double {

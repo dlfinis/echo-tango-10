@@ -169,7 +169,8 @@ class ConfigStore {
       _prefs.setInt(kKeyMessageRotationSeconds, seconds);
 
   int leaderboardRotationSeconds() =>
-      _prefs.getInt(kKeyLeaderboardRotationSeconds) ?? 300;
+      _prefs.getInt(kKeyLeaderboardRotationSeconds) ??
+      kMaxLeaderboardRotationSeconds;
 
   /// Persists the leaderboard rotation interval. The kiosk uses this
   /// value to decide how long to show the "Últimos ganadores" panel

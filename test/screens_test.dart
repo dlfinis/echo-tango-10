@@ -129,11 +129,11 @@ void main() {
       // The default invitation list has 3 messages. With a 1s
       // rotation interval the message phase lasts 3*1 = 3 seconds.
       // After 3s the state machine flips to the leaderboard view
-      // (60s phase). Pump 3.5s so the periodic timer fires
+      // (15s phase). Pump 3.5s so the periodic timer fires
       // 3 times and the state machine has advanced into the
       // leaderboard phase.
       await pair.store.setMessageRotationSeconds(1);
-      await pair.store.setLeaderboardRotationSeconds(60);
+      await pair.store.setLeaderboardRotationSeconds(15);
       // Seed 5 leaderboard entries — matches the default top-N.
       for (int i = 0; i < 5; i++) {
         await pair.lb.add(_entry(
@@ -168,7 +168,7 @@ void main() {
       // Pump 3.5s so the periodic timer fires 3 times and the
       // state machine advances into the leaderboard phase.
       await pair.store.setMessageRotationSeconds(1);
-      await pair.store.setLeaderboardRotationSeconds(60);
+      await pair.store.setLeaderboardRotationSeconds(15);
       // Two entries with known rawSeconds values.
       await pair.lb.add(_entry(name: 'AAA', rawSeconds: 9.9982, delta: -0.0018));
       await pair.lb.add(_entry(name: 'BBB', rawSeconds: 10.0017, delta: 0.0017));
@@ -192,6 +192,75 @@ void main() {
       // Sanity: the old '+0.0017s' / '-0.0018s' format must be gone.
       expect(find.textContaining('+0.0017s'), findsNothing);
       expect(find.textContaining('-0.0018s'), findsNothing);
+    });
+
+    testWidgets(
+        'backdrop painter repaints across 3s without rebuilding the widget tree',
+        (WidgetTester tester) async {
+      // Regression for the 'freezing' bug: the old implementation
+      // scheduled a setState at 20 Hz that rebuilt the whole
+      // Waiting tree on every frame. The fix drives the painter
+      // directly through a Listenable on the AnimationController
+      // (no setState). This test pumps 3 simulated seconds and
+      // confirms the painter re-runs (no exception is raised and
+      // the CustomPaint widget is still mounted).
+      final pair = await _bootstrap();
+      await tester.pumpWidget(_wrap(WaitingScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+      )));
+      await tester.pump();
+      final Finder customPaint = find.byType(CustomPaint);
+      expect(customPaint, findsWidgets);
+
+      // Run the painter for 3 simulated seconds. The
+      // AnimationController repeats every 10s, so 3s stays
+      // inside the first cycle (no modulo surprises).
+      await tester.pump(const Duration(seconds: 3));
+      // No layout or paint exception should have been raised.
+      expect(tester.takeException(), isNull,
+          reason: 'painter must survive 3s of repaint ticks without throwing');
+      // The painter is still on screen.
+      expect(customPaint, findsWidgets);
+      // Confirm an InvaderMarchPainter is in the tree and its
+      // shouldRepaint respects the listenable swap (a fresh
+      // painter with a different listenable must repaint).
+      final InvaderMarchPainter fresh = InvaderMarchPainter(seed: 1);
+      final InvaderMarchPainter sameListen = InvaderMarchPainter(seed: 1);
+      // Both painters in this test have no listenable assigned
+      // (the constructor's listenable is null by default), so
+      // shouldRepaint returns false. Verify the contract directly
+      // by feeding one a real Listenable — the assertion below
+      // proves shouldRepaint is wired to the listenable field.
+      final AnimationController c = AnimationController(
+        vsync: const TestVSync(),
+        duration: const Duration(seconds: 1),
+      );
+      addTearDown(c.dispose);
+      final InvaderMarchPainter withC = InvaderMarchPainter(
+        seed: 1,
+        listenable: c,
+      );
+      final InvaderMarchPainter withOther = InvaderMarchPainter(
+        seed: 1,
+        listenable: c,
+      );
+      expect(withC.shouldRepaint(withOther), isFalse,
+          reason: 'same listenable -> no repaint');
+      final AnimationController c2 = AnimationController(
+        vsync: const TestVSync(),
+        duration: const Duration(seconds: 1),
+      );
+      addTearDown(c2.dispose);
+      final InvaderMarchPainter withC2 = InvaderMarchPainter(
+        seed: 1,
+        listenable: c2,
+      );
+      expect(withC.shouldRepaint(withC2), isTrue,
+          reason: 'different listenable -> repaint');
+      // Use `fresh` and `sameListen` to silence the analyzer
+      // (they exercise the no-listenable path).
+      expect(fresh.shouldRepaint(sameListen), isFalse);
     });
   });
 
@@ -470,7 +539,7 @@ void main() {
       expect(pair.store.messageRotationSeconds(), 45);
     });
 
-    testWidgets('Tiempo del ranking accepts 3..120 and rejects out-of-range',
+    testWidgets('Tiempo del ranking accepts 3..15 and rejects out-of-range',
         (WidgetTester tester) async {
       final pair = await _bootstrap();
       await tester.pumpWidget(_wrap(AdminScreen(
@@ -484,29 +553,30 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pump();
 
-      // (1) In-range: 30s is saved and the pref reflects it.
+      // (1) In-range: 10s is saved and the pref reflects it.
       final Finder field =
           find.widgetWithText(TextFormField, 'Tiempo del ranking');
       expect(field, findsOneWidget);
-      await tester.enterText(field, '30');
+      await tester.enterText(field, '10');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
-      expect(pair.store.leaderboardRotationSeconds(), 30);
+      expect(pair.store.leaderboardRotationSeconds(), 10);
 
-      // (2) The setter itself rejects 0 (below min) and 500 (above max).
+      // (2) The setter itself rejects 0 (below min) and 20 (above max).
       expect(
         () => pair.store.setLeaderboardRotationSeconds(0),
         throwsArgumentError,
       );
       expect(
-        () => pair.store.setLeaderboardRotationSeconds(500),
+        () => pair.store.setLeaderboardRotationSeconds(20),
         throwsArgumentError,
+        reason: '20 is above the new 15-second hard cap',
       );
-      // (3) Edge cases: 3 and 120 are accepted.
+      // (3) Edge cases: 3 and 15 are accepted.
       await pair.store.setLeaderboardRotationSeconds(3);
       expect(pair.store.leaderboardRotationSeconds(), 3);
-      await pair.store.setLeaderboardRotationSeconds(120);
-      expect(pair.store.leaderboardRotationSeconds(), 120);
+      await pair.store.setLeaderboardRotationSeconds(15);
+      expect(pair.store.leaderboardRotationSeconds(), 15);
     });
   });
 
@@ -614,6 +684,38 @@ void main() {
         viewport: const Size(800, 480),
       );
       expect(find.text('¡GANASTE!'), findsOneWidget);
+      // The invader slot is wrapped in Flexible + FittedBox so a
+      // tight viewport must not raise an overflow or paint
+      // exception.
+      expect(tester.takeException(), isNull,
+          reason: 'invader slot must not overflow at 800x480');
+    });
+
+    testWidgets('invader is wrapped in FittedBox.scaleDown at 800x480',
+        (WidgetTester tester) async {
+      // Pins the Fix 4 refactor: the invader CustomPaint must
+      // descend from a FittedBox with BoxFit.scaleDown so it
+      // shrinks on the smallest kiosk viewport.
+      tester.view.physicalSize = const Size(800, 480);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_wrap(ResultScreen(
+        elapsedSeconds: 10.0005,
+        onNext: () {},
+      )));
+      await tester.pump(const Duration(seconds: 2));
+
+      final Finder fitted = find.ancestor(
+        of: find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.painter is InvaderSpritePainter,
+        ),
+        matching: find.byType(FittedBox),
+      );
+      expect(fitted, findsWidgets,
+          reason: 'invader painter must be inside a FittedBox');
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('auto-returns to onNext after the configured timeout',

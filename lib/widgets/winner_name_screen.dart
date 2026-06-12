@@ -315,11 +315,8 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                           fontSize: 36,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 4,
-                          fontFamily: 'DSEG7Classic-Bold',
-                          fontFamilyFallback: <String>[
-                            'DSEG7Modern-Bold',
-                            'monospace',
-                          ],
+                          fontFamily: 'BungeeInline',
+                          fontFamilyFallback: <String>['Bungee'],
                         ),
                         cursorColor: const Color(kDefaultAccentColorHex),
                         decoration: const InputDecoration(
