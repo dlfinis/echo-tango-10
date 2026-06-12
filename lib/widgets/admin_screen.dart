@@ -177,16 +177,55 @@ class _AdminScreenState extends State<AdminScreen> {
   Future<void> _saveIntervals() async {
     final int? msg = int.tryParse(_messageIntervalController.text.trim());
     final int? sub = int.tryParse(_subTaglineIntervalController.text.trim());
-    final int? lb = int.tryParse(_leaderboardIntervalController.text.trim());
     if (msg != null && msg >= 1 && msg <= 3600) {
       await widget.configStore.setMessageRotationSeconds(msg);
     }
     if (sub != null && sub >= 1 && sub <= 3600) {
       await widget.configStore.setSubTaglineRotationSeconds(sub);
     }
-    if (lb != null && lb >= 1 && lb <= 3600) {
-      await widget.configStore.setLeaderboardRotationSeconds(lb);
+  }
+
+  Future<void> _saveLeaderboardRotation() async {
+    final int? v =
+        int.tryParse(_leaderboardIntervalController.text.trim());
+    if (v == null) return;
+    if (v < kMinLeaderboardRotationSeconds ||
+        v > kMaxLeaderboardRotationSeconds) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFB71C1C),
+          content: Text(
+            'Tiempo del ranking debe estar entre '
+            '3 y 120 segundos',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
     }
+    try {
+      await widget.configStore.setLeaderboardRotationSeconds(v);
+    } on ArgumentError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB71C1C),
+          content: Text('Tiempo del ranking inválido: ${e.message}'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Tiempo del ranking guardado ($v s)',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _saveResultTimeout() async {
@@ -416,9 +455,10 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
               const SizedBox(height: 12),
               _numericField(
-                label: 'Rotación de leaderboard',
+                label: 'Tiempo del ranking',
                 controller: _leaderboardIntervalController,
-                onSave: _saveIntervals,
+                onSave: _saveLeaderboardRotation,
+                helperText: 'Segundos. Mínimo 3, máximo 120.',
               ),
               const SizedBox(height: 24),
 

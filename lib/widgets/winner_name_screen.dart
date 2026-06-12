@@ -248,6 +248,8 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                         fontSize: widget.isEasterEgg ? 112 : 96,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 4,
+                        fontFamily: 'BungeeInline',
+                        fontFamilyFallback: const <String>['Bungee'],
                         shadows: widget.isEasterEgg
                             ? const <Shadow>[
                                 Shadow(
@@ -264,9 +266,11 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(kDefaultTextColorHex),
-                        fontSize: 32,
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2,
+                        fontFamily: 'BungeeInline',
+                        fontFamilyFallback: <String>['Bungee'],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -274,8 +278,13 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                       _formattedRaw(),
                       style: const TextStyle(
                         color: Color(kDefaultTextColorHex),
-                        fontSize: 72,
+                        fontSize: 56,
                         fontWeight: FontWeight.w900,
+                        fontFamily: 'DSEG7Classic-Bold',
+                        fontFamilyFallback: <String>[
+                          'DSEG7Modern-Bold',
+                          'monospace',
+                        ],
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
@@ -284,8 +293,10 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                       _formattedDelta(),
                       style: const TextStyle(
                         color: Color(kDefaultAccentColorHex),
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'BungeeInline',
+                        fontFamilyFallback: <String>['Bungee'],
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -304,6 +315,11 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                           fontSize: 36,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 4,
+                          fontFamily: 'DSEG7Classic-Bold',
+                          fontFamilyFallback: <String>[
+                            'DSEG7Modern-Bold',
+                            'monospace',
+                          ],
                         ),
                         cursorColor: const Color(kDefaultAccentColorHex),
                         decoration: const InputDecoration(
@@ -311,6 +327,8 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                           hintStyle: TextStyle(
                             color: Color(0xFF888888),
                             fontSize: 24,
+                            fontFamily: 'BungeeInline',
+                            fontFamilyFallback: <String>['Bungee'],
                           ),
                           counterStyle: TextStyle(
                             color: Color(0xFF888888),
@@ -358,8 +376,10 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                               vertical: 16,
                             ),
                             textStyle: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 18,
                               fontWeight: FontWeight.w900,
+                              fontFamily: 'BungeeInline',
+                              fontFamilyFallback: <String>['Bungee'],
                             ),
                           ),
                           child: const Text('Aceptar'),
@@ -379,8 +399,10 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                               vertical: 16,
                             ),
                             textStyle: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 18,
                               fontWeight: FontWeight.w900,
+                              fontFamily: 'BungeeInline',
+                              fontFamilyFallback: <String>['Bungee'],
                             ),
                           ),
                           child: const Text('SALTAR'),

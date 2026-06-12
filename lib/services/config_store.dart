@@ -171,8 +171,23 @@ class ConfigStore {
   int leaderboardRotationSeconds() =>
       _prefs.getInt(kKeyLeaderboardRotationSeconds) ?? 300;
 
-  Future<void> setLeaderboardRotationSeconds(int seconds) =>
-      _prefs.setInt(kKeyLeaderboardRotationSeconds, seconds);
+  /// Persists the leaderboard rotation interval. The kiosk uses this
+  /// value to decide how long to show the "Últimos ganadores" panel
+  /// before rotating back to invitation messages. Must be in
+  /// `[kMinLeaderboardRotationSeconds, kMaxLeaderboardRotationSeconds]`
+  /// — anything else throws [ArgumentError] and leaves the pref
+  /// untouched.
+  Future<void> setLeaderboardRotationSeconds(int seconds) {
+    if (seconds < kMinLeaderboardRotationSeconds ||
+        seconds > kMaxLeaderboardRotationSeconds) {
+      throw ArgumentError(
+        'leaderboard rotation seconds must be between '
+        '$kMinLeaderboardRotationSeconds and '
+        '$kMaxLeaderboardRotationSeconds (got $seconds)',
+      );
+    }
+    return _prefs.setInt(kKeyLeaderboardRotationSeconds, seconds);
+  }
 
   // ---------------------------------------------------------------------------
   // RESULT screen auto-return

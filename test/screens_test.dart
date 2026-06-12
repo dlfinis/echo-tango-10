@@ -111,6 +111,88 @@ void main() {
       // was released.
       await tester.pump(const Duration(milliseconds: 200));
     });
+
+    testWidgets(
+        'leaderboard panel with 5 entries at 800x600 does not throw overflow',
+        (WidgetTester tester) async {
+      // Pin the viewport to 800x600 (the default). The Waiting
+      // screen places the leaderboard inside a Column that is
+      // ~528 px tall; without the SingleChildScrollView wrap that
+      // exceeds the 475 px tall usable area and Flutter reports
+      // 'A RenderFlex overflowed by 53 pixels on the bottom.'
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      // The default invitation list has 3 messages. With a 1s
+      // rotation interval the message phase lasts 3*1 = 3 seconds.
+      // After 3s the state machine flips to the leaderboard view
+      // (60s phase). Pump 3.5s so the periodic timer fires
+      // 3 times and the state machine has advanced into the
+      // leaderboard phase.
+      await pair.store.setMessageRotationSeconds(1);
+      await pair.store.setLeaderboardRotationSeconds(60);
+      // Seed 5 leaderboard entries — matches the default top-N.
+      for (int i = 0; i < 5; i++) {
+        await pair.lb.add(_entry(
+          name: 'P${i + 1}',
+          rawSeconds: 10.0 + i * 0.01,
+          delta: i * 0.01,
+        ));
+      }
+
+      await tester.pumpWidget(_wrap(WaitingScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+      )));
+      await tester.pump();
+      // Cross the 3s message boundary so the screen switches to
+      // the leaderboard panel (which is what overflows).
+      await tester.pump(const Duration(milliseconds: 3500));
+      // The header must be rendered (proves the leaderboard
+      // phase is active).
+      expect(find.text('ÚLTIMOS GANADORES'), findsOneWidget);
+      // No overflow / layout exception should have been captured
+      // by the test binding.
+      expect(tester.takeException(), isNull,
+          reason: 'leaderboard panel must not overflow at 800x600');
+    });
+
+    testWidgets('leaderboard rows show rawSeconds, no `s` suffix',
+        (WidgetTester tester) async {
+      final pair = await _bootstrap();
+      // The default invitation list has 3 messages. With a 1s
+      // rotation interval the message phase lasts 3*1 = 3 seconds.
+      // Pump 3.5s so the periodic timer fires 3 times and the
+      // state machine advances into the leaderboard phase.
+      await pair.store.setMessageRotationSeconds(1);
+      await pair.store.setLeaderboardRotationSeconds(60);
+      // Two entries with known rawSeconds values.
+      await pair.lb.add(_entry(name: 'AAA', rawSeconds: 9.9982, delta: -0.0018));
+      await pair.lb.add(_entry(name: 'BBB', rawSeconds: 10.0017, delta: 0.0017));
+
+      await tester.pumpWidget(_wrap(WaitingScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+      )));
+      await tester.pump();
+      // Cross the 3s message boundary so the screen switches to
+      // the leaderboard panel.
+      await tester.pump(const Duration(milliseconds: 3500));
+
+      // The leaderboard header is on screen.
+      expect(find.text('ÚLTIMOS GANADORES'), findsOneWidget);
+      // The leaderboard rows display rawSeconds with 4 decimals and
+      // NO trailing 's' and NO leading sign. No '±', no '-'.
+      expect(find.text('9.9982'), findsOneWidget,
+          reason: 'row shows the raw achieved time, not the delta');
+      expect(find.text('10.0017'), findsOneWidget);
+      // Sanity: the old '+0.0017s' / '-0.0018s' format must be gone.
+      expect(find.textContaining('+0.0017s'), findsNothing);
+      expect(find.textContaining('-0.0018s'), findsNothing);
+    });
   });
 
   group('WinnerNameScreen', () {
@@ -386,6 +468,45 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
       expect(pair.store.messageRotationSeconds(), 45);
+    });
+
+    testWidgets('Tiempo del ranking accepts 3..120 and rejects out-of-range',
+        (WidgetTester tester) async {
+      final pair = await _bootstrap();
+      await tester.pumpWidget(_wrap(AdminScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+        onExit: () {},
+      )));
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pump();
+
+      // (1) In-range: 30s is saved and the pref reflects it.
+      final Finder field =
+          find.widgetWithText(TextFormField, 'Tiempo del ranking');
+      expect(field, findsOneWidget);
+      await tester.enterText(field, '30');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      expect(pair.store.leaderboardRotationSeconds(), 30);
+
+      // (2) The setter itself rejects 0 (below min) and 500 (above max).
+      expect(
+        () => pair.store.setLeaderboardRotationSeconds(0),
+        throwsArgumentError,
+      );
+      expect(
+        () => pair.store.setLeaderboardRotationSeconds(500),
+        throwsArgumentError,
+      );
+      // (3) Edge cases: 3 and 120 are accepted.
+      await pair.store.setLeaderboardRotationSeconds(3);
+      expect(pair.store.leaderboardRotationSeconds(), 3);
+      await pair.store.setLeaderboardRotationSeconds(120);
+      expect(pair.store.leaderboardRotationSeconds(), 120);
     });
   });
 

@@ -320,111 +320,116 @@ class _WaitingScreenState extends State<WaitingScreen>
   Widget _buildLeaderboardPanel(List<LeaderboardEntry> top) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'ÚLTIMOS GANADORES',
-              style: TextStyle(
-                color: Color(kDefaultAccentColorHex),
-                fontSize: 80,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 4,
-                fontFamily: 'BungeeInline',
-                fontFamilyFallback: <String>['Bungee'],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (top.isEmpty)
+      // The leaderboard panel renders a fixed-size header plus up to 5
+      // large rows. On a tight test viewport (800x600 → 475px tall
+      // usable) the natural height is ~528px, which overflows the
+      // Column. Wrapping in a SingleChildScrollView lets the panel
+      // scroll if it doesn't fit while still rendering the centered
+      // layout at its natural size on a real kiosk.
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
             const FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
+                'ÚLTIMOS GANADORES',
                 style: TextStyle(
-                  color: Color(0xFFAAAAAA),
-                  fontSize: 48,
+                  color: Color(kDefaultAccentColorHex),
+                  fontSize: 80,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
+                  letterSpacing: 4,
                   fontFamily: 'BungeeInline',
                   fontFamilyFallback: <String>['Bungee'],
                 ),
               ),
-            )
-          else
-            ...top.asMap().entries.map((MapEntry<int, LeaderboardEntry> e) {
-              final int rank = e.key + 1;
-              final LeaderboardEntry entry = e.value;
-              final String deltaStr = _formatSignedDelta(entry.delta);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      SizedBox(
-                        width: 80,
-                        child: Text(
-                          '$rank.',
-                          style: const TextStyle(
-                            color: Color(0xFFAAAAAA),
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'BungeeInline',
-                            fontFamilyFallback: <String>['Bungee'],
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 600,
-                        child: Text(
-                          entry.name,
-                          style: const TextStyle(
-                            color: Color(kDefaultTextColorHex),
-                            fontSize: 56,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'BungeeInline',
-                            fontFamilyFallback: <String>['Bungee'],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        deltaStr,
-                        style: const TextStyle(
-                          color: Color(kDefaultAccentColorHex),
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'DSEG7Modern-Regular',
-                          fontFamilyFallback: <String>[
-                            'DSEG7Modern-Bold',
-                            'DSEG7Classic-Bold',
-                          ],
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
+            ),
+            const SizedBox(height: 16),
+            if (top.isEmpty)
+              const FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!',
+                  style: TextStyle(
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                    fontFamily: 'BungeeInline',
+                    fontFamilyFallback: <String>['Bungee'],
                   ),
                 ),
-              );
-            }),
-        ],
+              )
+            else
+              ...top.asMap().entries.map((MapEntry<int, LeaderboardEntry> e) {
+                final int rank = e.key + 1;
+                final LeaderboardEntry entry = e.value;
+                final String rawStr = entry.rawSeconds.toStringAsFixed(4);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 80,
+                          child: Text(
+                            '$rank.',
+                            style: const TextStyle(
+                              color: Color(0xFFAAAAAA),
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'BungeeInline',
+                              fontFamilyFallback: <String>['Bungee'],
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 600,
+                          child: Text(
+                            entry.name,
+                            style: const TextStyle(
+                              color: Color(kDefaultTextColorHex),
+                              fontSize: 56,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'BungeeInline',
+                              fontFamilyFallback: <String>['Bungee'],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          rawStr,
+                          style: const TextStyle(
+                            color: Color(kDefaultAccentColorHex),
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'DSEG7Modern-Regular',
+                            fontFamilyFallback: <String>[
+                              'DSEG7Modern-Bold',
+                              'DSEG7Classic-Bold',
+                            ],
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }
-
-  String _formatSignedDelta(double delta) {
-    final String sign = delta >= 0 ? '+' : '-';
-    return '$sign${delta.abs().toStringAsFixed(3)}s';
-  }
 }
+
 
 // ===========================================================================
 // InvaderMarchPainter — full-screen Space Invaders march that draws

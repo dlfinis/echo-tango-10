@@ -35,6 +35,16 @@ const Duration kMessageRotationInterval = Duration(seconds: 30);
 /// How long the leaderboard view is shown before rotating back to messages.
 const Duration kLeaderboardRotationInterval = Duration(seconds: 300);
 
+/// Inclusive lower bound of the leaderboard rotation interval
+/// (seconds). Anything shorter than this is rejected by
+/// `ConfigStore.setLeaderboardRotationSeconds`.
+const int kMinLeaderboardRotationSeconds = 3;
+
+/// Inclusive upper bound of the leaderboard rotation interval
+/// (seconds). Anything longer than this is rejected by
+/// `ConfigStore.setLeaderboardRotationSeconds`.
+const int kMaxLeaderboardRotationSeconds = 120;
+
 // ---------------------------------------------------------------------------
 // Gameplay timing & tolerance (see spec requirements 1, 3, 6)
 // ---------------------------------------------------------------------------

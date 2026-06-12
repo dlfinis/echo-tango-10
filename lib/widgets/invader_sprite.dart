@@ -15,15 +15,16 @@
 ///   * `casi`        — static. Flat-line eyes, one arm half-raised,
 ///                     a "..." bubble above the head. `t` is ignored
 ///                     (rendering is identical at t=0 and t=1).
-///   * `niPorAsomo`  — looping "fall apart → reassemble" sequence
-///                     driven by a 2.5s repeat controller. Each of
-///                     the 8 rows separates downward (translateY)
-///                     with a per-row stagger (bottom lands first,
-///                     top lands last) and alternating rows rotate
-///                     ±15°. After a brief rest, the rows rise back
-///                     to the assembled body with the same stagger
-///                     (bottom rises first). Eyes are X-shapes.
-///                     `t=0` and `t=1` → assembled (loop is seamless).
+///   * `niPorAsomo`  — looping "glitch CRT" corruption effect driven
+///                     by a 2.5s repeat controller. The body color
+///                     RGB-splits between cyan and red at 10 Hz, each
+///                     row wobbles ±3 px horizontally at 8 Hz, the
+///                     whole sprite shrinks 1.0→0.4 (easeIn), and
+///                     over the last 10% of the cycle the sprite
+///                     fades to invisible — then "respawns" full-size
+///                     at t=0 of the next cycle. X-shape eyes flicker
+///                     on/off at ~6.7 Hz. `t=0` and `t=1` → assembled,
+///                     full-scale, full-alpha (loop is seamless).
 ///   * `tePasaste`   — one-shot explosion. t<0.3: 4 colored squares
 ///                     pulse outward in a cross pattern. t>=0.3:
 ///                     squares fly outward and fade. `t=1` → nothing.
@@ -310,23 +311,32 @@ class InvaderSpritePainter extends CustomPainter {
   }
 
   // -------------------------------------------------------------------------
-  // NI POR ASOMO — fall apart, X eyes
+  // NI POR ASOMO — glitch CRT corruption
   //
-  // The parent controller is a 2.5s repeat, so t goes 0→1 over 2.5s
-  // and then loops back to 0. We map the global t to four phases:
+  // The parent controller is a 2.5s `repeat()`, so t goes 0→1 over
+  // 2.5s and then loops back to 0. All effects are derived from
+  // t inside the painter — no Transform wrappers, no
+  // `canvas.save/translate` outside the body draw. At t=0 the
+  // sprite is assembled, full-scale, full-alpha and full-color;
+  // at t=1 it is the same. The loop is seamless.
   //
-  //   [0.00, 0.40) — fall:        rows separate downward (offset 0 → -120)
-  //   [0.40, 0.50) — rest:        debris at the bottom, no motion
-  //   [0.50, 0.90) — reassemble:  rows rise back (offset -120 → 0)
-  //   [0.90, 1.00] — rest:        body whole, no motion (loops into t=0)
-  //
-  // At t=0 the body is whole (offset=0) and at t=1 the body is whole
-  // (offset=0), so the controller loop is seamless.
-  //
-  // Each row has a stagger factor (bottom row = 1, top row = 0) so
-  // the bottom row lands first on the way down and rises first on
-  // the way up. Alternating rows rotate ±15° and unwind with the
-  // same stagger.
+  // Effects layered each frame:
+  //   1. RGB split      — body color alternates between a +cyan
+  //                       blend and a +red blend every 0.1s
+  //                       (10 Hz square wave). Gives the chromatic
+  //                       aberration look of a broken CRT.
+  //   2. Pixel jitter   — each row shifts horizontally by
+  //                       ±3 * sin(t*2π*8 + row*1.3) px. High-
+  //                       frequency wobble per row, cheap to draw.
+  //   3. Shrink         — global scale 1.0 → 0.4, easeIn.
+  //   4. Disappear      — alpha 1.0 → 0.0 over the last 10% of
+  //                       the cycle (t > 0.9), then back to 1.0
+  //                       at t=0 of the next loop. The sprite
+  //                       "respawns" at full size, not as a
+  //                       reverse-zoom.
+  //   5. Eye flicker    — X-eyes gate visible on/off every 0.15s
+  //                       (~6.7 Hz). When "off" the body color
+  //                       fills the eye pixels.
   // -------------------------------------------------------------------------
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
     final double tClamped = t.clamp(0.0, 1.0);
@@ -336,100 +346,89 @@ class InvaderSpritePainter extends CustomPainter {
     final double originX = (size.width - spriteW) / 2.0;
     final double originY = (size.height - spriteH) / 2.0;
 
-    // Per-row progress, derived from global t. Each row has a
-    // stagger window of `staggerSpan` within the fall / rise phases.
-    // Bottom row stagger is 1.0 (lands first), top row is 0.0
-    // (lands last).
-    const double maxShift = 120.0;
-    const double fallEnd = 0.4;
-    const double restEnd = 0.5;
-    const double riseEnd = 0.9;
-    // Stagger window: how much of the fall/rise phase each row
-    // "owns". 0.6 means the bottom row starts at t=0, the top row
-    // starts at t=0.4*0.6 = 0.24 of the global fall phase.
-    const double staggerSpan = 0.6;
+    // (1) RGB split — 10 Hz square wave. (t * 10) % 2 < 1 selects
+    // the cyan half of the cycle, else red.
+    final Color shiftedBody =
+        (tClamped * 10.0) % 2.0 < 1.0
+            ? (Color.lerp(body, Colors.cyan, 0.6) ?? body)
+            : (Color.lerp(body, Colors.red, 0.6) ?? body);
+
+    // (3) Shrink — 1.0 → 0.4, easeIn.
+    final double scale = 1.0 - 0.6 * Curves.easeIn.transform(tClamped);
+
+    // (4) Disappear — alpha 1.0 → 0.0 over the last 10% of the
+    // cycle. At t > 0.9 the sprite fades to invisible; at t=0
+    // (loop start) it is full-alpha again.
+    final double alpha = tClamped > 0.9
+        ? (1.0 - (tClamped - 0.9) / 0.1).clamp(0.0, 1.0)
+        : 1.0;
+
+    // (5) Eye flicker — every 0.15s the eyes turn off and on. At
+    // `(t*6.67) % 2 < 1` the eyes are ON; otherwise the body
+    // color fills the eye pixels (no cavity is drawn).
+    final bool eyesVisible = (tClamped * 6.67) % 2.0 < 1.0;
+
+    canvas.save();
+    // Apply the global shrink first (around the canvas center
+    // so the sprite shrinks in place rather than toward 0,0).
+    canvas.translate(size.width / 2.0, size.height / 2.0);
+    canvas.scale(scale, scale);
+    canvas.translate(-size.width / 2.0, -size.height / 2.0);
 
     for (int r = 0; r < _rows; r++) {
-      final double stagger = r / (_rows - 1); // 0 (top) .. 1 (bottom)
+      // (2) Per-row pixel jitter — ±3 px at 8 Hz, phased by row
+      // index so adjacent rows wobble out of sync.
+      final double jitterX =
+          3.0 * math.sin(tClamped * 2 * math.pi * 8.0 + r * 1.3);
 
-      // Per-row fall progress (0..1): 0 = not yet falling, 1 = fully
-      // spread at -120. The bottom row reaches 1 first; the top
-      // row reaches 1 last.
-      final double fallStart = (1.0 - stagger) * staggerSpan * fallEnd;
-      double fallRowT = 0.0;
-      if (tClamped < fallStart) {
-        fallRowT = 0.0;
-      } else if (tClamped >= fallEnd) {
-        fallRowT = 1.0;
-      } else {
-        fallRowT = (tClamped - fallStart) /
-            (fallEnd - fallStart).clamp(1e-9, double.infinity);
-      }
-      fallRowT = fallRowT.clamp(0.0, 1.0);
-
-      // Per-row rise progress (0..1): 0 = still at -120, 1 = back
-      // to 0. The bottom row starts rising first; the top row
-      // starts last.
-      final double riseStart = restEnd + (1.0 - stagger) * staggerSpan * (riseEnd - restEnd);
-      double riseRowT = 0.0;
-      if (tClamped < restEnd) {
-        riseRowT = 0.0;
-      } else if (tClamped >= riseEnd) {
-        riseRowT = 1.0;
-      } else {
-        riseRowT = (tClamped - riseStart) /
-            (riseEnd - riseStart).clamp(1e-9, double.infinity);
-      }
-      riseRowT = riseRowT.clamp(0.0, 1.0);
-
-      // Combined progress for the row: 0 = whole, 1 = fully spread.
-      // During the rest at the end (t >= 0.9) the progress is 0.
-      final double spreadT;
-      if (tClamped >= riseEnd) {
-        spreadT = 0.0; // body whole, ready for the loop
-      } else if (tClamped >= restEnd) {
-        // Reassembling.
-        spreadT = 1.0 - Curves.easeInOut.transform(riseRowT);
-      } else if (tClamped >= fallEnd) {
-        spreadT = 1.0; // debris at rest
-      } else {
-        // Falling.
-        spreadT = Curves.easeIn.transform(fallRowT);
-      }
-
-      final double rowOffset = -maxShift * spreadT;
-      final double rowY = originY + r * pixelSize + rowOffset;
-      final double rot = (r.isEven ? 1.0 : -1.0) *
-          15.0 *
-          math.pi /
-          180.0 *
-          spreadT;
-
-      canvas.save();
-      canvas.translate(
-          originX + (_cols * pixelSize) / 2.0, rowY + pixelSize / 2.0);
-      canvas.rotate(rot);
-      canvas.translate(
-          -(originX + (_cols * pixelSize) / 2.0), -(rowY + pixelSize / 2.0));
-      _drawBodyRow(canvas, originX, rowY, r, _niPorAsomo, Paint()..color = body);
-      canvas.restore();
+      // (4) Apply the alpha to the body paint. The eyes use
+      // `cavity` and stay full-alpha on their own pixels (we
+      // just skip drawing them when eyesVisible is false).
+      final Paint bodyPaint = Paint()..color = shiftedBody.withValues(alpha: alpha);
+      _drawBodyRow(
+        canvas,
+        originX + jitterX,
+        originY,
+        r,
+        _niPorAsomo,
+        bodyPaint,
+      );
     }
 
-    // X-shape eyes — drawn at the assembled position (originY) so
-    // they always sit where the eyes "should" be, regardless of
-    // how spread the rows are.
-    _drawEyePair(
-      canvas,
-      originX,
-      originY,
-      body: body,
-      cavity: cavity,
-      leftCol: 1,
-      rightCol: 6,
-      topRow: 3,
-      eyePattern: _niXLeftEye,
-      eyeHeightRows: 3,
-    );
+    // X-shape eyes, drawn at the assembled position. When
+    // eyesVisible is false, we draw the body color over the same
+    // pixels so the sprite has no carved-out eyes for that frame.
+    if (eyesVisible) {
+      final Paint eyePaint = Paint()..color = cavity.withValues(alpha: alpha);
+      _drawEyePairRaw(
+        canvas,
+        originX,
+        originY,
+        paint: eyePaint,
+        leftCol: 1,
+        rightCol: 6,
+        topRow: 3,
+        eyePattern: _niXLeftEye,
+        eyeHeightRows: 3,
+      );
+    } else {
+      // Cover the eye pixels with the (alpha'd) body color so the
+      // face is featureless for this frame.
+      final Paint coverPaint = Paint()..color = shiftedBody.withValues(alpha: alpha);
+      _drawEyePairRaw(
+        canvas,
+        originX,
+        originY,
+        paint: coverPaint,
+        leftCol: 1,
+        rightCol: 6,
+        topRow: 3,
+        eyePattern: _niXLeftEye,
+        eyeHeightRows: 3,
+      );
+    }
+
+    canvas.restore();
   }
 
   // -------------------------------------------------------------------------
@@ -543,6 +542,34 @@ class InvaderSpritePainter extends CustomPainter {
     int eyeHeightRows = 2,
   }) {
     final Paint paint = Paint()..color = cavity;
+    _drawEyePairRaw(
+      canvas,
+      originX,
+      originY,
+      paint: paint,
+      leftCol: leftCol,
+      rightCol: rightCol,
+      topRow: topRow,
+      eyePattern: eyePattern,
+      eyeHeightRows: eyeHeightRows,
+    );
+  }
+
+  /// Like [_drawEyePair] but takes a ready-made [Paint] (e.g. with
+  /// alpha already applied) instead of a `cavity` color. Used by the
+  /// niPorAsomo glitch branch, which flips between cavity and body
+  /// paint to make the eyes flicker on and off.
+  void _drawEyePairRaw(
+    Canvas canvas,
+    double originX,
+    double originY, {
+    required Paint paint,
+    required int leftCol,
+    required int rightCol,
+    required int topRow,
+    required List<List<bool>> eyePattern,
+    int eyeHeightRows = 2,
+  }) {
     final int eyeH = eyePattern.length;
     final int eyeW = eyePattern[0].length;
     for (final int baseCol in <int>[leftCol, rightCol]) {
