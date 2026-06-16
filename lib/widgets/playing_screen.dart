@@ -242,7 +242,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
           // secondary "advancing" hint instead of competing with
           // the main digits.
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 64),
             child: Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
@@ -257,7 +257,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
                         _seconds,
                         style: TextStyle(
                           color: digitColor,
-                          fontSize: 2000,
+                          fontSize: 1800,
                           fontWeight: FontWeight.w900,
                           height: 1.5,
                           fontFamily: 'DSEG7Modern-Regular',
@@ -271,7 +271,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
                         '.$_millis',
                         style: TextStyle(
                           color: digitColor,
-                          fontSize: 800,
+                          fontSize: 720,
                           fontWeight: FontWeight.w900,
                           height: 1.0,
                           fontFamily: 'DSEG7Modern-Regular',

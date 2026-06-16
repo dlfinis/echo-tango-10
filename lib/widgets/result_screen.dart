@@ -78,6 +78,7 @@ class _ResultScreenState extends State<ResultScreen>
   AnimationController? _spinController;
   AnimationController? _dropController;
   AnimationController? _teShakeController;
+  AnimationController? _casiTrembleController;
 
   /// Set to true on mount for the CASI branch. Gates the one-shot
   /// scale-in of the achieved-time "sign" widget next to the
@@ -153,6 +154,13 @@ class _ResultScreenState extends State<ResultScreen>
       // Flip the "sign animated" flag so [_buildEmoji] mounts the
       // TweenAnimationBuilder exactly once on the first frame.
       _casiSignAnimated = true;
+      // 1 Hz square-wave tremble for the sign digits — alternates
+      // between the actual time and +1ms so the number visibly
+      // flickers, reinforcing the "casi casi" reading.
+      _casiTrembleController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      )..repeat(reverse: true);
     } else if (_verdict == _Verdict.niPorAsomo) {
       _dropController = AnimationController(
         vsync: this,
@@ -185,6 +193,7 @@ class _ResultScreenState extends State<ResultScreen>
     _spinController?.dispose();
     _dropController?.dispose();
     _teShakeController?.dispose();
+    _casiTrembleController?.dispose();
     super.dispose();
   }
 
@@ -368,17 +377,30 @@ class _ResultScreenState extends State<ResultScreen>
                       width: 4,
                     ),
                   ),
-                  child: Text(
-                    '${widget.elapsedSeconds.toStringAsFixed(2)}s',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(kDefaultAccentColorHex),
-                      fontSize: 56,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'DSEG7Classic-Bold',
-                      fontFamilyFallback: <String>['monospace'],
-                      height: 1.0,
-                    ),
+                  child: AnimatedBuilder(
+                    animation: _casiTrembleController ??
+                        const AlwaysStoppedAnimation<double>(0.0),
+                    builder: (BuildContext context, Widget? _) {
+                      // Square-wave: at t<0.5 show real time, at
+                      // t>=0.5 show time+1ms — visible "trembling"
+                      // reinforces the "casi casi" reading.
+                      final bool up =
+                          (_casiTrembleController?.value ?? 0.0) < 0.5;
+                      final double shown =
+                          up ? widget.elapsedSeconds : widget.elapsedSeconds + 0.001;
+                      return Text(
+                        '${shown.toStringAsFixed(3)}s',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFFFFFFFF),
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'DSEG7Classic-Bold',
+                          fontFamilyFallback: <String>['monospace'],
+                          height: 1.0,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

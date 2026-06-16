@@ -867,9 +867,17 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('¡CASI, CASI!'), findsOneWidget,
           reason: 'verdict label still renders for CASI');
-      expect(find.text('10.01s'), findsOneWidget,
-          reason: 'achieved-time sign shows the elapsed time with 2 decimals '
-              'and an s suffix');
+      // 3 decimals + s suffix, trembling between actual and +1ms
+      // means either "10.005s" or "10.006s" can render at this
+      // moment. Allow both via a predicate.
+      expect(
+        find.byWidgetPredicate((Widget w) =>
+            w is Text &&
+            (w.data == '10.005s' || w.data == '10.006s')),
+        findsOneWidget,
+        reason: 'achieved-time sign shows the elapsed time with 3 decimals '
+            'and an s suffix (trembling between two values)',
+      );
       // The invader painter is still present alongside the sign.
       expect(
         find.byWidgetPredicate(
@@ -895,12 +903,18 @@ void main() {
         onNext: () {},
       )));
       await tester.pump(const Duration(seconds: 1));
-      final Finder signFinder = find.text('9.42s');
+      // 3 decimals + s suffix, trembling between actual and +1ms
+      // means either "9.420s" or "9.421s" can render at this
+      // moment.
+      final Finder signFinder = find.byWidgetPredicate((Widget w) =>
+          w is Text && (w.data == '9.420s' || w.data == '9.421s'));
       expect(signFinder, findsOneWidget);
       final Text sign = tester.widget<Text>(signFinder);
       expect(sign.style!.fontFamily, 'DSEG7Classic-Bold');
-      expect(sign.style!.fontSize, 56.0);
-      expect(sign.style!.color, const Color(kDefaultAccentColorHex));
+      expect(sign.style!.fontSize, 48.0);
+      // White text reads better than the green accent on the
+      // black sign background.
+      expect(sign.style!.color, const Color(0xFFFFFFFF));
     });
 
     testWidgets(
@@ -1121,14 +1135,15 @@ void main() {
     });
 
     testWidgets(
-        'chronograph natural fontSizes are 2000/800/360 at 1280x800',
+        'chronograph natural fontSizes are 1800/720/320 at 1280x800',
         (WidgetTester tester) async {
       // Pins the Fix 1 scale-up: with the new padding
-      // (vertical: 0, horizontal: 2) the chronograph should fill
-      // the 800-px height. The natural fontSizes are pinned to
-      // 2000/800/360 (bumped further from 1200/600/360 to max
-      // out the Fire HD 8 viewport). If a future refactor shrinks
-      // the natural sizes the test catches it.
+      // (vertical: 0, horizontal: 0, bottom: 64 for cheer
+      // separation) the chronograph should fill the 800-px
+      // height and reach the left/right edges. The natural
+      // fontSizes are pinned to 1800/720/320 (slightly under
+      // 2000/800/360 so FittedBox doesn't reserve margin) so the
+      // FittedBox picks the largest size that touches the edges.
       await setFireHd8Viewport(tester);
       final StopwatchController controller = StopwatchController();
       await tester.pumpWidget(_wrap(PlayingScreen(
@@ -1168,10 +1183,10 @@ void main() {
       final Text secondsText = tester.widget<Text>(secondsFinder.first);
       final Text dotText = tester.widget<Text>(dotMillisFinder);
       final Text uText = tester.widget<Text>(lastDigitFinder);
-      expect(secondsText.style!.fontSize, 2000.0,
-          reason: 'seconds natural fontSize should be 2000 (max-out)');
-      expect(dotText.style!.fontSize, 800.0,
-          reason: '.mmm natural fontSize should be 800');
+      expect(secondsText.style!.fontSize, 1800.0,
+          reason: 'seconds natural fontSize should be 1800 (edge-to-edge)');
+      expect(dotText.style!.fontSize, 720.0,
+          reason: '.mmm natural fontSize should be 720');
       expect(uText.style!.fontSize, 360.0,
           reason: 'u natural fontSize should be 360');
       // No overflow / paint exception.

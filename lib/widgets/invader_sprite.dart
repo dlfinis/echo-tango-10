@@ -438,7 +438,7 @@ class InvaderSpritePainter extends CustomPainter {
           text: '¡BOO!',
           style: TextStyle(
             color: Colors.red.withValues(alpha: booAlpha),
-            fontSize: 96,
+            fontSize: 72,
             fontWeight: FontWeight.w900,
             fontFamily: 'BungeeInline',
             fontFamilyFallback: const <String>['Bungee'],
@@ -447,7 +447,10 @@ class InvaderSpritePainter extends CustomPainter {
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
       );
-      tp.layout(maxWidth: size.width);
+      // maxWidth: double.infinity lets the text layout to its
+      // natural width; constraining to size.width caused "¡BOO!"
+      // to wrap and the last chars to be clipped offscreen.
+      tp.layout(maxWidth: double.infinity);
       canvas.save();
       canvas.translate(size.width / 2.0, size.height / 2.0);
       canvas.scale(booScale, booScale);
