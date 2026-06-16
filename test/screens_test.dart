@@ -1121,14 +1121,14 @@ void main() {
     });
 
     testWidgets(
-        'chronograph natural fontSizes are 1200/600/360 at 1280x800',
+        'chronograph natural fontSizes are 2000/800/360 at 1280x800',
         (WidgetTester tester) async {
       // Pins the Fix 1 scale-up: with the new padding
-      // (vertical: 0) the chronograph should fill the 800-px
-      // height. The natural fontSizes are pinned to 1200/600/360
-      // (33% larger than 900/400/240) so the FittedBox picks the
-      // largest size that fits the viewport. If a future refactor
-      // shrinks the natural sizes the test catches it.
+      // (vertical: 0, horizontal: 2) the chronograph should fill
+      // the 800-px height. The natural fontSizes are pinned to
+      // 2000/800/360 (bumped further from 1200/600/360 to max
+      // out the Fire HD 8 viewport). If a future refactor shrinks
+      // the natural sizes the test catches it.
       await setFireHd8Viewport(tester);
       final StopwatchController controller = StopwatchController();
       await tester.pumpWidget(_wrap(PlayingScreen(
@@ -1168,10 +1168,10 @@ void main() {
       final Text secondsText = tester.widget<Text>(secondsFinder.first);
       final Text dotText = tester.widget<Text>(dotMillisFinder);
       final Text uText = tester.widget<Text>(lastDigitFinder);
-      expect(secondsText.style!.fontSize, 1200.0,
-          reason: 'seconds natural fontSize should be 1200 (33% scale-up)');
-      expect(dotText.style!.fontSize, 600.0,
-          reason: '.mmm natural fontSize should be 600');
+      expect(secondsText.style!.fontSize, 2000.0,
+          reason: 'seconds natural fontSize should be 2000 (max-out)');
+      expect(dotText.style!.fontSize, 800.0,
+          reason: '.mmm natural fontSize should be 800');
       expect(uText.style!.fontSize, 360.0,
           reason: 'u natural fontSize should be 360');
       // No overflow / paint exception.

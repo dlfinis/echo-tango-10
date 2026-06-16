@@ -239,7 +239,7 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       widget.isEasterEgg ? '¡EXACTO!' : 'VICTORIA',
                       textAlign: TextAlign.center,
