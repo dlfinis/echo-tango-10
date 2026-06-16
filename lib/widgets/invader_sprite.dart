@@ -282,38 +282,12 @@ class InvaderSpritePainter extends CustomPainter {
     final double originX = (size.width - spriteW) / 2.0;
     final double originY = (size.height - spriteH) / 2.0;
 
-    // Alpha flicker: 2 Hz square wave between 0.4 and 1.0.
-    // Drives the whole sprite through a saveLayer with the
-    // computed alpha. The flicker is the "casi" identity — the
-    // static sign text (handled by the parent ResultScreen) is
-    // what carries the meaning.
-    final double tClamped = t.clamp(0.0, 1.0);
-    final double alpha = (tClamped * 4.0) % 2.0 < 1.0 ? 1.0 : 0.45;
-    canvas.saveLayer(
-      Rect.fromLTWH(0.0, 0.0, size.width, size.height),
-      Paint()..color = Color.fromRGBO(0, 0, 0, alpha),
-    );
-
+    // (1) Static invader body — same _casi grid as before, no
+    // alpha flicker, no transforms. The motion now lives in
+    // the sweat drop below.
     _drawBodyGrid(canvas, originX, originY, _casi, body);
 
-    // "..." thinking bubble — 3 small cavity dots, drawn 1 row above
-    // the head (i.e. one pixelSize above originY - 2*pixelSize, with
-    // a 4px gap as the spec requested).
-    const double gap = 4.0;
-    final double dotY = originY - gap - pixelSize;
-    final Paint dot = Paint()..color = cavity;
-    final double firstDotX = (size.width / 2.0) - 1.5 * pixelSize;
-    for (int i = 0; i < 3; i++) {
-      final Rect r = Rect.fromLTWH(
-        firstDotX + i * pixelSize,
-        dotY,
-        pixelSize,
-        pixelSize,
-      );
-      canvas.drawRect(r, dot);
-    }
-
-    // Flat-line eyes: carve a horizontal 1-px line on row 3.
+    // (2) Flat-line eyes: carve a horizontal 1-px line on row 3.
     _drawEyePair(
       canvas,
       originX,
@@ -326,8 +300,55 @@ class InvaderSpritePainter extends CustomPainter {
       eyePattern: _casiFlatEyes,
     );
 
-    // Close the alpha-flicker saveLayer.
-    canvas.restore();
+    // (3) Sweat drop. A single cavity-colored pixel that
+    // spawns above the invader's head at t=0, falls down the
+    // right side of the sprite over the full cycle, and fades
+    // out as it reaches the bottom (t=1). The drop's color is
+    // a soft sky blue (typical anime sweat) so it reads as a
+    // drop, not a glitch pixel.
+    final double tClamped = t.clamp(0.0, 1.0);
+
+    // Drop starts 1.5 * pixelSize above the head, lands at the
+    // bottom of the sprite. easeIn makes the drop accelerate
+    // under gravity (anime style).
+    final double startY = originY - 1.5 * pixelSize;
+    final double endY = originY + spriteH - pixelSize;
+    final double dropY =
+        startY + (endY - startY) * Curves.easeIn.transform(tClamped);
+
+    // Drop is positioned on the right side of the invader's
+    // head (col 9, just outside the rightmost body pixel).
+    final double dropX = originX + 9.0 * pixelSize;
+
+    // Alpha: full at t in [0, 0.4], fade to 0 over t in
+    // [0.4, 1.0] so the drop "evaporates" before it disappears
+    // off-screen.
+    final double dropAlpha = tClamped < 0.4
+        ? 1.0
+        : (1.0 - (tClamped - 0.4) / 0.6).clamp(0.0, 1.0);
+
+    if (dropAlpha > 0.0) {
+      // Build a slightly tear-shaped drop: 1px wide on top, 2px
+      // wide on bottom, by drawing two stacked cavity rects.
+      final Paint dropPaint = Paint()
+        ..color = const Color(0xFF6FC3FF).withValues(alpha: dropAlpha);
+      canvas.drawRect(
+        Rect.fromLTWH(dropX, dropY, pixelSize, pixelSize),
+        dropPaint,
+      );
+      // Small tail below for the classic teardrop shape.
+      if (tClamped > 0.1) {
+        canvas.drawRect(
+          Rect.fromLTWH(
+            dropX - pixelSize * 0.5,
+            dropY + pixelSize,
+            pixelSize * 2.0,
+            pixelSize,
+          ),
+          dropPaint,
+        );
+      }
+    }
   }
 
   // -------------------------------------------------------------------------

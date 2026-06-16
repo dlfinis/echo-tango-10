@@ -78,7 +78,7 @@ class _ResultScreenState extends State<ResultScreen>
   AnimationController? _spinController;
   AnimationController? _dropController;
   AnimationController? _teShakeController;
-  AnimationController? _casiTrembleController;
+  AnimationController? _casiTrembleController; // CASI sweat-drop cycle (800ms repeat).
 
   /// Set to true on mount for the CASI branch. Gates the one-shot
   /// scale-in of the achieved-time "sign" widget next to the
@@ -154,13 +154,14 @@ class _ResultScreenState extends State<ResultScreen>
       // Flip the "sign animated" flag so [_buildEmoji] mounts the
       // TweenAnimationBuilder exactly once on the first frame.
       _casiSignAnimated = true;
-      // 1 Hz square-wave tremble for the sign digits — alternates
-      // between the actual time and +1ms so the number visibly
-      // flickers, reinforcing the "casi casi" reading.
+      // Sweat drop cycle: 800ms repeat (no reverse). The painter
+      // uses t to position a single pixel drop that falls from
+      // above the invader's head to the bottom of the sprite,
+      // fading out as it falls. Loops cleanly at 1.25 Hz.
       _casiTrembleController = AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 500),
-      )..repeat(reverse: true);
+        duration: const Duration(milliseconds: 800),
+      )..repeat();
     } else if (_verdict == _Verdict.niPorAsomo) {
       _dropController = AnimationController(
         vsync: this,
@@ -308,7 +309,12 @@ class _ResultScreenState extends State<ResultScreen>
                   t = _spinController!.value;
                   break;
                 case _Verdict.casi:
-                  t = 0.0; // static
+                  // Sweat drop cycle: controller is 800ms repeat (no
+                  // reverse), so t goes 0→1 in 800ms. The painter
+                  // uses t to drive the drop's Y position and
+                  // alpha — at t=0 the drop is above the head, at
+                  // t=1 it has fallen and faded out.
+                  t = _casiTrembleController?.value ?? 0.0;
                   break;
                 case _Verdict.niPorAsomo:
                   // Linear 0..1..0..1 in 2.5s — the painter handles its
