@@ -282,6 +282,18 @@ class InvaderSpritePainter extends CustomPainter {
     final double originX = (size.width - spriteW) / 2.0;
     final double originY = (size.height - spriteH) / 2.0;
 
+    // Alpha flicker: 2 Hz square wave between 0.4 and 1.0.
+    // Drives the whole sprite through a saveLayer with the
+    // computed alpha. The flicker is the "casi" identity — the
+    // static sign text (handled by the parent ResultScreen) is
+    // what carries the meaning.
+    final double tClamped = t.clamp(0.0, 1.0);
+    final double alpha = (tClamped * 4.0) % 2.0 < 1.0 ? 1.0 : 0.45;
+    canvas.saveLayer(
+      Rect.fromLTWH(0.0, 0.0, size.width, size.height),
+      Paint()..color = Color.fromRGBO(0, 0, 0, alpha),
+    );
+
     _drawBodyGrid(canvas, originX, originY, _casi, body);
 
     // "..." thinking bubble — 3 small cavity dots, drawn 1 row above
@@ -313,6 +325,9 @@ class InvaderSpritePainter extends CustomPainter {
       topRow: 3,
       eyePattern: _casiFlatEyes,
     );
+
+    // Close the alpha-flicker saveLayer.
+    canvas.restore();
   }
 
   // -------------------------------------------------------------------------
@@ -350,6 +365,15 @@ class InvaderSpritePainter extends CustomPainter {
   // -------------------------------------------------------------------------
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
     final double tClamped = t.clamp(0.0, 1.0);
+
+    // The BOO text and the invader share the same canvas; without
+    // shrinking the invader the BOO's middle line crashes into the
+    // invader's body. Scale the invader to 0.6 of the canvas so
+    // there's clear vertical space for BOO above and below.
+    canvas.save();
+    canvas.translate(size.width / 2.0, size.height * 0.55);
+    canvas.scale(0.6, 0.6);
+    canvas.translate(-size.width / 2.0, -size.height / 2.0);
 
     final double spriteW = _cols * pixelSize;
     final double spriteH = _rows * pixelSize;
@@ -420,6 +444,9 @@ class InvaderSpritePainter extends CustomPainter {
         canvas.restore();
       }
     }
+
+    // Close the 0.6 scale wrapper around the invader.
+    canvas.restore();
 
     // (2) "¡BOO!" text overlay. Grows 0 → 1.2 with a small
     // overshoot during the turn-around phase (0.1 ≤ t < 0.4),

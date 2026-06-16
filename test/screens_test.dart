@@ -853,8 +853,10 @@ void main() {
         (WidgetTester tester) async {
       // Pump ResultScreen with elapsed=10.005 (CASI range). After
       // a 1s pump the TweenAnimationBuilder has completed (its
-      // duration is 400ms), so the sign text is at full scale.
-      // 10.005.toStringAsFixed(2) → "10.01" in Dart.
+      // duration is 400ms), so the sign is at full scale.
+      // The sign now shows the arcade caption "¡POR UN PELO!" in
+      // BungeeInline, NOT the elapsed time — the invader's alpha
+      // flicker is what carries the motion.
       tester.view.physicalSize = const Size(1280, 720);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -867,17 +869,8 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('¡CASI, CASI!'), findsOneWidget,
           reason: 'verdict label still renders for CASI');
-      // 3 decimals + s suffix, trembling between actual and +1ms
-      // means either "10.005s" or "10.006s" can render at this
-      // moment. Allow both via a predicate.
-      expect(
-        find.byWidgetPredicate((Widget w) =>
-            w is Text &&
-            (w.data == '10.005s' || w.data == '10.006s')),
-        findsOneWidget,
-        reason: 'achieved-time sign shows the elapsed time with 3 decimals '
-            'and an s suffix (trembling between two values)',
-      );
+      expect(find.text('¡POR UN PELO!'), findsOneWidget,
+          reason: 'CASI sign shows the arcade caption');
       // The invader painter is still present alongside the sign.
       expect(
         find.byWidgetPredicate(
@@ -888,11 +881,11 @@ void main() {
     });
 
     testWidgets(
-        'CASI branch sign uses DSEG7Classic-Bold at fontSize 56 with accent color',
+        'CASI branch sign uses BungeeInline at fontSize 44 in white',
         (WidgetTester tester) async {
       // Pins the visual recipe: the sign Text widget must be
-      // DSEG7Classic-Bold, fontSize 56, color = default accent
-      // (the green kDefaultAccentColorHex), weight 900.
+      // BungeeInline, fontSize 44, color white, weight 900. The
+      // sign carries the arcade caption (not the elapsed time).
       tester.view.physicalSize = const Size(1280, 720);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -903,17 +896,11 @@ void main() {
         onNext: () {},
       )));
       await tester.pump(const Duration(seconds: 1));
-      // 3 decimals + s suffix, trembling between actual and +1ms
-      // means either "9.420s" or "9.421s" can render at this
-      // moment.
-      final Finder signFinder = find.byWidgetPredicate((Widget w) =>
-          w is Text && (w.data == '9.420s' || w.data == '9.421s'));
+      final Finder signFinder = find.text('¡POR UN PELO!');
       expect(signFinder, findsOneWidget);
       final Text sign = tester.widget<Text>(signFinder);
-      expect(sign.style!.fontFamily, 'DSEG7Classic-Bold');
-      expect(sign.style!.fontSize, 48.0);
-      // White text reads better than the green accent on the
-      // black sign background.
+      expect(sign.style!.fontFamily, 'BungeeInline');
+      expect(sign.style!.fontSize, 44.0);
       expect(sign.style!.color, const Color(0xFFFFFFFF));
     });
 

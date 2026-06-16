@@ -340,9 +340,10 @@ class _ResultScreenState extends State<ResultScreen>
     // CASI: a Row of [invader | sign]. The sign scales in once on
     // mount via a TweenAnimationBuilder — the flag set in
     // initState ensures we only run the animation on the first
-    // build. The sign's text uses DSEG7-Classic-Bold at fontSize
-    // 56 with the verdict accent colour and a dark "pixel-art
-    // sign" frame so it reads as a retro placard.
+    // build. The sign shows the static arcade caption "¡POR UN
+    // PELO!" in BungeeInline (no number, no tremble) and the
+    // invader itself is what carries the motion (alpha flicker
+    // inside the painter).
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -367,8 +368,8 @@ class _ResultScreenState extends State<ResultScreen>
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                    horizontal: 16,
+                    vertical: 10,
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF000000),
@@ -377,30 +378,17 @@ class _ResultScreenState extends State<ResultScreen>
                       width: 4,
                     ),
                   ),
-                  child: AnimatedBuilder(
-                    animation: _casiTrembleController ??
-                        const AlwaysStoppedAnimation<double>(0.0),
-                    builder: (BuildContext context, Widget? _) {
-                      // Square-wave: at t<0.5 show real time, at
-                      // t>=0.5 show time+1ms — visible "trembling"
-                      // reinforces the "casi casi" reading.
-                      final bool up =
-                          (_casiTrembleController?.value ?? 0.0) < 0.5;
-                      final double shown =
-                          up ? widget.elapsedSeconds : widget.elapsedSeconds + 0.001;
-                      return Text(
-                        '${shown.toStringAsFixed(3)}s',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFFFFFFFF),
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'DSEG7Classic-Bold',
-                          fontFamilyFallback: <String>['monospace'],
-                          height: 1.0,
-                        ),
-                      );
-                    },
+                  child: const Text(
+                    '¡POR UN PELO!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFFFFFFF),
+                      fontSize: 44,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'BungeeInline',
+                      fontFamilyFallback: <String>['Bungee'],
+                      height: 1.0,
+                    ),
                   ),
                 ),
               ),

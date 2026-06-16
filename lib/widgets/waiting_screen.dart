@@ -322,18 +322,26 @@ class _WaitingScreenState extends State<WaitingScreen>
   Widget _buildLeaderboardPanel(List<LeaderboardEntry> top) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-      // The leaderboard panel renders a fixed-size header plus up to 5
-      // large rows. On a tight test viewport (800x600 → 475px tall
-      // usable) the natural height is ~528px, which overflows the
-      // Column. Wrapping in a SingleChildScrollView lets the panel
-      // scroll if it doesn't fit while still rendering the centered
-      // layout at its natural size on a real kiosk.
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
+      // LayoutBuilder gives us the actual viewport constraints.
+      // We force the inner Column to fill the FULL viewport height
+      // (with IntrinsicHeight) so the panel doesn't collapse to
+      // its content's natural height when the leaderboard is
+      // empty (single "TODAVÍA NO HAY GANADORES" line). With a
+      // single short line, the column otherwise renders at maybe
+      // 100px and leaves the rest of the screen black.
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
             const FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -437,12 +445,17 @@ class _WaitingScreenState extends State<WaitingScreen>
                   ),
                 );
               }),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  },
       ),
     );
   }
 }
+
 
 
 // ===========================================================================
