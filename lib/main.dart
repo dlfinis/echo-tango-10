@@ -16,14 +16,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'services/audio_service.dart';
 import 'services/input_service.dart';
 import 'services/keyboard_input.dart';
 import 'services/usb_serial_input.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final InputService input = kIsWeb ? KeyboardInput() : UsbSerialInput();
+  final AudioService audio = AudioService();
+  // Best-effort preload. Missing assets are tolerated by the
+  // service (it just logs); the kiosk works without audio.
+  await audio.preload();
 
-  runApp(AppRoot(input: input));
+  runApp(AppRoot(input: input, audio: audio));
 }

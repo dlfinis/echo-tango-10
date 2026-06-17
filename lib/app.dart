@@ -17,6 +17,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'services/audio_service.dart';
 import 'services/config_store.dart';
 import 'services/input_service.dart';
 import 'services/keyboard_input.dart';
@@ -34,9 +35,10 @@ import 'widgets/waiting_screen.dart';
 import 'widgets/winner_name_screen.dart';
 
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key, required this.input});
+  const AppRoot({super.key, required this.input, required this.audio});
 
   final InputService input;
+  final AudioService audio;
 
   @override
   State<AppRoot> createState() => _AppRootState();
@@ -86,6 +88,10 @@ class _AppRootState extends State<AppRoot> {
   }
 
   void _handlePulse() {
+    // Audio feedback for the physical button press. Fired BEFORE
+    // the debounce check so the operator hears something even on a
+    // rejected double-tap.
+    widget.audio.playPulse();
     // Debounce happens inside the stopwatch controller / input service.
     // The state machine itself only sees filtered events.
     if (!_stopwatch.tryPulse()) return;
@@ -131,7 +137,29 @@ class _AppRootState extends State<AppRoot> {
     }
 
     if (!mounted) return;
+    final AppState prevState = _state;
     setState(() => _state = nextState);
+    // Audio cue when transitioning INTO the result screen. We
+    // classify against the same range passed to ResultScreen so the
+    // sound matches the verdict label the player sees.
+    if (prevState == AppState.playing && nextState == AppState.result) {
+      final ConfigStore? store = _configStore;
+      final double start = store?.victoryRangeStart() ?? kDefaultVictoryRangeStart;
+      final double end = store?.victoryRangeEnd() ?? kDefaultVictoryRangeEnd;
+      final double elapsed = _lastElapsedSeconds;
+      if (elapsed >= start && elapsed <= end) {
+        widget.audio.playVictory();
+      } else if (elapsed < start) {
+        // Within 50ms of victory start = CASI; otherwise NI POR ASOMO.
+        if ((start - elapsed).abs() < 0.050) {
+          widget.audio.playCasi();
+        } else {
+          widget.audio.playNiPorAsomo();
+        }
+      } else {
+        widget.audio.playTePasaste();
+      }
+    }
   }
 
   /// Returns true if [elapsedSeconds] would land in the top 10 of the
