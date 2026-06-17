@@ -19,6 +19,7 @@
 /// never touches `SharedPreferences` directly.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -576,8 +577,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   onPressed: _handleConnectUsb,
                   icon: const Icon(Icons.usb,
                       color: Color(kDefaultAccentColorHex)),
-                  label: const Text(
-                    'Connect USB (Web Serial)',
+                  label: Text(
+                    !kIsWeb
+                        ? 'Conectar Arduino'
+                        : 'Connect USB (Web Serial)',
                     style: TextStyle(
                       color: Color(kDefaultAccentColorHex),
                     ),

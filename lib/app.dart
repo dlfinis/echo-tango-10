@@ -21,6 +21,7 @@ import 'services/config_store.dart';
 import 'services/input_service.dart';
 import 'services/keyboard_input.dart';
 import 'services/leaderboard.dart';
+import 'services/usb_serial_input.dart';
 import 'services/web_serial.dart' as web_serial;
 import 'models/leaderboard_entry.dart';
 import 'state/app_state.dart';
@@ -171,10 +172,25 @@ class _AppRootState extends State<AppRoot> {
     setState(() => _state = next(_state, TimerEvent.acceptWinner));
   }
 
-  // WEB SERIAL DEV GATE — requires Chrome HTTPS or localhost
+  // USB connect entry point used by the admin "Connect" button.
+  //
+  // Behaviour by platform:
+  //   * Android (Fire HD 8 + Arduino) — calls [UsbSerialInput.connect]
+  //     which opens the CDC-ACM port at 9600 8N1 and starts reading.
+  //   * Web (dev only)               — opens the Web Serial picker
+  //     and pipes any 'P'/'p' bytes into the InputService.
+  //   * Any other platform            — throws [UnsupportedError]
+  //     so the admin can show a SnackBar.
   Future<void> _connectUsbSerial() async {
+    if (widget.input is UsbSerialInput) {
+      final UsbSerialInput usb = widget.input as UsbSerialInput;
+      await usb.connect();
+      return;
+    }
     if (!kIsWeb) {
-      throw UnsupportedError('Web Serial solo disponible en Web.');
+      throw UnsupportedError(
+        'Conectar USB solo disponible en Android (Arduino) o Web.',
+      );
     }
     await web_serial.connectUsbSerial(widget.input);
   }
@@ -273,7 +289,9 @@ class _AppRootState extends State<AppRoot> {
           configStore: _configStore!,
           leaderboard: _leaderboard!,
           onExit: _exitAdmin,
-          onConnectUsb: kIsWeb ? _connectUsbSerial : null,
+          onConnectUsb: (kIsWeb || widget.input is UsbSerialInput)
+              ? _connectUsbSerial
+              : null,
         );
     }
   }
