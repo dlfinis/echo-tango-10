@@ -19,8 +19,14 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.0.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    // AGP 8.7 + Kotlin 1.9.22 — chosen because the USB serial
+    // plugins we depend on (flutter_libserialport 0.6.0) use
+    // older classpath setups and do NOT declare the
+    // com.android.library plugin required by AGP 9's strict
+    // evaluation. AGP 8.7 is the latest version that works
+    // without patching the plugin's build.gradle at runtime.
+    id("com.android.application") version "8.7.3" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
 }
 
 include(":app")
