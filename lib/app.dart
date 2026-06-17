@@ -29,8 +29,10 @@ import 'state/app_state.dart';
 import 'state/stopwatch_controller.dart';
 import 'utils/constants.dart';
 import 'widgets/admin_screen.dart';
+import 'widgets/error_screen.dart';
 import 'widgets/playing_screen.dart';
 import 'widgets/result_screen.dart';
+import 'widgets/splash_screen.dart';
 import 'widgets/waiting_screen.dart';
 import 'widgets/winner_name_screen.dart';
 
@@ -54,6 +56,8 @@ class _AppRootState extends State<AppRoot> {
   // these are still null.
   ConfigStore? _configStore;
   Leaderboard? _leaderboard;
+  _BootStatus _bootStatus = _BootStatus.booting;
+  String? _bootError;
 
   @override
   void initState() {
@@ -79,12 +83,21 @@ class _AppRootState extends State<AppRoot> {
   }
 
   Future<void> _initPersistence() async {
-    final ConfigStore store = await ConfigStore.load();
-    if (!mounted) return;
-    setState(() {
-      _configStore = store;
-      _leaderboard = Leaderboard(store);
-    });
+    try {
+      final ConfigStore store = await ConfigStore.load();
+      if (!mounted) return;
+      setState(() {
+        _configStore = store;
+        _leaderboard = Leaderboard(store);
+        _bootStatus = _BootStatus.ready;
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _bootError = e.toString();
+        _bootStatus = _BootStatus.error;
+      });
+    }
   }
 
   void _handlePulse() {
@@ -247,8 +260,33 @@ class _AppRootState extends State<AppRoot> {
               displayColor: const Color(kDefaultTextColorHex),
             ),
       ),
-      home: _buildInputLayer(child: _buildScreen()),
+      home: _buildBootGate(child: _buildInputLayer(child: _buildScreen())),
     );
+  }
+
+  /// Routes between splash / error / normal flow based on [_bootStatus].
+  Widget _buildBootGate({required Widget child}) {
+    switch (_bootStatus) {
+      case _BootStatus.booting:
+        return const SplashScreen();
+      case _BootStatus.error:
+        return ErrorScreen(
+          message: _bootError ?? 'Error desconocido',
+          onRetry: _retryBoot,
+        );
+      case _BootStatus.ready:
+        return child;
+    }
+  }
+
+  void _retryBoot() {
+    setState(() {
+      _bootStatus = _BootStatus.booting;
+      _bootError = null;
+      _configStore = null;
+      _leaderboard = null;
+    });
+    _initPersistence();
   }
 
   /// Wraps the active screen in a transparent input layer.
@@ -324,3 +362,10 @@ class _AppRootState extends State<AppRoot> {
     }
   }
 }
+
+/// Boot state machine for the app root.
+///
+/// `booting` is the initial state shown while SharedPreferences
+/// loads. `ready` is the normal app. `error` is shown if the load
+/// throws (e.g. permission denied, corrupt JSON).
+enum _BootStatus { booting, ready, error }
