@@ -5,12 +5,17 @@
 /// by the [StopwatchController] (same primitive as the Web
 /// [KeyboardInput]), so the [InputService] contract is identical
 /// regardless of source.
+///
+/// Uses `package:flutter_libserialport` for the serial-port
+/// enumeration + reading. The first available port is picked on
+/// [connect] — on a real Android device with an Arduino over USB
+/// OTG this resolves to `/dev/ttyUSB0` or `/dev/ttyACM0`.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:usb_serial/usb_serial.dart';
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 
 import '../state/stopwatch_controller.dart';
 import 'input_service.dart';
@@ -27,7 +32,8 @@ class UsbSerialInput implements InputService {
 
   final StopwatchController _debounce;
   void Function()? _callback;
-  UsbPort? _port;
+  SerialPort? _port;
+  SerialPortReader? _reader;
   StreamSubscription<Uint8List>? _subscription;
 
   @override
@@ -35,50 +41,35 @@ class UsbSerialInput implements InputService {
     _callback = cb;
   }
 
-  /// Scans for USB devices and connects to the first one whose vendor
-  /// ID matches a known Arduino/CDC-ACM chipset (CH340, FTDI, CP210x,
-  /// or genuine Arduino). Falls back to the first enumerated device
-  /// if none of those vendors match — many cheap Arduino clones
-  /// re-use the CH340 VID anyway, but a debug-printed Arduino may
-  /// show a custom VID.
+  /// Enumerates the available serial ports and opens the first one
+  /// at 9600 8N1 for reading.
   ///
   /// Throws [StateError] when no device is found or the port cannot
   /// be opened. The caller (admin "Connect USB" button) is expected
   /// to surface the error via SnackBar.
   Future<bool> connect() async {
-    final List<UsbDevice> devices = await UsbSerial.listDevices();
-    if (devices.isEmpty) {
-      throw StateError('No hay dispositivos USB conectados');
+    final List<String> ports = SerialPort.availablePorts;
+    if (ports.isEmpty) {
+      throw StateError('No hay dispositivos seriales conectados');
     }
-    final UsbDevice device = devices.firstWhere(
-      (UsbDevice d) =>
-          d.vid == 0x1A86 || // CH340 (most Arduino clones)
-          d.vid == 0x0403 || // FTDI
-          d.vid == 0x10C4 || // CP210x
-          d.vid == 0x2341 || // Arduino
-          d.vid == 0x2A03, // Arduino (alternate)
-      orElse: () => devices.first,
-    );
-    final UsbPort? port = await device.create();
-    if (port == null) {
-      throw StateError('No se pudo abrir el puerto USB');
+    final String name = ports.first;
+    final SerialPort port = SerialPort(name);
+    if (!port.openRead()) {
+      throw StateError('No se pudo abrir el puerto serial "$name"');
     }
-    await port.open();
-    await port.setDTR(true);
-    await port.setRTS(true);
-    await port.setPortParameters(
-      9600,
-      UsbPort.DATABITS_8,
-      UsbPort.STOPBITS_1,
-      UsbPort.PARITY_NONE,
-    );
+    // 9600 8N1 is the canonical Arduino bootloader rate.
+    port.config = SerialPortConfig()
+      ..baudRate = 9600
+      ..bits = 8
+      ..stopBits = 1
+      ..parity = SerialPortParity.none
+      ..setFlowControl(SerialPortFlowControl.none);
     _port = port;
-    _subscription = port.inputStream?.listen(
+    _reader = SerialPortReader(port);
+    _subscription = _reader!.stream.listen(
       _onData,
       onError: (Object _) {
-        // Port errors are non-fatal — the caller can re-call
-        // [connect]. We do not propagate; the stream may continue
-        // after the error.
+        // Stream errors are non-fatal — caller can re-call [connect].
       },
       cancelOnError: false,
     );
@@ -100,23 +91,26 @@ class UsbSerialInput implements InputService {
     return true;
   }
 
-  /// Test-only entry point: feeds raw bytes through the same
-  /// dispatch + debounce path the real USB stream uses. Lets
-  /// integration tests validate the protocol without needing
-  /// a physical device or a mocked `UsbPort`.
-  @visibleForTesting
-  void feedBytesForTest(Uint8List data) => _onData(data);
-
   /// Indicates whether a port is currently open and reading.
-  bool get isConnected => _port != null;
+  bool get isConnected => _port != null && _port!.isOpen;
 
   @override
   Future<void> dispose() async {
     await _subscription?.cancel();
     _subscription = null;
-    await _port?.close();
+    _reader?.close();
+    _reader = null;
+    _port?.close();
+    _port?.dispose();
     _port = null;
     _callback = null;
     _debounce.dispose();
   }
+
+  /// Test-only entry point: feeds raw bytes through the same
+  /// dispatch + debounce path the real USB stream uses. Lets
+  /// integration tests validate the protocol without needing
+  /// a physical device or a mocked [SerialPort].
+  @visibleForTesting
+  void feedBytesForTest(Uint8List data) => _onData(data);
 }
