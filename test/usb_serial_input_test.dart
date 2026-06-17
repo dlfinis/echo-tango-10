@@ -17,9 +17,10 @@
 
 import 'dart:typed_data';
 
-import 'package:arcade_timer_10s/services/usb_serial_input.dart';
 import 'package:arcade_timer_10s/state/stopwatch_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:arcade_timer_10s/services/usb_serial_input.dart';
 
 void main() {
   group('UsbSerialInput — Arduino protocol', () {
