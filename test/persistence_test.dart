@@ -245,4 +245,86 @@ void main() {
       expect(lb.top(5), hasLength(1));
     });
   });
+
+  group('ConfigStore — setters added after PR2', () {
+    // These cover every setter that was introduced for the operator-
+    // tunable admin sections. Each test writes through the public
+    // setter, asserts the in-memory getter returns the new value,
+    // then re-instantiates ConfigStore (simulating a restart) and
+    // asserts the value survives. Validation errors are also
+    // asserted.
+    test('setResultAutoReturnSeconds persists and survives restart',
+        () async {
+      final store = await ConfigStore.load();
+      await store.setResultAutoReturnSeconds(7);
+      expect(store.resultAutoReturnSeconds(), 7);
+      final store2 = await ConfigStore.load();
+      expect(store2.resultAutoReturnSeconds(), 7);
+    });
+
+    test('setSubTaglines + setSubTaglineRotationSeconds persist',
+        () async {
+      final store = await ConfigStore.load();
+      await store.setSubTaglines(<String>['TAG A', 'TAG B']);
+      await store.setSubTaglineRotationSeconds(4);
+      expect(store.subTaglines(), <String>['TAG A', 'TAG B']);
+      expect(store.subTaglineRotationSeconds(), 4);
+      final store2 = await ConfigStore.load();
+      expect(store2.subTaglines(), <String>['TAG A', 'TAG B']);
+      expect(store2.subTaglineRotationSeconds(), 4);
+    });
+
+    test('setVictoryRange persists and survives restart', () async {
+      final store = await ConfigStore.load();
+      await store.setVictoryRange(start: 9.4, end: 9.6);
+      expect(store.victoryRangeStart(), 9.4);
+      expect(store.victoryRangeEnd(), 9.6);
+      final store2 = await ConfigStore.load();
+      expect(store2.victoryRangeStart(), 9.4);
+      expect(store2.victoryRangeEnd(), 9.6);
+    });
+
+    test('setVictoryRange throws when start >= end', () async {
+      final store = await ConfigStore.load();
+      expect(
+        () => store.setVictoryRange(start: 10.0, end: 9.5),
+        throwsArgumentError,
+      );
+      // No pref was mutated on validation failure.
+      expect(store.victoryRangeStart(), kDefaultVictoryRangeStart);
+      expect(store.victoryRangeEnd(), kDefaultVictoryRangeEnd);
+    });
+
+    test('setVictoryRange throws when bounds are not positive', () async {
+      final store = await ConfigStore.load();
+      expect(
+        () => store.setVictoryRange(start: -1.0, end: 10.0),
+        throwsArgumentError,
+      );
+      expect(
+        () => store.setVictoryRange(start: 9.0, end: 0.0),
+        throwsArgumentError,
+      );
+    });
+
+    test('setLeaderboardRotationSeconds clamps to the documented range',
+        () async {
+      final store = await ConfigStore.load();
+      // In range — succeeds.
+      await store.setLeaderboardRotationSeconds(8);
+      expect(store.leaderboardRotationSeconds(), 8);
+      // Below min — throws and leaves pref untouched.
+      expect(
+        () => store.setLeaderboardRotationSeconds(0),
+        throwsArgumentError,
+      );
+      // Above max — throws and leaves pref untouched.
+      expect(
+        () => store.setLeaderboardRotationSeconds(120),
+        throwsArgumentError,
+      );
+      // Value still 8 after both throws.
+      expect(store.leaderboardRotationSeconds(), 8);
+    });
+  });
 }
