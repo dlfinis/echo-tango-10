@@ -8,8 +8,8 @@
 library;
 
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:usb_serial/usb_serial.dart';
 
 import '../state/stopwatch_controller.dart';
@@ -99,6 +99,13 @@ class UsbSerialInput implements InputService {
     _callback?.call();
     return true;
   }
+
+  /// Test-only entry point: feeds raw bytes through the same
+  /// dispatch + debounce path the real USB stream uses. Lets
+  /// integration tests validate the protocol without needing
+  /// a physical device or a mocked `UsbPort`.
+  @visibleForTesting
+  void feedBytesForTest(Uint8List data) => _onData(data);
 
   /// Indicates whether a port is currently open and reading.
   bool get isConnected => _port != null;
