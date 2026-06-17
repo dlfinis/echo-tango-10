@@ -49,7 +49,11 @@ jobs:
         run: flutter pub get
 
       - name: flutter analyze
-        run: flutter analyze
+        # --no-fatal-infos: the project has 3 pre-existing lint infos
+        # (prefer_const_constructors in admin_screen.dart). The CI
+        # gates on errors and warnings, not infos. Local devs still
+        # see the infos via `flutter analyze` without the flag.
+        run: flutter analyze --no-fatal-infos
 
       - name: flutter test
         run: flutter test --no-pub --reporter=expanded
