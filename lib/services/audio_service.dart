@@ -1,12 +1,12 @@
 /// Audio facade for the kiosk. Plays verdict sound effects on a pulse
-/// or a result transition. The actual `.mp3` files live under
-/// `assets/sounds/` — the operator is expected to drop them there
-/// before deploying the kiosk.
+/// or a result transition. The actual `.wav` files live under
+/// `assets/sounds/` — sourced from "Retro game sound effects" by
+/// Vircon32 (Carra), CC-BY 4.0, https://opengameart.org/content/
+/// retro-game-sound-effects.
 ///
 /// **Asset behaviour**: if an asset is missing, the play call logs a
-/// debugPrint warning and continues silently. This is intentional —
-/// the audio service is a STUB until the operator provides real
-/// sound files. The kiosk works without any audio files present.
+/// debugPrint warning and continues silently. The kiosk works without
+/// any audio files present — every play call is best-effort.
 library;
 
 import 'package:audioplayers/audioplayers.dart';
@@ -31,11 +31,11 @@ class AudioService {
     if (_preloaded) return;
     _preloaded = true;
     await Future.wait(<Future<void>>[
-      _safeSetSource(_pulse, 'sounds/pulse.mp3'),
-      _safeSetSource(_victory, 'sounds/victory.mp3'),
-      _safeSetSource(_casi, 'sounds/casi.mp3'),
-      _safeSetSource(_niPorAsomo, 'sounds/ni_por_asomo.mp3'),
-      _safeSetSource(_tePasaste, 'sounds/te_pasaste.mp3'),
+      _safeSetSource(_pulse, 'sounds/pulse.wav'),
+      _safeSetSource(_victory, 'sounds/victory.wav'),
+      _safeSetSource(_casi, 'sounds/casi.wav'),
+      _safeSetSource(_niPorAsomo, 'sounds/ni_por_asomo.wav'),
+      _safeSetSource(_tePasaste, 'sounds/te_pasaste.wav'),
     ]);
   }
 

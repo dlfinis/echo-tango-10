@@ -1,0 +1,17 @@
+Sound effects in this directory are from "Retro game sound effects"
+by Vircon32 (Carra), published at OpenGameArt.org under
+Creative Commons Attribution 4.0 International (CC BY 4.0).
+
+Source: https://opengameart.org/content/retro-game-sound-effects
+License: https://creativecommons.org/licenses/by/4.0/
+
+Mapping (kiosk filename -> source filename):
+
+  pulse.wav         <- SoundClick.wav
+  victory.wav       <- SoundReachGoal.wav
+  casi.wav          <- SoundBonus.wav
+  ni_por_asomo.wav  <- SoundFallDull.wav
+  te_pasaste.wav    <- SoundGameOver.wav
+
+Attribution notice: "Retro game sound effects", by Vircon32 (Carra).
+Published at OpenGameArt under license CC-BY 4.0.
