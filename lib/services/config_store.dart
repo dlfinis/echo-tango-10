@@ -75,6 +75,24 @@ class ConfigStore {
       'result_auto_return_seconds';
   static const String kKeyVictoryRangeStart = 'victory_range_start';
   static const String kKeyVictoryRangeEnd = 'victory_range_end';
+  static const String kKeyActiveThemeId = 'active_theme_id';
+
+  // ---------------------------------------------------------------------------
+  // Active theme
+  // ---------------------------------------------------------------------------
+
+  /// Returns the persisted theme id, or `null` when no preference
+  /// has been saved. The caller is expected to resolve `null` /
+  /// unknown ids through [themeFor] in the registry.
+  String? activeThemeId() => _prefs.getString(kKeyActiveThemeId);
+
+  /// Persists the active theme id. No validation here: the
+  /// registry's [themeFor] handles unknown ids by falling back to
+  /// the default, so an operator downgrade that removes a theme
+  /// does not corrupt the kiosk.
+  Future<void> setActiveThemeId(String id) async {
+    await _prefs.setString(kKeyActiveThemeId, id);
+  }
 
   // ---------------------------------------------------------------------------
   // Invitation messages
@@ -83,10 +101,17 @@ class ConfigStore {
   /// Returns the configured invitation message list, falling back to
   /// [kDefaultInvitationMessages] when the pref is missing or corrupted.
   List<String> invitationMessages() {
+    return invitationMessagesOrNull() ??
+        List<String>.unmodifiable(kDefaultInvitationMessages);
+  }
+
+  /// Returns the persisted operator override for invitation messages,
+  /// or `null` when no override has been saved. Screens with a
+  /// [KioskTheme] can use this to fall back to the theme's own
+  /// defaults when the operator has not customised the copy.
+  List<String>? invitationMessagesOrNull() {
     final String? raw = _prefs.getString(kKeyInvitationMessages);
-    if (raw == null || raw.isEmpty) {
-      return List<String>.unmodifiable(kDefaultInvitationMessages);
-    }
+    if (raw == null || raw.isEmpty) return null;
     try {
       final Object? decoded = jsonDecode(raw);
       if (decoded is List) {
@@ -98,9 +123,9 @@ class ConfigStore {
         if (out.isNotEmpty) return List<String>.unmodifiable(out);
       }
     } on FormatException {
-      // Corrupt JSON — fall through to defaults.
+      // Corrupt JSON — fall through to null.
     }
-    return List<String>.unmodifiable(kDefaultInvitationMessages);
+    return null;
   }
 
   Future<void> setInvitationMessages(List<String> messages) async {
@@ -121,10 +146,17 @@ class ConfigStore {
   /// Returns the configured sub-tagline list, falling back to
   /// [kDefaultSubTaglines] when the pref is missing or corrupted.
   List<String> subTaglines() {
+    return subTaglinesOrNull() ??
+        List<String>.unmodifiable(kDefaultSubTaglines);
+  }
+
+  /// Returns the persisted operator override for sub-taglines, or
+  /// `null` when no override has been saved. Screens with a
+  /// [KioskTheme] can use this to fall back to the theme's own
+  /// defaults when the operator has not customised the copy.
+  List<String>? subTaglinesOrNull() {
     final String? raw = _prefs.getString(kKeySubTaglines);
-    if (raw == null || raw.isEmpty) {
-      return List<String>.unmodifiable(kDefaultSubTaglines);
-    }
+    if (raw == null || raw.isEmpty) return null;
     try {
       final Object? decoded = jsonDecode(raw);
       if (decoded is List) {
@@ -138,7 +170,7 @@ class ConfigStore {
     } on FormatException {
       // fall through
     }
-    return List<String>.unmodifiable(kDefaultSubTaglines);
+    return null;
   }
 
   Future<void> setSubTaglines(List<String> taglines) async {

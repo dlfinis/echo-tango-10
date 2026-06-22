@@ -16,6 +16,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../state/stopwatch_controller.dart';
+import '../theme/kiosk_theme.dart';
+import '../theme/themes/classic_theme.dart';
 import '../utils/constants.dart';
 
 class PlayingScreen extends StatefulWidget {
@@ -23,10 +25,12 @@ class PlayingScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onTimeout,
+    this.theme = const ClassicTheme(),
   });
 
   final StopwatchController controller;
   final VoidCallback onTimeout;
+  final KioskTheme theme;
 
   @override
   State<PlayingScreen> createState() => _PlayingScreenState();
@@ -51,26 +55,17 @@ class _PlayingScreenState extends State<PlayingScreen> {
   bool _nearMissFlashed = false;
   int? _countdownValue;
 
-  /// Cheer / taunt messages shown below the chronograph. Two sets:
-  /// [preparation] runs while the chronograph is still far from 10
-  /// (calm, encouraging), [urgency] runs once we cross
-  /// [kCheerPhaseSwitchSeconds] (push, press now). The split is
-  /// deliberate: a "PREPARATE" while the player is at 9.7s
-  /// would be confusing; an "APURATE" at 3.0s would be premature.
-  static const List<String> _preparationMessages = <String>[
-    'PREPARATÉ',
-    'YA VIENE',
-    'PODRÁS',
-    'ENFOQUE',
-    'CONCENTRACIÓN',
-  ];
-  static const List<String> _urgencyMessages = <String>[
-    '¡YA!',
-    '¡APURATÉ!',
-    '¡PRESIONA!',
-    '¡AHORA!',
-    '¡DALE YA!',
-  ];
+  /// Cheer / taunt messages shown below the chronograph. Two sets
+  /// supplied by the active [KioskTheme]:
+  ///   * [preparation] runs while the chronograph is still far from
+  ///     10 (calm, encouraging).
+  ///   * [urgency] runs once we cross [kCheerPhaseSwitchSeconds]
+  ///     (push, press now).
+  /// The split is deliberate: a "PREPARATE" while the player is at
+  /// 9.7s would be confusing; an "APURATE" at 3.0s would be
+  /// premature. Each theme picks its own list of phrases.
+  List<String> get _preparationMessages => widget.theme.playingPreparationMessages;
+  List<String> get _urgencyMessages => widget.theme.playingUrgencyMessages;
 
   @override
   void initState() {
@@ -117,7 +112,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
       if (!mounted) return;
       setState(() {
         _colorIndex =
-            (_colorIndex + 1) % kPlayingColorPaletteHex.length;
+            (_colorIndex + 1) % widget.theme.playingColorPalette.length;
       });
     });
     _cheerTimer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
@@ -188,9 +183,9 @@ class _PlayingScreenState extends State<PlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color baseColor = Color(kPlayingColorPaletteHex[_colorIndex]);
+    final Color baseColor = widget.theme.playingColorPalette[_colorIndex];
     final Color digitColor =
-        _nearMissActive ? const Color(kDefaultAccentColorHex) : baseColor;
+        _nearMissActive ? widget.theme.accentColor : baseColor;
     // Pick the right list based on the visible elapsed time.
     // Clamp the index so a leftover index from the other list
     // can't cause an out-of-bounds crash.
@@ -203,7 +198,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
         : activeList[_cheerIndex % activeList.length];
 
     return Scaffold(
-      backgroundColor: const Color(kPlayingBackgroundColorHex),
+      backgroundColor: widget.theme.playingBackgroundColor,
       body: Stack(
         children: <Widget>[
           // Cheer message — bigger and more visible than before
@@ -221,7 +216,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
                   key: ValueKey<String>(cheer),
                   style: TextStyle(
                     color: urgency
-                        ? const Color(kDefaultAccentColorHex)
+                        ? widget.theme.accentColor
                         : baseColor.withValues(alpha: 0.55),
                     fontSize: 75,
                     fontWeight: FontWeight.w900,
@@ -318,7 +313,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
                       key: ValueKey<int?>(_countdownValue),
                       style: TextStyle(
                         color: _countdownValue == 0
-                            ? const Color(kDefaultAccentColorHex)
+                            ? widget.theme.accentColor
                             : digitColor,
                         fontSize: 480,
                         fontWeight: FontWeight.w900,

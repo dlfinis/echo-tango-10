@@ -27,6 +27,8 @@ import 'services/web_serial.dart' as web_serial;
 import 'models/leaderboard_entry.dart';
 import 'state/app_state.dart';
 import 'state/stopwatch_controller.dart';
+import 'theme/kiosk_theme.dart';
+import 'theme/theme_registry.dart';
 import 'utils/constants.dart';
 import 'widgets/admin_screen.dart';
 import 'widgets/error_screen.dart';
@@ -59,6 +61,13 @@ class _AppRootState extends State<AppRoot> {
   _BootStatus _bootStatus = _BootStatus.booting;
   String? _bootError;
 
+  // The active kiosk theme. Defaults to the registered default
+  // (classic) so the first frame never depends on async prefs.
+  // Re-resolved on every rebuild once _configStore is loaded, so
+  // the operator can switch themes from the admin panel without
+  // restarting the app.
+  KioskTheme _theme = themeFor(null);
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +98,7 @@ class _AppRootState extends State<AppRoot> {
       setState(() {
         _configStore = store;
         _leaderboard = Leaderboard(store);
+        _theme = themeFor(store.activeThemeId());
         _bootStatus = _BootStatus.ready;
       });
     } on Object catch (e) {
@@ -246,18 +256,18 @@ class _AppRootState extends State<AppRoot> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Arcade Timer 10s',
+      title: _theme.materialAppTitle,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(kDefaultBgColorHex),
+        scaffoldBackgroundColor: _theme.backgroundColor,
         // The chronograph digits use the DSEG7-Classic-Bold font
         // (declared in pubspec.yaml), a 7-segment LCD display face
         // bundled locally so the kiosk works offline. The default
         // body text falls back to the platform sans-serif.
         textTheme: ThemeData.dark().textTheme.apply(
-              bodyColor: const Color(kDefaultTextColorHex),
-              displayColor: const Color(kDefaultTextColorHex),
+              bodyColor: _theme.textColor,
+              displayColor: _theme.textColor,
             ),
       ),
       home: _buildBootGate(child: _buildInputLayer(child: _buildScreen())),
@@ -309,11 +319,11 @@ class _AppRootState extends State<AppRoot> {
       // First-frame loader. Shown for ~1 frame in practice because
       // SharedPreferences mock values are available synchronously on
       // most platforms and the platform channel is fast.
-      return const Scaffold(
-        backgroundColor: Color(kDefaultBgColorHex),
+      return Scaffold(
+        backgroundColor: _theme.backgroundColor,
         body: Center(
           child: CircularProgressIndicator(
-            color: Color(kDefaultAccentColorHex),
+            color: _theme.accentColor,
           ),
         ),
       );
@@ -324,12 +334,14 @@ class _AppRootState extends State<AppRoot> {
           configStore: _configStore!,
           leaderboard: _leaderboard!,
           onAdminGesture: _openAdmin,
+          theme: _theme,
         );
 
       case AppState.playing:
         return PlayingScreen(
           controller: _stopwatch,
           onTimeout: _handlePlayingTimeout,
+          theme: _theme,
         );
 
       case AppState.result:
@@ -339,6 +351,7 @@ class _AppRootState extends State<AppRoot> {
           victoryRangeStart: _configStore!.victoryRangeStart(),
           victoryRangeEnd: _configStore!.victoryRangeEnd(),
           onNext: _handlePulse,
+          theme: _theme,
         );
 
       case AppState.winnerName:

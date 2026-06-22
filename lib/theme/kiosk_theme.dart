@@ -44,8 +44,14 @@ abstract class KioskTheme {
 
   // -- Identity / palette --------------------------------------------------
 
-  /// App-wide background (waiting + admin + winner screens).
+  /// App-wide background (admin + winner screens).
   Color get backgroundColor;
+
+  /// Background of the WAITING screen Scaffold, shown only as a
+  /// fallback before the [backgroundMarchPainter] paints its first
+  /// frame (and during transitions). The marching painter draws
+  /// over it on every tick.
+  Color get waitingScaffoldColor;
 
   /// App-wide body text.
   Color get textColor;

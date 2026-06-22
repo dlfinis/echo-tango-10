@@ -31,6 +31,8 @@ import 'package:flutter/material.dart';
 import '../models/leaderboard_entry.dart';
 import '../services/config_store.dart';
 import '../services/leaderboard.dart';
+import '../theme/kiosk_theme.dart';
+import '../theme/themes/classic_theme.dart';
 import '../utils/constants.dart';
 
 class WaitingScreen extends StatefulWidget {
@@ -39,11 +41,13 @@ class WaitingScreen extends StatefulWidget {
     required this.configStore,
     required this.leaderboard,
     this.onAdminGesture,
+    this.theme = const ClassicTheme(),
   });
 
   final ConfigStore configStore;
   final Leaderboard leaderboard;
   final VoidCallback? onAdminGesture;
+  final KioskTheme theme;
 
   @override
   State<WaitingScreen> createState() => _WaitingScreenState();
@@ -100,8 +104,14 @@ class _WaitingScreenState extends State<WaitingScreen>
     final int messageSec = widget.configStore.messageRotationSeconds();
     final int subTaglineSec = widget.configStore.subTaglineRotationSeconds();
     final int leaderboardSec = widget.configStore.leaderboardRotationSeconds();
-    final List<String> messages = widget.configStore.invitationMessages();
-    final List<String> taglines = widget.configStore.subTaglines();
+    // Copy precedence: operator override (if any) wins, otherwise
+    // the active theme's defaults. This lets a theme ship with its
+    // own copy without losing the operator's ability to customise.
+    final List<String> messages =
+        widget.configStore.invitationMessagesOrNull() ??
+            widget.theme.invitationMessages;
+    final List<String> taglines =
+        widget.configStore.subTaglinesOrNull() ?? widget.theme.subTaglines;
 
     if (messages.isEmpty) {
       if (!_showingLeaderboard) {
@@ -169,8 +179,11 @@ class _WaitingScreenState extends State<WaitingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final List<String> messages = widget.configStore.invitationMessages();
-    final List<String> taglines = widget.configStore.subTaglines();
+    final List<String> messages =
+        widget.configStore.invitationMessagesOrNull() ??
+            widget.theme.invitationMessages;
+    final List<String> taglines =
+        widget.configStore.subTaglinesOrNull() ?? widget.theme.subTaglines;
     final List<LeaderboardEntry> top = widget.leaderboard.top(5);
 
     final String message = messages.isEmpty
@@ -185,19 +198,20 @@ class _WaitingScreenState extends State<WaitingScreen>
       // (it animates between palette entries internally as the
       // formation lands). This avoids any setState cross-talk
       // between the painter and the parent widget.
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: widget.theme.waitingScaffoldColor,
       body: Stack(
         children: <Widget>[
-          // Full-screen Space Invaders march. The painter draws
-          // everything (background + invaders + scanlines + stars)
-          // and re-paints on every tick of the backdrop controller
-          // — CustomPaint subscribes to the painter's `listenable`
-          // and triggers a paint WITHOUT rebuilding this widget.
-          // This is the fix for the 20 Hz setState freeze.
+          // Full-screen themed march. The theme owns the painter
+          // (Space Invaders for the classic theme, footballs for
+          // worldcup). The painter draws everything (background +
+          // formation + scanlines + stars) and re-paints on every
+          // tick of the backdrop controller — CustomPaint
+          // subscribes to the painter's `listenable` and triggers
+          // a paint WITHOUT rebuilding this widget. This is the
+          // fix for the 20 Hz setState freeze.
           Positioned.fill(
             child: CustomPaint(
-              painter: InvaderMarchPainter(
-                seed: 1337,
+              painter: widget.theme.backgroundMarchPainter(
                 listenable: _backdropTicker,
               ),
             ),
@@ -231,8 +245,8 @@ class _WaitingScreenState extends State<WaitingScreen>
                             value: _adminHoldProgress,
                             strokeWidth: 4,
                             backgroundColor: const Color(0xFF1E1E1E),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(kDefaultAccentColorHex),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              widget.theme.accentColor,
                             ),
                           ),
                         ),
@@ -242,13 +256,13 @@ class _WaitingScreenState extends State<WaitingScreen>
                             color: const Color(0xFF1E1E1E),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(kDefaultAccentColorHex),
+                              color: widget.theme.accentColor,
                               width: 2,
                             ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.settings,
-                            color: Color(kDefaultAccentColorHex),
+                            color: widget.theme.accentColor,
                             size: 40,
                           ),
                         ),
@@ -285,8 +299,8 @@ class _WaitingScreenState extends State<WaitingScreen>
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(kDefaultTextColorHex),
+                style: TextStyle(
+                  color: widget.theme.textColor,
                   fontSize: 480,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2,
@@ -302,8 +316,8 @@ class _WaitingScreenState extends State<WaitingScreen>
                   tagline,
                   key: ValueKey<String>(tagline),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(kDefaultAccentColorHex),
+                  style: TextStyle(
+                    color: widget.theme.accentColor,
                     fontSize: 220,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 4,
@@ -342,13 +356,13 @@ class _WaitingScreenState extends State<WaitingScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-            const FittedBox(
+            FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 'ÚLTIMOS GANADORES',
                 style: TextStyle(
-                  color: Color(kDefaultAccentColorHex),
+                  color: widget.theme.accentColor,
                   fontSize: 80,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 4,
@@ -416,8 +430,8 @@ class _WaitingScreenState extends State<WaitingScreen>
                           width: 600,
                           child: Text(
                             entry.name,
-                            style: const TextStyle(
-                              color: Color(kDefaultTextColorHex),
+                            style: TextStyle(
+                              color: widget.theme.textColor,
                               fontSize: 56,
                               fontWeight: FontWeight.w900,
                               fontFamily: 'BungeeInline',
@@ -428,8 +442,8 @@ class _WaitingScreenState extends State<WaitingScreen>
                         ),
                         Text(
                           rawStr,
-                          style: const TextStyle(
-                            color: Color(kDefaultAccentColorHex),
+                          style: TextStyle(
+                            color: widget.theme.accentColor,
                             fontSize: 48,
                             fontWeight: FontWeight.w900,
                             fontFamily: 'DSEG7Modern-Regular',

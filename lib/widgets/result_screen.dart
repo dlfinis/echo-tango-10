@@ -29,8 +29,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../theme/kiosk_theme.dart';
+import '../theme/themes/classic_theme.dart';
 import '../utils/constants.dart';
-import 'invader_sprite.dart';
 
 enum _Verdict { victory, casi, niPorAsomo, tePasaste }
 
@@ -42,6 +43,7 @@ class ResultScreen extends StatefulWidget {
     this.resultTimeoutSeconds = 5,
     this.victoryRangeStart = 9.9990,
     this.victoryRangeEnd = 10.0010,
+    this.theme = const ClassicTheme(),
   });
 
   final double elapsedSeconds;
@@ -60,6 +62,10 @@ class ResultScreen extends StatefulWidget {
   /// Inclusive upper bound of the VICTORY window, in seconds.
   /// Defaults to [kDefaultVictoryRangeEnd].
   final double victoryRangeEnd;
+
+  /// Visual theme. Defaults to [ClassicTheme] so existing tests
+  /// and call sites keep working without a theme argument.
+  final KioskTheme theme;
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -230,29 +236,21 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   String get _verdictLabel {
-    switch (_verdict) {
-      case _Verdict.victory:
-        return '¡GANASTE!';
-      case _Verdict.casi:
-        return '¡CASI, CASI!';
-      case _Verdict.niPorAsomo:
-        return '¡NI POR ASOMO!';
-      case _Verdict.tePasaste:
-        return '¡TE PASASTE!';
-    }
+    return widget.theme.verdictLabel(_toVerdictKind(_verdict));
   }
 
-  /// Map the internal verdict to the public [InvaderExpression] enum
-  InvaderExpression get _expression {
-    switch (_verdict) {
+  /// Map the internal verdict to the public [VerdictKind] enum
+  /// that the theme understands.
+  VerdictKind _toVerdictKind(_Verdict v) {
+    switch (v) {
       case _Verdict.victory:
-        return InvaderExpression.victoria;
+        return VerdictKind.victoria;
       case _Verdict.casi:
-        return InvaderExpression.casi;
+        return VerdictKind.casi;
       case _Verdict.niPorAsomo:
-        return InvaderExpression.niPorAsomo;
+        return VerdictKind.niPorAsomo;
       case _Verdict.tePasaste:
-        return InvaderExpression.tePasaste;
+        return VerdictKind.tePasaste;
     }
   }
 
@@ -326,8 +324,8 @@ class _ResultScreenState extends State<ResultScreen>
                   break;
               }
               return CustomPaint(
-                painter: InvaderSpritePainter(
-                  expression: _expression,
+                painter: widget.theme.resultSpritePainter(
+                  verdict: _toVerdictKind(_verdict),
                   pixelSize: pixelSize,
                   t: t,
                   colors: colors,
@@ -380,14 +378,14 @@ class _ResultScreenState extends State<ResultScreen>
                   decoration: BoxDecoration(
                     color: const Color(0xFF000000),
                     border: Border.all(
-                      color: const Color(kDefaultAccentColorHex),
+                      color: widget.theme.accentColor,
                       width: 4,
                     ),
                   ),
-                  child: const Text(
-                    '¡POR UN PELO!',
+                  child: Text(
+                    widget.theme.casiCaption(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Color(0xFFFFFFFF),
                       fontSize: 44,
                       fontWeight: FontWeight.w900,
@@ -406,32 +404,13 @@ class _ResultScreenState extends State<ResultScreen>
 
   /// Background color tinted by the verdict. The first ~50ms of
   /// mount animate the background IN from black via the implicit
-  /// AnimatedContainer.
-  Color get _verdictBg {
-    switch (_verdict) {
-      case _Verdict.victory:
-        return const Color(0xFF003A0A); // deep green
-      case _Verdict.casi:
-        return const Color(0xFF3A1F00); // deep amber
-      case _Verdict.niPorAsomo:
-        return const Color(0xFF2A0505); // soft red
-      case _Verdict.tePasaste:
-        return const Color(0xFF1A0303); // deeper red
-    }
-  }
+  /// AnimatedContainer. The active [KioskTheme] owns the palette
+  /// so different themes can pick different mood colours.
+  Color get _verdictBg =>
+      widget.theme.verdictBackground(_toVerdictKind(_verdict));
 
-  Color get _verdictColor {
-    switch (_verdict) {
-      case _Verdict.victory:
-        return const Color(kDefaultAccentColorHex);
-      case _Verdict.casi:
-        return const Color(0xFFFFC107);
-      case _Verdict.niPorAsomo:
-        return const Color(0xFFFF7070);
-      case _Verdict.tePasaste:
-        return const Color(0xFFFF5252);
-    }
-  }
+  Color get _verdictColor =>
+      widget.theme.verdictColor(_toVerdictKind(_verdict));
 
   @override
   Widget build(BuildContext context) {
@@ -467,8 +446,8 @@ class _ResultScreenState extends State<ResultScreen>
     required double shakeT,
     required double scrollT,
   }) {
-    const accent = Color(kDefaultAccentColorHex);
-    const white = Color(kDefaultTextColorHex);
+    final Color accent = widget.theme.accentColor;
+    final Color white = widget.theme.textColor;
 
     // Per-verdict animation deltas.
     double shakeX = 0;

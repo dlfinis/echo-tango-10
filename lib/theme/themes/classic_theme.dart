@@ -59,6 +59,9 @@ class ClassicTheme implements KioskTheme {
   Color get backgroundColor => _kClassicBackground;
 
   @override
+  Color get waitingScaffoldColor => const Color(0xFF0A0A0A);
+
+  @override
   Color get textColor => _kClassicText;
 
   @override
