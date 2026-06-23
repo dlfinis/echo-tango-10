@@ -1,32 +1,26 @@
-/// PenaltyScenePainter — full-screen penalty scene for the worldcup
-/// theme. Two modes:
+/// PenaltyScenePainter — penalty scene rendered as a small
+/// inset in the upper-right corner of the PLAYING / RESULT
+/// screen. The kiosk background is white (the chronograph
+/// lives on top of it); the scene only renders the goal +
+/// goalkeeper + kicker + ball in the corner.
 ///
-///   * **Compact** (`compact: true`) — used by the PLAYING screen.
-///     Drawn inside a SizedBox at the TOP of the screen (the
-///     chronograph sits below). The scene shows goal +
-///     goalkeeper + a kicker silhouette crouched behind the
-///     ball, with a glow halo and pronounced idle wobble.
-///
-///   * **Full** (`compact: false`, default) — used by the RESULT
-///     screen. Drawn across the whole viewport with a ball
-///     trajectory animation that matches the verdict (goal /
-///     post / wide / over).
+/// The painter is intentionally compact — designed for a
+/// box of roughly 35% of the viewport width × 40% of the
+/// viewport height. Pixel art is hand-tuned for that scale.
 ///
 /// Five animation modes:
-///   * `idle`    — ball wobbles, goalkeeper sways, kicker
-///                 breathes, crowd bobs.
-///   * `goal`    — ball flies into the net, net shakes hard,
-///                 crowd raises arms (green tint).
-///   * `post`    — ball ricochets off the post with a spark
-///                 burst, then bounces back.
-///   * `wide`    — ball streaks past the post off-screen,
-///                 crowd boos (red zigzags).
-///   * `over`    — ball sails over the crossbar with a
-///                 parabolic arc, crowd groans.
+///   * `idle`     — ball pulses with a yellow glow, kicker
+///                  crouches, goalkeeper sways.
+///   * `goal`     — ball flies into the net, net shakes
+///                  hard, crowd raises arms.
+///   * `post`     — ball ricochets off the post with sparks.
+///   * `wide`     — ball streaks past the post off-screen.
+///   * `over`     — ball sails over the crossbar.
 ///
-/// Compact mode swaps the goal frame to the upper half of the
-/// compact area and places the ball+kicker in the lower half so
-/// the chronograph never overlaps them.
+/// Compact-only now: the full-screen mode was removed because
+/// the kiosk uses a small corner inset. The painter is invoked
+/// from PlayingScreen and ResultScreen with the same
+/// corner-box layout.
 library;
 
 import 'dart:math' as math;
@@ -45,608 +39,518 @@ class PenaltyScenePainter extends CustomPainter {
   PenaltyScenePainter({
     required this.animation,
     required this.t,
-    this.compact = false,
     this.seed = 1337,
   });
 
   final PenaltySceneAnimation animation;
   final double t;
-  final bool compact;
   final int seed;
 
   // Selección Colombia tones.
   static const Color _kAzulBandera = Color(0xFF0E1A4A);
   static const Color _kAmarilloBandera = Color(0xFFFFCD00);
+  static const Color _kAmarilloOscuro = Color(0xFFE8B400);
+  static const Color _kRojoBandera = Color(0xFFCE1126);
   static const Color _kBallBlack = Color(0xFF111111);
-
-  // Crowd / lights.
-  static const int _crowdHeads = 80;
-  static const double _netSpacing = 10.0;
-  static const double _netAlpha = 0.55;
+  static const Color _kSkinTone = Color(0xFFE0AC77);
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (compact) {
-      _paintCompact(canvas, size);
-    } else {
-      _paintFull(canvas, size);
-    }
-  }
+    // Background — TRANSPARENT so the white kiosk background
+    // shows through. No green field, no sky gradient.
+    // (Operator asked for the white kiosk background to remain.)
 
-  // ===========================================================================
-  // COMPACT (PLAYING screen — top portion of viewport)
-  // ===========================================================================
+    // Field patch (small green strip at the bottom of the
+    // corner box, NOT a full-screen fill — just a tiny
+    // grass patch for context).
+    _drawGrassPatch(canvas, size);
 
-  void _paintCompact(Canvas canvas, Size size) {
-    // Sky gradient at the top, goal mid-area, ball+kicker at the
-    // bottom. No field stripe — the chronograph provides the
-    // "floor" below.
-    _drawCompactSky(canvas, size);
+    // Subtle box border (CRT-style outline).
+    _drawFrameBorder(canvas, size);
 
-    // Crowd at the very top.
-    _drawCompactCrowd(canvas, size);
+    // Crowd at the very top — small dots.
+    _drawCrowd(canvas, size);
 
-    // Stadium floodlights (corners).
-    _drawCompactFloodlights(canvas, size);
-
-    // Goal frame + net (top 50% of the compact area).
+    // Goal frame + net (top 55% of the corner box).
     final Rect goalRect = Rect.fromLTWH(
-      size.width * 0.15,
+      size.width * 0.18,
       size.height * 0.18,
-      size.width * 0.70,
-      size.height * 0.42,
+      size.width * 0.64,
+      size.height * 0.45,
     );
-    _drawNet(canvas, goalRect, shakeT: 0);
+    _drawNet(canvas, goalRect, shakeT: _netShakeT());
     _drawGoalFrame(canvas, goalRect);
 
-    // Goalkeeper — sways dramatically.
-    _drawGoalkeeperCompact(canvas, goalRect);
+    // Goalkeeper in the goal (sways with verdict).
+    _drawGoalkeeper(canvas, goalRect);
 
-    // Ball — bigger, with glow halo, in front of the kicker.
-    _drawBallCompact(canvas, size);
-
-    // Kicker silhouette — crouched behind the ball, breathing.
+    // Kicker silhouette in the lower-left, crouched, breathing.
     _drawKicker(canvas, size);
 
-    // "READY" label below the kicker (subtle).
-    _drawReadyLabel(canvas, size);
-  }
-
-  void _drawCompactSky(Canvas canvas, Size size) {
-    final Rect rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Color(0xFF87CEEB), // sky blue
-            Color(0xFFB0E0E6), // pale blue
-            Color(0xFFE8F4D8), // light lime
-          ],
-          stops: <double>[0.0, 0.5, 1.0],
-        ).createShader(rect),
-    );
-  }
-
-  void _drawCompactCrowd(Canvas canvas, Size size) {
-    final Paint paint = Paint()..color = _kAzulBandera.withValues(alpha: 0.18);
-    final double baseY = size.height * 0.10;
-    for (int i = 0; i < _crowdHeads; i++) {
-      final double fx = _hash01(seed + i * 7919);
-      final double x = fx * size.width;
-      final double r = 4.0 + _hash01(seed + i * 7901) * 5.0;
-      // Crowd bobs in idle — each head a different phase.
-      final double bob = math.sin(t * 2 * math.pi +
-              _hash01(seed + i * 7793) * 6.28) *
-          r *
-          0.6;
-      canvas.drawCircle(Offset(x, baseY - r / 2 + bob), r, paint);
-    }
-  }
-
-  void _drawCompactFloodlights(Canvas canvas, Size size) {
-    final Paint lightPaint = Paint()
-      ..color = const Color(0xFFFFE082).withValues(alpha: 0.20);
-    final double r = size.height * 0.45;
-    canvas.drawCircle(
-        Offset(-r * 0.3, size.height * 0.05), r, lightPaint);
-    canvas.drawCircle(
-        Offset(size.width + r * 0.3, size.height * 0.05), r, lightPaint);
-  }
-
-  void _drawGoalkeeperCompact(Canvas canvas, Rect goal) {
-    final double cx = goal.center.dx;
-    final double cy = goal.center.dy + goal.height * 0.15;
-    final double scale = goal.height / 240.0;
-
-    // Idle: pronounced horizontal sway + small vertical bob.
-    // Goal: shake. Wide: dive. Over: arms-up crouch.
-    double swayX = 0;
-    double bobY = 0;
-    double armRaise = 0; // 0 = arms at sides, 1 = arms up
-    if (animation == PenaltySceneAnimation.idle) {
-      swayX = math.sin(t * 2 * math.pi) * goal.width * 0.10;
-      bobY = math.cos(t * 2 * math.pi) * goal.height * 0.04;
-    } else if (animation == PenaltySceneAnimation.goal) {
-      swayX = math.sin(t * math.pi * 8) * goal.width * 0.06;
-    } else if (animation == PenaltySceneAnimation.wide) {
-      final double dir = t < 0.5 ? -1 : 1;
-      swayX = dir * (goal.width * 0.35) * (t < 0.5 ? t * 2 : 1.0);
-    } else if (animation == PenaltySceneAnimation.over) {
-      armRaise = math.sin(t * math.pi) * 1.0;
-      swayX = math.sin(t * math.pi * 2) * goal.width * 0.04;
-    }
-
-    canvas.save();
-    canvas.translate(cx + swayX, cy + bobY);
-
-    // Body (yellow Selección jersey)
-    final Paint bodyPaint = Paint()..color = _kAmarilloBandera;
-    canvas.drawRect(
-      Rect.fromCenter(center: Offset(0, 0), width: 36 * scale, height: 70 * scale),
-      bodyPaint,
-    );
-    // Shorts (azul)
-    final Paint shortsPaint = Paint()..color = _kAzulBandera;
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(0, 45 * scale), width: 38 * scale, height: 28 * scale),
-      shortsPaint,
-    );
-    // Legs
-    final Paint legPaint = Paint()..color = const Color(0xFF222222);
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(-12 * scale, 78 * scale), width: 12 * scale, height: 36 * scale),
-      legPaint,
-    );
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(12 * scale, 78 * scale), width: 12 * scale, height: 36 * scale),
-      legPaint,
-    );
-    // Head (skin)
-    final Paint headPaint = Paint()..color = const Color(0xFFE0AC77);
-    canvas.drawCircle(Offset(0, -48 * scale), 14 * scale, headPaint);
-    // Gloves — at sides normally, raised up when "over" or shaking.
-    final Paint glovePaint = Paint()..color = const Color(0xFFFFFFFF);
-    final double gloveX = 26 * scale;
-    final double gloveYBase = -10 * scale - armRaise * 40 * scale;
-    canvas.drawCircle(
-        Offset(-gloveX, gloveYBase), 9 * scale, glovePaint);
-    canvas.drawCircle(Offset(gloveX, gloveYBase), 9 * scale, glovePaint);
-    // Arms (lines from shoulders to gloves)
-    final Paint armPaint = Paint()
-      ..color = const Color(0xFFE0AC77)
-      ..strokeWidth = 6 * scale
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-        Offset(-14 * scale, -20 * scale),
-        Offset(-gloveX, gloveYBase),
-        armPaint);
-    canvas.drawLine(
-        Offset(14 * scale, -20 * scale),
-        Offset(gloveX, gloveYBase),
-        armPaint);
-
-    canvas.restore();
-  }
-
-  void _drawBallCompact(Canvas canvas, Size size) {
-    // Ball at the penalty mark (bottom-center of the compact
-    // area, visible above the chronograph).
-    final double ballRadius = size.width * 0.045;
-    final double spotY = size.height * 0.78;
-    final double idleWobble =
-        math.sin(t * 2 * math.pi) * ballRadius * 0.18;
-    final double rotation = t * 2 * math.pi;
-    final Offset pos = Offset(size.width / 2, spotY - ballRadius + idleWobble);
-    _drawBallAt(canvas, pos, ballRadius, rotation, glow: animation == PenaltySceneAnimation.idle);
-  }
-
-  void _drawKicker(Canvas canvas, Size size) {
-    // Crouched kicker silhouette behind the ball. Pixel-art
-    // 11x10 grid. Always faces right (the goal is on the right
-    // in our scene) — left leg planted, right leg drawn back
-    // ready to swing.
-    final double scale = size.height * 0.012;
-    final double baseX = size.width / 2 - size.width * 0.13;
-    final double baseY = size.height * 0.92;
-    // Breathing bob.
-    final double breathe = math.sin(t * 2 * math.pi) * scale * 1.5;
-
-    // Head
-    canvas.drawCircle(
-      Offset(baseX, baseY - 9 * scale + breathe),
-      2.5 * scale,
-      Paint()..color = const Color(0xFFE0AC77),
-    );
-    // Body (jersey Selección amarilla)
-    final Paint bodyPaint = Paint()..color = _kAmarilloBandera;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        baseX - 3 * scale,
-        baseY - 7 * scale + breathe,
-        6 * scale,
-        7 * scale,
-      ),
-      bodyPaint,
-    );
-    // Shorts (azul)
-    final Paint shortsPaint = Paint()..color = _kAzulBandera;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        baseX - 3 * scale,
-        baseY + 0 * scale + breathe,
-        6 * scale,
-        3 * scale,
-      ),
-      shortsPaint,
-    );
-    // Planted leg (forward, to the right of the body)
-    final Paint legPaint = Paint()..color = const Color(0xFF222222);
-    canvas.drawRect(
-      Rect.fromLTWH(
-        baseX + 1 * scale,
-        baseY + 3 * scale + breathe,
-        2 * scale,
-        5 * scale,
-      ),
-      legPaint,
-    );
-    // Kicking leg drawn BACK (to the left) — slight oscillation
-    // during idle to reinforce "ready to kick" feel.
-    final double backSwing =
-        math.sin(t * 2 * math.pi) * scale * 1.0;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        baseX - 5 * scale - backSwing,
-        baseY + 3 * scale + breathe,
-        2 * scale,
-        5 * scale,
-      ),
-      legPaint,
-    );
-  }
-
-  void _drawReadyLabel(Canvas canvas, Size size) {
-    // Subtle "¡LISTOS!" label that fades in/out gently.
-    final double alpha =
-        0.5 + 0.5 * math.sin(t * 2 * math.pi);
-    final TextPainter tp = TextPainter(
-      text: TextSpan(
-        text: '¡LISTOS!',
-        style: TextStyle(
-          color: _kAmarilloBandera.withValues(alpha: alpha),
-          fontSize: size.height * 0.06,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 4,
-          shadows: const <Shadow>[
-            Shadow(
-              color: Color(0xCC000000),
-              blurRadius: 6,
-              offset: Offset(2, 2),
-            ),
-          ],
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(
-      canvas,
-      Offset(
-        (size.width - tp.width) / 2,
-        size.height * 0.02,
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // FULL (RESULT screen — full viewport)
-  // ===========================================================================
-
-  void _paintFull(Canvas canvas, Size size) {
-    _drawField(canvas, size);
-    _drawCrowd(canvas, size);
-    _drawFloodlights(canvas, size);
-
-    final Rect goalRect = _goalRect(size);
-    _drawNet(canvas, goalRect, shakeT: animation == PenaltySceneAnimation.goal ? t : 0);
-    _drawGoalFrame(canvas, goalRect);
-    _drawGoalkeeper(canvas, goalRect);
-    _drawPenaltyMarkings(canvas, size);
+    // Ball — animated by verdict. Idle has a glow halo.
     _drawBall(canvas, size);
   }
 
-  Rect _goalRect(Size size) {
-    final double w = size.width * 0.55;
-    final double h = size.height * 0.35;
-    return Rect.fromLTWH(
-      (size.width - w) / 2,
-      size.height * 0.05,
-      w,
-      h,
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
-  void _drawField(Canvas canvas, Size size) {
-    final Rect fieldRect = Rect.fromLTWH(0, 0, size.width, size.height);
+  void _drawGrassPatch(Canvas canvas, Size size) {
+    // Small green strip at the bottom 18% of the corner box.
+    final Rect grassRect = Rect.fromLTWH(
+      0,
+      size.height * 0.82,
+      size.width,
+      size.height * 0.18,
+    );
     canvas.drawRect(
-      fieldRect,
+      grassRect,
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0xFFE8F4D8),
             Color(0xFFBFE3A2),
-            Color(0xFF8FBE6F),
+            Color(0xFF7FB05A),
           ],
-        ).createShader(fieldRect),
+        ).createShader(grassRect),
     );
-    final Paint stripePaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.06);
-    for (double y = 0; y < size.height; y += 24) {
-      canvas.drawRect(
-        Rect.fromLTWH(0, y, size.width, 12),
-        stripePaint,
+    // Grass texture — short vertical strokes.
+    final Paint grassStroke = Paint()
+      ..color = const Color(0xFF4F8A3F).withValues(alpha: 0.5)
+      ..strokeWidth = 1.0;
+    for (double x = 4; x < size.width; x += 6) {
+      final double h = 3 + _hash01(seed + x.toInt()) * 3;
+      canvas.drawLine(
+        Offset(x, grassRect.top + 2),
+        Offset(x, grassRect.top + 2 + h),
+        grassStroke,
       );
     }
   }
 
-  void _drawCrowd(Canvas canvas, Size size) {
-    final Paint paint = Paint()..color = _kAzulBandera.withValues(alpha: 0.10);
-    final double baseY = size.height * 0.04;
-    for (int i = 0; i < _crowdHeads; i++) {
-      final double fx = _hash01(seed + i * 7919);
-      final double x = fx * size.width;
-      final double r = 4.0 + _hash01(seed + i * 7901) * 4.0;
-      canvas.drawCircle(Offset(x, baseY - r / 2), r, paint);
-    }
+  void _drawFrameBorder(Canvas canvas, Size size) {
+    // Thin amber inner border + thicker dark outer border —
+    // gives the corner box a CRT-monitor feel.
+    final Rect outer = Rect.fromLTWH(
+      1.0,
+      1.0,
+      size.width - 2.0,
+      size.height - 2.0,
+    );
+    canvas.drawRect(
+      outer,
+      Paint()
+        ..color = const Color(0xFF1A1A1A)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0,
+    );
+    // Inner amber inset (3 px in from the border).
+    final Rect inner = outer.deflate(3);
+    canvas.drawRect(
+      inner,
+      Paint()
+        ..color = _kAmarilloBandera.withValues(alpha: 0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
   }
 
-  void _drawFloodlights(Canvas canvas, Size size) {
-    final Paint lightPaint = Paint()
-      ..color = const Color(0xFFFFE082).withValues(alpha: 0.15);
-    final double r = size.height * 0.20;
-    canvas.drawCircle(
-        Offset(-r * 0.4, size.height * 0.08), r, lightPaint);
-    canvas.drawCircle(
-        Offset(size.width + r * 0.4, size.height * 0.08), r, lightPaint);
+  void _drawCrowd(Canvas canvas, Size size) {
+    final Paint paint = Paint()..color = _kAzulBandera.withValues(alpha: 0.25);
+    final double baseY = size.height * 0.08;
+    final int n = 18;
+    for (int i = 0; i < n; i++) {
+      final double fx = (i + 0.5) / n;
+      final double x = fx * size.width + (_hash01(seed + i) - 0.5) * 4;
+      final double r = 2.5 + _hash01(seed + i * 31) * 1.5;
+      // On goal: arms raised (heads lift slightly). On misses:
+      // bob normally.
+      double lift = 0;
+      if (animation == PenaltySceneAnimation.goal && t > 0.6) {
+        lift = (math.sin(t * math.pi * 6 + i)) * 2;
+      }
+      canvas.drawCircle(Offset(x, baseY - r - lift), r, paint);
+    }
   }
 
   void _drawNet(Canvas canvas, Rect goal, {required double shakeT}) {
+    // Net grid — small horizontal + vertical lines.
     final Paint netPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: _netAlpha)
-      ..strokeWidth = 1.0;
-    for (double x = goal.left; x <= goal.right; x += _netSpacing) {
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.75)
+      ..strokeWidth = 0.7;
+    final double dx = goal.width / 6;
+    final double dy = goal.height / 5;
+    for (double x = goal.left; x <= goal.right; x += dx) {
       canvas.drawLine(Offset(x, goal.top), Offset(x, goal.bottom), netPaint);
     }
-    for (double y = goal.top; y <= goal.bottom; y += _netSpacing) {
+    for (double y = goal.top; y <= goal.bottom; y += dy) {
       canvas.drawLine(Offset(goal.left, y), Offset(goal.right, y), netPaint);
     }
-    // Net shake — dramatic on goal, subtle on impact (post).
-    double amp = 0;
-    if (shakeT > 0.0) {
-      amp = (1.0 - shakeT) * 6.0;
-    } else if (animation == PenaltySceneAnimation.post &&
-        t > 0.5 &&
-        t < 0.55) {
-      // Single hard shake on post impact.
-      amp = (0.55 - t) * 50.0;
-    }
-    if (amp > 0.5) {
-      final Paint shakePaint = Paint()
-        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.7)
-        ..strokeWidth = 2.0;
-      for (int i = 0; i < 5; i++) {
-        final double y = goal.top + goal.height * (0.2 + i * 0.15) +
-            math.sin(shakeT * math.pi * 8 + i) * amp;
+    if (shakeT > 0) {
+      // Net shake (3 horizontal lines bowing in/out).
+      final double amp = (1.0 - shakeT) * 4.0;
+      final Paint shake = Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.7 * shakeT)
+        ..strokeWidth = 1.5;
+      for (int i = 0; i < 3; i++) {
+        final double y = goal.top + goal.height * (0.3 + i * 0.2) +
+            math.sin(shakeT * math.pi * 6 + i) * amp;
         canvas.drawLine(
           Offset(goal.left, y),
           Offset(goal.right, y),
-          shakePaint,
+          shake,
         );
       }
     }
   }
 
   void _drawGoalFrame(Canvas canvas, Rect goal) {
-    final double frameThickness = math.max(8.0, goal.width * 0.012);
-    final Paint framePaint = Paint()
-      ..color = _kAmarilloBandera
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = frameThickness;
-    final Rect frameOuter = goal.inflate(frameThickness / 2);
-    canvas.drawRect(frameOuter, framePaint);
-    final Paint shadowPaint = Paint()
-      ..color = const Color(0xCC8A6A00)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = frameThickness / 2;
-    canvas.drawRect(frameOuter.deflate(frameThickness / 4), shadowPaint);
+    // 3D-look yellow goal frame: a thick outer rectangle in
+    // bright amarillo, a thinner inner darker line for depth.
+    final double frameT = math.max(3.0, goal.width * 0.018);
+    final Paint outerPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[_kAmarilloBandera, _kAmarilloOscuro],
+      ).createShader(goal.inflate(frameT / 2));
+    canvas.drawRect(goal.inflate(frameT / 2), outerPaint);
+    // Inner darker inset.
+    canvas.drawRect(
+      goal,
+      Paint()
+        ..color = const Color(0xFF8A6A00)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+    // Outer black border.
+    canvas.drawRect(
+      goal.inflate(frameT / 2),
+      Paint()
+        ..color = const Color(0xFF111111)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
   }
 
   void _drawGoalkeeper(Canvas canvas, Rect goal) {
     final double cx = goal.center.dx;
-    final double cy = goal.center.dy;
-    final double scale = goal.height / 220.0;
+    final double cy = goal.bottom - goal.height * 0.10;
+    final double scale = goal.height / 90.0;
 
     double swayX = 0;
-    if (animation == PenaltySceneAnimation.idle) {
-      swayX = math.sin(t * 2 * math.pi) * goal.width * 0.05;
-    } else if (animation == PenaltySceneAnimation.goal) {
-      swayX = math.sin(t * math.pi * 6) * goal.width * 0.04;
-    } else if (animation == PenaltySceneAnimation.wide) {
-      final double dir = t < 0.5 ? -1 : 1;
-      swayX = dir * (goal.width * 0.3) * (t < 0.5 ? t * 2 : 1.0);
-    } else if (animation == PenaltySceneAnimation.over) {
-      swayX = math.sin(t * math.pi * 2) * goal.width * 0.03;
+    double armRaise = 0;
+    switch (animation) {
+      case PenaltySceneAnimation.idle:
+        swayX = math.sin(t * 2 * math.pi) * goal.width * 0.06;
+        break;
+      case PenaltySceneAnimation.goal:
+        swayX = math.sin(t * math.pi * 6) * goal.width * 0.04;
+        break;
+      case PenaltySceneAnimation.wide:
+        final double dir = t < 0.5 ? -1 : 1;
+        swayX = dir * (goal.width * 0.30) * (t < 0.5 ? t * 2 : 1.0);
+        break;
+      case PenaltySceneAnimation.over:
+        armRaise = math.sin(t * math.pi) * 1.0;
+        swayX = math.sin(t * math.pi * 2) * goal.width * 0.04;
+        break;
+      case PenaltySceneAnimation.post:
+        swayX = math.sin(t * math.pi * 4) * goal.width * 0.05;
+        break;
     }
 
     canvas.save();
     canvas.translate(cx + swayX, cy);
 
-    final Paint bodyPaint = Paint()..color = _kAmarilloBandera;
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(0, 0), width: 30 * scale, height: 60 * scale),
-      bodyPaint,
+    // Body (amarillo jersey)
+    _paintRect(canvas, 0, -10 * scale, 12 * scale, 22 * scale, _kAmarilloBandera);
+    // Azule detail on the chest
+    _paintRect(canvas, -3 * scale, -4 * scale, 6 * scale, 2 * scale, _kAzulBandera);
+    // Shorts (azul)
+    _paintRect(canvas, -5 * scale, 12 * scale, 10 * scale, 8 * scale, _kAzulBandera);
+    // Legs
+    _paintRect(canvas, -4 * scale, 20 * scale, 3 * scale, 12 * scale, const Color(0xFF222222));
+    _paintRect(canvas, 1 * scale, 20 * scale, 3 * scale, 12 * scale, const Color(0xFF222222));
+    // Head (skin)
+    canvas.drawCircle(Offset(0, -16 * scale), 5 * scale, Paint()..color = _kSkinTone);
+    // Hair (dark)
+    _paintRect(canvas, -4 * scale, -21 * scale, 8 * scale, 3 * scale, const Color(0xFF222222));
+    // Gloves (white) — at sides normally, raised up on 'over'.
+    final double gloveY = -8 * scale - armRaise * 16 * scale;
+    canvas.drawCircle(
+        Offset(-9 * scale, gloveY), 3 * scale, Paint()..color = const Color(0xFFFFFFFF));
+    canvas.drawCircle(
+        Offset(9 * scale, gloveY), 3 * scale, Paint()..color = const Color(0xFFFFFFFF));
+    // Arms (skin) connecting shoulders to gloves.
+    final Paint arm = Paint()
+      ..color = _kSkinTone
+      ..strokeWidth = 2.5 * scale
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(-5 * scale, -6 * scale),
+      Offset(-9 * scale, gloveY),
+      arm,
     );
-    final Paint shortsPaint = Paint()..color = _kAzulBandera;
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(0, 38 * scale), width: 32 * scale, height: 24 * scale),
-      shortsPaint,
+    canvas.drawLine(
+      Offset(5 * scale, -6 * scale),
+      Offset(9 * scale, gloveY),
+      arm,
     );
-    final Paint legPaint = Paint()..color = const Color(0xFF333333);
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(-10 * scale, 65 * scale), width: 10 * scale, height: 32 * scale),
-      legPaint,
-    );
-    canvas.drawRect(
-      Rect.fromCenter(
-          center: Offset(10 * scale, 65 * scale), width: 10 * scale, height: 32 * scale),
-      legPaint,
-    );
-    final Paint headPaint = Paint()..color = const Color(0xFFE0AC77);
-    canvas.drawCircle(Offset(0, -40 * scale), 12 * scale, headPaint);
-    final Paint glovePaint = Paint()..color = const Color(0xFFEEEEEE);
-    canvas.drawCircle(Offset(-22 * scale, -8 * scale), 8 * scale, glovePaint);
-    canvas.drawCircle(Offset(22 * scale, -8 * scale), 8 * scale, glovePaint);
 
     canvas.restore();
   }
 
-  void _drawPenaltyMarkings(Canvas canvas, Size size) {
-    final Paint linePaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.55)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    final double spotY = size.height * 0.78;
-    final double arcRadius = size.height * 0.10;
-    canvas.drawArc(
-      Rect.fromCircle(
-          center: Offset(size.width / 2, spotY), radius: arcRadius),
-      -math.pi,
-      math.pi,
-      false,
-      linePaint,
+  void _drawKicker(Canvas canvas, Size size) {
+    // Crouched kicker in the lower-left corner, behind the
+    // ball. Always faces right (the goal is to the right).
+    final double scale = size.height * 0.022;
+    final double baseX = size.width * 0.30;
+    final double baseY = size.height * 0.78;
+    // Breathing bob — faster on idle, slower when ball is in
+    // flight.
+    final double bobRate = animation == PenaltySceneAnimation.idle
+        ? 2.0
+        : 1.0;
+    final double breathe = math.sin(t * math.pi * bobRate) * scale * 1.2;
+
+    // Planted leg (forward)
+    _paintRect(canvas,
+        baseX + 1 * scale, baseY + 3 * scale + breathe,
+        2 * scale, 7 * scale, const Color(0xFF222222));
+    // Body (amarillo jersey, leaning forward)
+    _paintRect(canvas,
+        baseX - 3 * scale, baseY - 8 * scale + breathe,
+        7 * scale, 11 * scale, _kAmarilloBandera);
+    // Azule diagonal stripe on chest (the Selección number area)
+    _paintRect(canvas,
+        baseX - 2 * scale, baseY - 5 * scale + breathe,
+        5 * scale, 2 * scale, _kAzulBandera);
+    // Shorts (azul)
+    _paintRect(canvas,
+        baseX - 3 * scale, baseY + 3 * scale + breathe,
+        7 * scale, 4 * scale, _kAzulBandera);
+    // Kicking leg (drawn back, swinging oscillation)
+    final double backSwing = math.sin(t * 2 * math.pi) * scale * 1.5;
+    _paintRect(canvas,
+        baseX - 6 * scale - backSwing, baseY + 4 * scale + breathe,
+        2 * scale, 6 * scale, const Color(0xFF222222));
+    // Head
+    canvas.drawCircle(
+      Offset(baseX, baseY - 12 * scale + breathe),
+      3.5 * scale,
+      Paint()..color = _kSkinTone,
     );
-    final Paint spotPaint = Paint()..color = const Color(0xFFFFFFFF);
-    canvas.drawCircle(Offset(size.width / 2, spotY), 3.0, spotPaint);
-    final double boxTop = size.height * 0.40;
-    final double boxLeft = size.width * 0.18;
-    final double boxRight = size.width * 0.82;
-    final Paint boxPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawRect(
-      Rect.fromLTRB(boxLeft, boxTop, boxRight, size.height),
-      boxPaint,
-    );
+    // Hair
+    _paintRect(canvas,
+        baseX - 3 * scale, baseY - 15 * scale + breathe,
+        6 * scale, 2 * scale, const Color(0xFF222222));
   }
 
+  // ---------------------------------------------------------------------------
+  // Ball — verdict-driven trajectory, with idle glow and
+  // post-impact reset.
+  // ---------------------------------------------------------------------------
+
   void _drawBall(Canvas canvas, Size size) {
-    final double ballRadius = size.width * 0.025;
+    final double ballRadius = size.width * 0.045;
     final double spotY = size.height * 0.78;
+    final double startX = size.width * 0.46;
     Offset pos;
+    double rx = ballRadius;
+    double ry = ballRadius;
     double rotation = 0;
     double alpha = 1.0;
 
     switch (animation) {
       case PenaltySceneAnimation.idle:
-        pos = Offset(size.width / 2, spotY - ballRadius);
+        // Subtle wobble + glow.
+        final double wobble = math.sin(t * 2 * math.pi) * ballRadius * 0.10;
+        pos = Offset(startX, spotY - ballRadius + wobble);
         rotation = t * 2 * math.pi;
+        _drawBallGlow(canvas, pos, ballRadius);
         break;
+
       case PenaltySceneAnimation.goal:
-        final Rect goal = _goalRect(size);
-        final Offset start = Offset(size.width / 2, spotY - ballRadius);
-        final Offset end =
-            Offset(goal.center.dx, goal.center.dy + ballRadius);
+        final Rect goal = Rect.fromLTWH(
+          size.width * 0.18,
+          size.height * 0.18,
+          size.width * 0.64,
+          size.height * 0.45,
+        );
+        final Offset end = Offset(goal.center.dx, goal.center.dy);
         if (t < 0.6) {
-          pos = Offset.lerp(start, end, t / 0.6)!;
+          final double tt = t / 0.6;
+          // Parabolic arc — peaks mid-flight.
+          final double midY = (spotY - ballRadius + end.dy) / 2 - 12;
+          final double x = startX + (end.dx - startX) * tt;
+          final double y = _quadBezier(spotY - ballRadius, midY, end.dy, tt);
+          pos = Offset(x, y);
         } else {
           pos = end;
           alpha = 1.0 - (t - 0.6) / 0.4 * 0.3;
         }
-        rotation = t * 4 * math.pi;
+        rotation = t * 5 * math.pi;
         break;
+
       case PenaltySceneAnimation.post:
-        final Rect goal = _goalRect(size);
-        final double postX = goal.left + 6;
-        final double postY = goal.top + goal.height * 0.55;
-        final Offset start = Offset(size.width / 2, spotY - ballRadius);
-        if (t < 0.5) {
-          pos = Offset.lerp(start, Offset(postX, postY), t / 0.5)!;
+        final Rect goal = Rect.fromLTWH(
+          size.width * 0.18,
+          size.height * 0.18,
+          size.width * 0.64,
+          size.height * 0.45,
+        );
+        final double postX = goal.left + 3;
+        final double postY = goal.top + goal.height * 0.30;
+        if (t < 0.45) {
+          final double tt = t / 0.45;
+          pos = Offset.lerp(
+            Offset(startX, spotY - ballRadius),
+            Offset(postX, postY),
+            tt,
+          )!;
+        } else if (t < 0.55) {
+          // Spark burst at the post — ball squashed against it.
+          pos = Offset(postX, postY);
+          rx = ballRadius * (1.0 - (t - 0.45) / 0.10 * 0.4);
+          ry = ballRadius * (1.0 + (t - 0.45) / 0.10 * 0.3);
         } else {
+          final double tt = (t - 0.55) / 0.45;
           pos = Offset.lerp(
             Offset(postX, postY),
-            Offset(start.dx + ballRadius * 2, start.dy),
-            (t - 0.5) / 0.5,
+            Offset(startX + ballRadius * 2, spotY - ballRadius),
+            tt,
           )!;
         }
-        rotation = t * 6 * math.pi;
+        rotation = t * 7 * math.pi;
+        _drawSparks(canvas, pos, t);
         break;
+
       case PenaltySceneAnimation.wide:
-        final double dir = (seed.isEven ? -1 : 1);
-        final Rect goal = _goalRect(size);
-        final double postX = dir < 0 ? goal.left - 6 : goal.right + 6;
-        final double postY = goal.center.dy - 20;
-        final Offset start = Offset(size.width / 2, spotY - ballRadius);
-        pos = Offset.lerp(start, Offset(postX, postY), t)!;
-        rotation = t * 8 * math.pi;
+        final double dir = seed.isEven ? -1 : 1;
+        final Rect goal = Rect.fromLTWH(
+          size.width * 0.18,
+          size.height * 0.18,
+          size.width * 0.64,
+          size.height * 0.45,
+        );
+        final double postX = dir < 0 ? goal.left - 4 : goal.right + 4;
+        final double postY = goal.center.dy;
+        pos = Offset.lerp(
+          Offset(startX, spotY - ballRadius),
+          Offset(postX, postY),
+          t,
+        )!;
+        rotation = t * 9 * math.pi;
         alpha = 1.0 - (t > 0.8 ? (t - 0.8) / 0.2 * 0.7 : 0.0);
+        _drawStreak(canvas, pos, dir);
         break;
+
       case PenaltySceneAnimation.over:
-        final Rect goal = _goalRect(size);
-        final double crossbarY = goal.top - ballRadius - 8;
-        final Offset start = Offset(size.width / 2, spotY - ballRadius);
+        final Rect goal = Rect.fromLTWH(
+          size.width * 0.18,
+          size.height * 0.18,
+          size.width * 0.64,
+          size.height * 0.45,
+        );
+        final double crossbarY = goal.top - ballRadius - 4;
         final double tt = t;
         pos = Offset(
-          size.width / 2 + math.sin(tt * math.pi) * 8,
-          start.dy + (crossbarY - start.dy) * tt,
+          startX + (goal.center.dx - startX) * tt,
+          (spotY - ballRadius) + (crossbarY - (spotY - ballRadius)) * tt,
         );
-        rotation = t * 5 * math.pi;
+        rotation = t * 6 * math.pi;
         alpha = 1.0 - (t > 0.85 ? (t - 0.85) / 0.15 * 0.5 : 0.0);
+        _drawStreak(canvas, pos, 0);
         break;
     }
 
-    _drawBallAt(canvas, pos, ballRadius, rotation, glow: false, alpha: alpha);
+    _drawBallOval(canvas, pos, rx, ry, rotation, alpha: alpha);
   }
 
-  // ===========================================================================
-  // SHARED ball-drawing primitive
-  // ===========================================================================
+  void _drawBallGlow(Canvas canvas, Offset pos, double radius) {
+    // Pulsing yellow halo around the ball.
+    final double pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
+    final double haloR = radius * (2.0 + pulse * 0.6);
+    final Paint halo = Paint()
+      ..color = _kAmarilloBandera.withValues(alpha: 0.25 + pulse * 0.20)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(pos, haloR, halo);
+  }
 
-  void _drawBallAt(
+  void _drawSparks(Canvas canvas, Offset pos, double t) {
+    if (t < 0.40 || t > 0.65) return;
+    final Paint paint = Paint()
+      ..color = _kAmarilloBandera
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    final double spread = (t - 0.40) * 30.0;
+    for (int i = 0; i < 6; i++) {
+      final double angle = i * math.pi / 3;
+      canvas.drawLine(
+        pos,
+        Offset(pos.dx + math.cos(angle) * spread, pos.dy + math.sin(angle) * spread),
+        paint,
+      );
+    }
+  }
+
+  void _drawStreak(Canvas canvas, Offset pos, double dir) {
+    final Paint paint = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.6)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(pos.dx - dir * 14, pos.dy),
+      pos,
+      paint,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ball oval drawing (handles non-round balls).
+  // ---------------------------------------------------------------------------
+
+  void _drawBallOval(
     Canvas canvas,
     Offset pos,
-    double radius,
+    double rx,
+    double ry,
     double rotation, {
-    bool glow = false,
     double alpha = 1.0,
   }) {
-    if (glow) {
-      // Soft pulsing halo around the ball — yellow Selección.
-      final double pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
-      final double haloR = radius * (2.4 + pulse * 0.5);
-      final Paint halo = Paint()
-        ..color = _kAmarilloBandera.withValues(alpha: (0.30 + pulse * 0.25) * alpha)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-      canvas.drawCircle(pos, haloR, halo);
-    }
-
+    if (alpha <= 0.01) return;
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
     canvas.rotate(rotation);
 
-    final double px = radius * 2 / 7;
-    final Paint bodyPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: alpha);
+    // Body — gradient for shading.
+    final Rect ballRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: rx * 2,
+      height: ry * 2,
+    );
+    canvas.drawOval(
+      ballRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: <Color>[
+            const Color(0xFFFFFFFF).withValues(alpha: alpha),
+            const Color(0xFFE0E0E0).withValues(alpha: alpha),
+          ],
+        ).createShader(ballRect.inflate(rx * 0.3)),
+    );
+    // Outline.
+    canvas.drawOval(
+      ballRect,
+      Paint()
+        ..color = const Color(0xFF111111).withValues(alpha: alpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+    // Pentagon (squashed along with the ball).
+    final double px = rx * 2 / 7;
     final Paint pentPaint = Paint()
       ..color = _kBallBlack.withValues(alpha: alpha);
     for (int r = 0; r < 7; r++) {
@@ -654,24 +558,51 @@ class PenaltyScenePainter extends CustomPainter {
         final double dx = (c - 3) + 0.5;
         final double dy = (r - 3) + 0.5;
         final double dist = math.sqrt(dx * dx + dy * dy);
-        if (dist > 3.2) continue;
+        if (dist > 3.0) continue;
         final bool isPent = (c == 3 && r == 3) ||
             (c == 3 && r == 2) ||
             (c == 2 && r == 3) ||
             (c == 4 && r == 3) ||
             (c == 3 && r == 4);
-        canvas.drawRect(
-          Rect.fromLTWH(
-            (c - 3) * px - px / 2,
-            (r - 3) * px - px / 2,
-            px - 0.5,
-            px - 0.5,
-          ),
-          isPent ? pentPaint : bodyPaint,
-        );
+        if (isPent) {
+          // Squash the pentagon vertically with the ball.
+          canvas.save();
+          canvas.scale(1.0, ry / rx);
+          canvas.drawRect(
+            Rect.fromLTWH(
+              (c - 3) * px - px / 2,
+              (r - 3) * px - px / 2,
+              px - 0.5,
+              px - 0.5,
+            ),
+            pentPaint,
+          );
+          canvas.restore();
+        }
       }
     }
     canvas.restore();
+  }
+
+  void _paintRect(Canvas canvas, double x, double y, double w, double h, Color color) {
+    canvas.drawRect(Rect.fromLTWH(x, y, w, h), Paint()..color = color);
+  }
+
+  double _netShakeT() {
+    if (animation == PenaltySceneAnimation.goal) {
+      return t > 0.55 ? (t - 0.55) / 0.45 : 0.0;
+    }
+    if (animation == PenaltySceneAnimation.post &&
+        t > 0.45 &&
+        t < 0.60) {
+      return (t - 0.45) / 0.15;
+    }
+    return 0.0;
+  }
+
+  double _quadBezier(double p0, double p1, double p2, double t) {
+    final double u = 1 - t;
+    return u * u * p0 + 2 * u * t * p1 + t * t * p2;
   }
 
   double _hash01(int n) {
@@ -684,8 +615,5 @@ class PenaltyScenePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(PenaltyScenePainter old) =>
-      old.animation != animation ||
-      old.t != t ||
-      old.seed != seed ||
-      old.compact != compact;
+      old.animation != animation || old.t != t || old.seed != seed;
 }

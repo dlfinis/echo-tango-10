@@ -32,6 +32,7 @@ import 'package:flutter/material.dart';
 import '../theme/kiosk_theme.dart';
 import '../theme/themes/classic_theme.dart';
 import '../utils/constants.dart';
+import 'crt_scanlines_painter.dart';
 
 enum _Verdict { victory, casi, niPorAsomo, tePasaste }
 
@@ -440,36 +441,59 @@ class _ResultScreenState extends State<ResultScreen>
               _scrollAnim,
             ]),
             builder: (BuildContext context, Widget? _) {
-              return Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  // Themed result scene (penalty scene for
-                  // worldcup, transparent for classic). Drives
-                  // the ball trajectory that matches the
-                  // verdict: VICTORIA -> ball into the net;
-                  // CASI -> hits the post; NI POR ASOMO ->
-                  // flies wide; TE PASASTE -> over the bar.
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: AnimatedBuilder(
-                        animation: _sceneController,
-                        builder: (BuildContext context, Widget? _) {
-                          return CustomPaint(
-                            painter: widget.theme.resultScenePainter(
-                              verdict: _toVerdictKind(_verdict),
-                              t: _sceneController.value,
+              return LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  final Size viewport = constraints.biggest;
+                  final bool sceneIsVisible =
+                      widget.theme.id != 'classic';
+                  final double sceneW = viewport.width * 0.35;
+                  final double sceneH = viewport.height * 0.40;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      // Themed result scene — small inset in
+                      // the UPPER-RIGHT corner. Drives the
+                      // ball trajectory that matches the
+                      // verdict.
+                      if (sceneIsVisible)
+                        Positioned(
+                          top: 16,
+                          right: 16,
+                          width: sceneW,
+                          height: sceneH,
+                          child: IgnorePointer(
+                            child: AnimatedBuilder(
+                              animation: _sceneController,
+                              builder: (BuildContext context, Widget? _) {
+                                return CustomPaint(
+                                  painter: widget.theme
+                                      .resultScenePainter(
+                                    verdict:
+                                        _toVerdictKind(_verdict),
+                                    t: _sceneController.value,
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
+                          ),
+                        ),
+                      _buildBody(
+                        glitchT: _glitchAnim.value,
+                        shakeT: _shakeAnim.value,
+                        scrollT: _scrollAnim.value,
                       ),
-                    ),
-                  ),
-                  _buildBody(
-                    glitchT: _glitchAnim.value,
-                    shakeT: _shakeAnim.value,
-                    scrollT: _scrollAnim.value,
-                  ),
-                ],
+                      // CRT scanlines overlay (worldcup only).
+                      if (widget.theme.appliesCrtOverlay)
+                        const Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: CrtScanlinesPainter(),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               );
             },
           ),

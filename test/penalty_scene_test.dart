@@ -16,6 +16,7 @@ import 'dart:ui' as ui;
 import 'package:arcade_timer_10s/theme/kiosk_theme.dart';
 import 'package:arcade_timer_10s/theme/themes/classic_theme.dart';
 import 'package:arcade_timer_10s/theme/themes/worldcup_theme.dart';
+import 'package:arcade_timer_10s/widgets/crt_scanlines_painter.dart';
 import 'package:arcade_timer_10s/widgets/football_sprite_painter.dart';
 import 'package:arcade_timer_10s/widgets/penalty_scene_painter.dart';
 import 'package:flutter/material.dart';
@@ -59,20 +60,6 @@ void main() {
       expect(a.shouldRepaint(b), isFalse);
     });
 
-    test('shouldRepaint is true when compact flag changes', () {
-      final PenaltyScenePainter a = PenaltyScenePainter(
-        animation: PenaltySceneAnimation.idle,
-        t: 0.5,
-        compact: false,
-      );
-      final PenaltyScenePainter b = PenaltyScenePainter(
-        animation: PenaltySceneAnimation.idle,
-        t: 0.5,
-        compact: true,
-      );
-      expect(a.shouldRepaint(b), isTrue);
-    });
-
     test('survives a full 0..1 cycle for every animation', () {
       const Size size = Size(1280, 800);
       for (final PenaltySceneAnimation anim
@@ -99,51 +86,34 @@ void main() {
       }
     });
 
-    test('compact idle scene renders at the top-half size without throwing',
+    test('corner-inset scene renders at 35% × 40% size without throwing',
         () {
       // Simulate the SizedBox that the PLAYING screen uses for
-      // the scene: ~40% of a 1280x800 viewport = 1280x320.
-      const Size size = Size(1280, 320);
-      for (double t = 0.0; t <= 1.0; t += 0.05) {
-        final PenaltyScenePainter p = PenaltyScenePainter(
-          animation: PenaltySceneAnimation.idle,
-          t: t,
-          compact: true,
-        );
-        final ui.PictureRecorder recorder = ui.PictureRecorder();
-        final Canvas canvas = Canvas(recorder);
-        p.paint(canvas, size);
-        final ui.Picture pic = recorder.endRecording();
-        expect(pic, isNotNull,
-            reason: 'compact idle at t=$t must produce a Picture');
-        pic.dispose();
-      }
-    });
-
-    test('compact full-screen painter renders every animation', () {
-      const Size size = Size(1280, 320);
+      // the scene: ~35% width × ~40% height of a 1280x800
+      // viewport.
+      const Size size = Size(448, 320);
       for (final PenaltySceneAnimation anim
           in PenaltySceneAnimation.values) {
         for (double t = 0.0; t <= 1.0; t += 0.10) {
           final PenaltyScenePainter p = PenaltyScenePainter(
             animation: anim,
             t: t,
-            compact: true,
           );
           final ui.PictureRecorder recorder = ui.PictureRecorder();
           final Canvas canvas = Canvas(recorder);
           p.paint(canvas, size);
           final ui.Picture pic = recorder.endRecording();
           expect(pic, isNotNull,
-              reason: 'compact $anim at t=$t must produce a Picture');
+              reason: '$anim at t=$t in corner inset must produce a Picture');
           pic.dispose();
         }
       }
     });
   });
 
-  group('FootballSpritePainter — NI POR ASOMO full cycle', () {
-    test('renders without throwing across the new red-card phases', () {
+  group('FootballSpritePainter — NI POR ASOMO deflation cycle', () {
+    test('renders the full deflate → flat → re-inflate cycle without '
+        'throwing', () {
       const Size size = Size(176.0, 128.0);
       FootballSpritePainter? prev;
       for (double t = 0.0; t <= 1.0; t += 0.02) {
@@ -165,6 +135,27 @@ void main() {
               reason: 'shouldRepaint must be true at t=$t');
         }
         prev = p;
+      }
+    });
+
+    test('rendering is seamless across the t=0 / t=1 boundary', () {
+      // At t=0 and t=1 the ball should be FULLY inflated (full
+      // circle). Verify by painting at both endpoints and
+      // ensuring they don't throw.
+      const Size size = Size(176.0, 128.0);
+      for (final double t in const <double>[0.0, 0.99, 1.0]) {
+        final FootballSpritePainter p = FootballSpritePainter(
+          expression: FootballExpression.niPorAsomo,
+          pixelSize: 16.0,
+          t: t,
+          colors: const <Color>[Color(0xFFFF5252), Color(0xFF000000)],
+        );
+        final ui.PictureRecorder recorder = ui.PictureRecorder();
+        final Canvas canvas = Canvas(recorder);
+        p.paint(canvas, size);
+        final ui.Picture pic = recorder.endRecording();
+        expect(pic, isNotNull);
+        pic.dispose();
       }
     });
 
@@ -203,10 +194,7 @@ void main() {
         () {
       const KioskTheme t = WorldcupTheme();
       final CustomPainter full = t.playingScenePainter(t: 0.5);
-      final CustomPainter compact =
-          t.playingScenePainter(t: 0.5, compact: true);
-      expect((full as PenaltyScenePainter).compact, isFalse);
-      expect((compact as PenaltyScenePainter).compact, isTrue);
+      expect(full, isA<PenaltyScenePainter>());
     });
 
     test('ClassicTheme returns a non-throwing transparent painter', () {
@@ -231,17 +219,22 @@ void main() {
       ];
       for (final KioskTheme theme in themes) {
         for (double t = 0.0; t <= 1.0; t += 0.25) {
-          for (final bool compact in <bool>[false, true]) {
-            // No throws, returns a CustomPainter for both
-            // compact and full-screen modes.
-            final CustomPainter p =
-                theme.playingScenePainter(t: t, compact: compact);
-            expect(p, isA<CustomPainter>(),
-                reason:
-                    't=$t compact=$compact must return a CustomPainter');
-          }
+          // No throws, returns a CustomPainter.
+          final CustomPainter p = theme.playingScenePainter(t: t);
+          expect(p, isA<CustomPainter>(),
+              reason: 't=$t must return a CustomPainter');
         }
       }
+    });
+  });
+
+  group('KioskTheme — CRT overlay flag', () {
+    test('WorldcupTheme applies the CRT overlay', () {
+      expect(const WorldcupTheme().appliesCrtOverlay, isTrue);
+    });
+
+    test('ClassicTheme does NOT apply the CRT overlay', () {
+      expect(const ClassicTheme().appliesCrtOverlay, isFalse);
     });
   });
 
@@ -310,6 +303,24 @@ void main() {
           }
         }
       }
+    });
+  });
+
+  group('CrtScanlinesPainter', () {
+    test('renders a viewport-sized overlay without throwing', () {
+      const CrtScanlinesPainter painter = CrtScanlinesPainter();
+      const Size size = Size(1280, 800);
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(recorder);
+      painter.paint(canvas, size);
+      final ui.Picture pic = recorder.endRecording();
+      expect(pic, isNotNull);
+      pic.dispose();
+    });
+
+    test('shouldRepaint is false (the overlay is static)', () {
+      const CrtScanlinesPainter p = CrtScanlinesPainter();
+      expect(p.shouldRepaint(p), isFalse);
     });
   });
 }

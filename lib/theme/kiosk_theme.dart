@@ -102,21 +102,21 @@ abstract class KioskTheme {
   /// screen hands its [AnimationController] in.
   CustomPainter backgroundMarchPainter({required Listenable listenable});
 
-  /// Background painter shown BEHIND the chronograph on the
-  /// PLAYING screen. Themes that don't have a themed scene
-  /// (e.g. the classic Space Invaders look) return an empty
-  /// painter; themes with a scene (e.g. worldcup's penalty
-  /// scene) return their own implementation. The painter
-  /// receives a `t` value in `[0, 1]` so the scene can have
-  /// idle animation while the player is winding up. The
-  /// caller passes `compact: true` when the scene is drawn
-  /// in a SizedBox at the TOP of the screen (chronograph
-  /// below) — the painter switches to a more compact,
-  /// ball+kicker-forward layout in that mode.
-  CustomPainter playingScenePainter({
-    required double t,
-    bool compact = false,
-  });
+  /// Background painter shown as a small inset in the upper
+  /// right corner of the PLAYING screen. Themes that don't
+  /// have a themed scene (e.g. the classic Space Invaders
+  /// look) return an empty painter; themes with a scene
+  /// (e.g. worldcup's penalty scene) return their own
+  /// implementation. The painter receives a `t` value in
+  /// `[0, 1]` so the scene can have idle animation while the
+  /// player is winding up.
+  CustomPainter playingScenePainter({required double t});
+
+  /// True if the theme wants the CRT scanlines overlay drawn
+  /// over the PLAYING / RESULT screens. Worldcup = true
+  /// (retro arcade feel); classic = false (preserves the
+  /// v0.1.0-arcade look).
+  bool get appliesCrtOverlay;
 
   /// Body sprite painter shown in the result screen for a given
   /// verdict. [pixelSize] is the size of a single "pixel" cell of

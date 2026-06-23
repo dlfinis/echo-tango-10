@@ -19,6 +19,7 @@ import '../state/stopwatch_controller.dart';
 import '../theme/kiosk_theme.dart';
 import '../theme/themes/classic_theme.dart';
 import '../utils/constants.dart';
+import 'crt_scanlines_painter.dart';
 
 class PlayingScreen extends StatefulWidget {
   const PlayingScreen({
@@ -212,55 +213,51 @@ class _PlayingScreenState extends State<PlayingScreen>
 
     return Scaffold(
       backgroundColor: widget.theme.playingBackgroundColor,
-      // Layout split: the scene lives at the TOP 40% of the
-      // viewport (goal + goalkeeper + kicker + ball), the
-      // chronograph occupies the BOTTOM 60% (never overlaps
-      // with the scene). This was the operator's explicit
-      // feedback — the ball was being hidden behind the big
-      // digit text.
+      // Layout: white kiosk background everywhere. The themed
+      // penalty scene sits as a small INSET in the UPPER-RIGHT
+      // CORNER (35% width × 40% height). The chronograph
+      // occupies the full viewport, centered. CRT scanlines
+      // (if the theme requests them) are drawn over the
+      // whole screen as the last layer.
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
-          final double viewportHeight = constraints.maxHeight;
-          // Only the worldcup theme actually paints a scene;
-          // classic returns a transparent painter so the
-          // SizedBox collapses visually and the chronograph
-          // gets the full viewport.
+          final Size viewport = constraints.biggest;
           final bool sceneIsVisible =
               widget.theme.id != 'classic';
-          final double sceneHeight =
-              sceneIsVisible ? viewportHeight * 0.40 : 0.0;
+          // Scene inset — upper-right corner, 35% wide, 40%
+          // tall, with a small inset margin.
+          final double sceneW = viewport.width * 0.35;
+          final double sceneH = viewport.height * 0.40;
+          final EdgeInsets sceneMargin = const EdgeInsets.only(
+            top: 16,
+            right: 16,
+          );
           return Stack(
             children: <Widget>[
-              // Themed scene at the TOP. The painter handles
-              // its own animation phase via the scene ticker
-              // (no widget rebuilds).
+              // White background fills the entire viewport.
+              // (Already the Scaffold backgroundColor; redundant
+              // Positioned.fill keeps the order explicit.)
               if (sceneIsVisible)
                 Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: sceneHeight,
+                  top: sceneMargin.top,
+                  right: sceneMargin.right,
+                  width: sceneW,
+                  height: sceneH,
                   child: AnimatedBuilder(
                     animation: _sceneTicker,
                     builder: (BuildContext context, Widget? _) {
                       return CustomPaint(
                         painter: widget.theme.playingScenePainter(
                           t: _sceneTicker.value,
-                          compact: true,
                         ),
                       );
                     },
                   ),
                 ),
-              // Chronograph area — BOTTOM 60% (or full viewport
-              // when no scene is shown). All the chronograph /
-              // cheer / countdown widgets are positioned
-              // within this child Stack.
-              Positioned(
-                top: sceneHeight,
-                left: 0,
-                right: 0,
-                bottom: 0,
+              // Chronograph area — full viewport (the scene is
+              // a small overlay, the chronograph is the main
+              // visual).
+              Positioned.fill(
                 child: _buildChronographArea(
                   baseColor: baseColor,
                   digitColor: digitColor,
@@ -268,6 +265,15 @@ class _PlayingScreenState extends State<PlayingScreen>
                   cheer: cheer,
                 ),
               ),
+              // CRT scanlines overlay (worldcup only).
+              if (widget.theme.appliesCrtOverlay)
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: CrtScanlinesPainter(),
+                    ),
+                  ),
+                ),
             ],
           );
         },
