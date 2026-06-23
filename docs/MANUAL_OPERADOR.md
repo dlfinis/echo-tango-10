@@ -4,6 +4,17 @@ Guía rápida para la persona que opera el kiosko en la feria. **No es documenta
 
 ---
 
+## 0. Temas visuales disponibles
+
+El kiosko tiene dos temas visuales que cambian colores, copy y gráficos. Podés cambiar entre ellos desde el admin (sección "Tema activo", ver abajo).
+
+- **Selección Colombia** (default). Paleta azul / amarillo / rojo bandera. Copy en español colombiano con jerga de fútbol: "¡GOOOOL!", "¡AL PALO!", "¡AFUERA!", "¡SE PITÓ FINAL!". Marcha de pelotas en la pantalla de espera.
+- **Arcade Clásico**. La apariencia original con invasores pixelados, paleta verde neón y copy "¡GANASTE!" / "¡CASI, CASI!" / etc.
+
+Ambos temas funcionan con la misma mecánica: el cronómetro de 10 segundos, los 4 veredictos, el leaderboard, el botón físico. Solo cambia lo visual y el texto.
+
+---
+
 ## 1. Cómo encender la tablet
 
 1. Conectá la tablet (Fire HD 8) al cable de alimentación.
@@ -24,6 +35,17 @@ Para salir: tocá el botón rojo **"Salir"** al final de la pantalla.
 ## 3. Qué hace cada sección del admin
 
 Las secciones están en orden de arriba hacia abajo. Cada una tiene un título claro.
+
+### 3.0 Tema activo (la primera sección)
+
+Un dropdown arriba de todo permite elegir el tema visual del kiosko. Las opciones son:
+
+- **Selección Colombia** — fútbol, paleta Selección, copy es-CO (default desde v0.2.0).
+- **Arcade Clásico** — Space Invaders, paleta neón, copy es-AR.
+
+Tocá el dropdown y elegí. El cambio se aplica al instante (sin reiniciar el kiosko). La selección queda guardada aunque se apague la tablet.
+
+**Cuándo cambiar de tema**: si el evento ya no es futbolero y querés volver al look original, pasá a "Arcade Clásico". Si volvés al mundial o a otro evento deportivo, dejá "Selección Colombia" o creá un tema nuevo (ver `docs/THEMES.md`).
 
 ### 3.1 Mensajes de invitación
 
