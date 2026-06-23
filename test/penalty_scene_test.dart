@@ -59,6 +59,20 @@ void main() {
       expect(a.shouldRepaint(b), isFalse);
     });
 
+    test('shouldRepaint is true when compact flag changes', () {
+      final PenaltyScenePainter a = PenaltyScenePainter(
+        animation: PenaltySceneAnimation.idle,
+        t: 0.5,
+        compact: false,
+      );
+      final PenaltyScenePainter b = PenaltyScenePainter(
+        animation: PenaltySceneAnimation.idle,
+        t: 0.5,
+        compact: true,
+      );
+      expect(a.shouldRepaint(b), isTrue);
+    });
+
     test('survives a full 0..1 cycle for every animation', () {
       const Size size = Size(1280, 800);
       for (final PenaltySceneAnimation anim
@@ -81,6 +95,48 @@ void main() {
                 reason: 't change must request repaint at t=$t');
           }
           prev = p;
+        }
+      }
+    });
+
+    test('compact idle scene renders at the top-half size without throwing',
+        () {
+      // Simulate the SizedBox that the PLAYING screen uses for
+      // the scene: ~40% of a 1280x800 viewport = 1280x320.
+      const Size size = Size(1280, 320);
+      for (double t = 0.0; t <= 1.0; t += 0.05) {
+        final PenaltyScenePainter p = PenaltyScenePainter(
+          animation: PenaltySceneAnimation.idle,
+          t: t,
+          compact: true,
+        );
+        final ui.PictureRecorder recorder = ui.PictureRecorder();
+        final Canvas canvas = Canvas(recorder);
+        p.paint(canvas, size);
+        final ui.Picture pic = recorder.endRecording();
+        expect(pic, isNotNull,
+            reason: 'compact idle at t=$t must produce a Picture');
+        pic.dispose();
+      }
+    });
+
+    test('compact full-screen painter renders every animation', () {
+      const Size size = Size(1280, 320);
+      for (final PenaltySceneAnimation anim
+          in PenaltySceneAnimation.values) {
+        for (double t = 0.0; t <= 1.0; t += 0.10) {
+          final PenaltyScenePainter p = PenaltyScenePainter(
+            animation: anim,
+            t: t,
+            compact: true,
+          );
+          final ui.PictureRecorder recorder = ui.PictureRecorder();
+          final Canvas canvas = Canvas(recorder);
+          p.paint(canvas, size);
+          final ui.Picture pic = recorder.endRecording();
+          expect(pic, isNotNull,
+              reason: 'compact $anim at t=$t must produce a Picture');
+          pic.dispose();
         }
       }
     });
@@ -143,6 +199,16 @@ void main() {
           PenaltySceneAnimation.idle);
     });
 
+    test('WorldcupTheme respects the compact flag in playingScenePainter',
+        () {
+      const KioskTheme t = WorldcupTheme();
+      final CustomPainter full = t.playingScenePainter(t: 0.5);
+      final CustomPainter compact =
+          t.playingScenePainter(t: 0.5, compact: true);
+      expect((full as PenaltyScenePainter).compact, isFalse);
+      expect((compact as PenaltyScenePainter).compact, isTrue);
+    });
+
     test('ClassicTheme returns a non-throwing transparent painter', () {
       const KioskTheme t = ClassicTheme();
       final CustomPainter p = t.playingScenePainter(t: 0.5);
@@ -165,9 +231,15 @@ void main() {
       ];
       for (final KioskTheme theme in themes) {
         for (double t = 0.0; t <= 1.0; t += 0.25) {
-          // No throws, returns a CustomPainter.
-          final CustomPainter p = theme.playingScenePainter(t: t);
-          expect(p, isA<CustomPainter>());
+          for (final bool compact in <bool>[false, true]) {
+            // No throws, returns a CustomPainter for both
+            // compact and full-screen modes.
+            final CustomPainter p =
+                theme.playingScenePainter(t: t, compact: compact);
+            expect(p, isA<CustomPainter>(),
+                reason:
+                    't=$t compact=$compact must return a CustomPainter');
+          }
         }
       }
     });

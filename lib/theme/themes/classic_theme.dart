@@ -164,7 +164,10 @@ class ClassicTheme implements KioskTheme {
   }
 
   @override
-  CustomPainter playingScenePainter({required double t}) {
+  CustomPainter playingScenePainter({
+    required double t,
+    bool compact = false,
+  }) {
     // The classic theme keeps the pure-white "paper stopwatch"
     // look on the PLAYING screen — no scene behind the
     // chronograph. Returning an empty transparent painter

@@ -212,76 +212,129 @@ class _PlayingScreenState extends State<PlayingScreen>
 
     return Scaffold(
       backgroundColor: widget.theme.playingBackgroundColor,
-      body: Stack(
-        children: <Widget>[
-          // Themed scene behind the chronograph. The scene
-          // painter handles its own animation phase via the
-          // scene ticker (no widget rebuilds). Themes without
-          // a scene (classic) return an empty transparent
-          // painter — invisible. The chronograph stays
-          // readable on top because its background is white
-          // (or near-white) and the scene is painted as a
-          // SEPARATE layer underneath.
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _sceneTicker,
-              builder: (BuildContext context, Widget? _) {
-                return CustomPaint(
-                  painter: widget.theme.playingScenePainter(
-                    t: _sceneTicker.value,
+      // Layout split: the scene lives at the TOP 40% of the
+      // viewport (goal + goalkeeper + kicker + ball), the
+      // chronograph occupies the BOTTOM 60% (never overlaps
+      // with the scene). This was the operator's explicit
+      // feedback — the ball was being hidden behind the big
+      // digit text.
+      body: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double viewportHeight = constraints.maxHeight;
+          // Only the worldcup theme actually paints a scene;
+          // classic returns a transparent painter so the
+          // SizedBox collapses visually and the chronograph
+          // gets the full viewport.
+          final bool sceneIsVisible =
+              widget.theme.id != 'classic';
+          final double sceneHeight =
+              sceneIsVisible ? viewportHeight * 0.40 : 0.0;
+          return Stack(
+            children: <Widget>[
+              // Themed scene at the TOP. The painter handles
+              // its own animation phase via the scene ticker
+              // (no widget rebuilds).
+              if (sceneIsVisible)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: sceneHeight,
+                  child: AnimatedBuilder(
+                    animation: _sceneTicker,
+                    builder: (BuildContext context, Widget? _) {
+                      return CustomPaint(
+                        painter: widget.theme.playingScenePainter(
+                          t: _sceneTicker.value,
+                          compact: true,
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
-          ),
-          // Cheer message — bigger and more visible than before
-          // because the user said the dim 48sp version "didn't
-          // have much sense". During the urgency phase the
-          // color is the accent (green) so it really pops.
-          Positioned(
-            right: 32,
-            bottom: 32,
-            child: IgnorePointer(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: Text(
-                  cheer,
-                  key: ValueKey<String>(cheer),
-                  style: TextStyle(
-                    color: urgency
-                        ? widget.theme.accentColor
-                        : baseColor.withValues(alpha: 0.55),
-                    fontSize: 75,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                    fontFamily: 'BungeeInline',
-                    fontFamilyFallback: const <String>['Bungee'],
-                  ),
+                ),
+              // Chronograph area — BOTTOM 60% (or full viewport
+              // when no scene is shown). All the chronograph /
+              // cheer / countdown widgets are positioned
+              // within this child Stack.
+              Positioned(
+                top: sceneHeight,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildChronographArea(
+                  baseColor: baseColor,
+                  digitColor: digitColor,
+                  urgency: urgency,
+                  cheer: cheer,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Builds the bottom-of-screen area: cheer message,
+  /// chronograph, and countdown overlay. Extracted from the
+  /// main `build` to keep the scene-vs-chronograph split
+  /// readable.
+  Widget _buildChronographArea({
+    required Color baseColor,
+    required Color digitColor,
+    required bool urgency,
+    required String cheer,
+  }) {
+    return Stack(
+      children: <Widget>[
+        // Cheer message — bigger and more visible than before
+        // because the user said the dim 48sp version "didn't
+        // have much sense". During the urgency phase the
+        // color is the accent (green) so it really pops.
+        Positioned(
+          right: 32,
+          bottom: 32,
+          child: IgnorePointer(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: Text(
+                cheer,
+                key: ValueKey<String>(cheer),
+                style: TextStyle(
+                  color: urgency
+                      ? widget.theme.accentColor
+                      : baseColor.withValues(alpha: 0.55),
+                  fontSize: 75,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                  fontFamily: 'BungeeInline',
+                  fontFamilyFallback: const <String>['Bungee'],
                 ),
               ),
             ),
           ),
-          // Main chronograph — THREE text widgets in a simple Row
-          // (no Transforms, no multi-font-size wizardry other than
-          // the final decimicro digit). The FittedBox scales the
-          // whole Row to fit the viewport. Hidden during countdown
-          // via Opacity. Format: `SS.mmm` (full size) + `u`
-          // (60% size + 0.6 alpha) so the last digit reads as a
-          // secondary "advancing" hint instead of competing with
-          // the main digits.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 64),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Opacity(
-                  opacity: _countdownValue == null ? 1.0 : 0.0,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: <Widget>[
-                      Text(
+        ),
+        // Main chronograph — THREE text widgets in a simple Row
+        // (no Transforms, no multi-font-size wizardry other than
+        // the final decimicro digit). The FittedBox scales the
+        // whole Row to fit the viewport. Hidden during countdown
+        // via Opacity. Format: `SS.mmm` (full size) + `u`
+        // (60% size + 0.6 alpha) so the last digit reads as a
+        // "secondary, advancing" hint instead of competing with
+        // the main digits.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Opacity(
+                opacity: _countdownValue == null ? 1.0 : 0.0,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: <Widget>[
+                    Text(
                         _seconds,
                         style: TextStyle(
                           color: digitColor,
@@ -359,7 +412,6 @@ class _PlayingScreenState extends State<PlayingScreen>
               ),
             ),
         ],
-      ),
-    );
+      );
   }
 }

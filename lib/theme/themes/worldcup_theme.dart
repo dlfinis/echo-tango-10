@@ -182,10 +182,14 @@ class WorldcupTheme implements KioskTheme {
   }
 
   @override
-  CustomPainter playingScenePainter({required double t}) {
+  CustomPainter playingScenePainter({
+    required double t,
+    bool compact = false,
+  }) {
     return PenaltyScenePainter(
       animation: PenaltySceneAnimation.idle,
       t: t,
+      compact: compact,
     );
   }
 
