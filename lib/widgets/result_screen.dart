@@ -80,6 +80,7 @@ class _ResultScreenState extends State<ResultScreen>
   late final Animation<double> _shakeAnim;
   late final AnimationController _scrollController;
   late final Animation<double> _scrollAnim;
+  late final AnimationController _sceneController; // drives the penalty scene
   late final _Verdict _verdict;
   AnimationController? _spinController;
   AnimationController? _dropController;
@@ -189,6 +190,15 @@ class _ResultScreenState extends State<ResultScreen>
         if (mounted) widget.onNext();
       },
     );
+
+    // Scene controller: drives the result-screen penalty scene
+    // (ball trajectory animation). 1.6s linear 0..1 once on
+    // mount. The painter reads `t` to position the ball,
+    // shake the net (victory), or fade it out (misses).
+    _sceneController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..forward();
   }
 
   @override
@@ -197,6 +207,7 @@ class _ResultScreenState extends State<ResultScreen>
     _glitchController.dispose();
     _shakeController.dispose();
     _scrollController.dispose();
+    _sceneController.dispose();
     _spinController?.dispose();
     _dropController?.dispose();
     _teShakeController?.dispose();
@@ -429,10 +440,36 @@ class _ResultScreenState extends State<ResultScreen>
               _scrollAnim,
             ]),
             builder: (BuildContext context, Widget? _) {
-              return _buildBody(
-                glitchT: _glitchAnim.value,
-                shakeT: _shakeAnim.value,
-                scrollT: _scrollAnim.value,
+              return Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  // Themed result scene (penalty scene for
+                  // worldcup, transparent for classic). Drives
+                  // the ball trajectory that matches the
+                  // verdict: VICTORIA -> ball into the net;
+                  // CASI -> hits the post; NI POR ASOMO ->
+                  // flies wide; TE PASASTE -> over the bar.
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _sceneController,
+                        builder: (BuildContext context, Widget? _) {
+                          return CustomPaint(
+                            painter: widget.theme.resultScenePainter(
+                              verdict: _toVerdictKind(_verdict),
+                              t: _sceneController.value,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  _buildBody(
+                    glitchT: _glitchAnim.value,
+                    shakeT: _shakeAnim.value,
+                    scrollT: _scrollAnim.value,
+                  ),
+                ],
               );
             },
           ),

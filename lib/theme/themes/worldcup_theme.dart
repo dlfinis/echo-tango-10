@@ -29,6 +29,7 @@ import 'package:flutter/material.dart';
 import '../kiosk_theme.dart';
 import '../../widgets/football_march_painter.dart';
 import '../../widgets/football_sprite_painter.dart';
+import '../../widgets/penalty_scene_painter.dart';
 
 /// Colombian flag blue — used as the primary background.
 const Color _kAzulBandera = Color(0xFF0E1A4A);
@@ -178,6 +179,42 @@ class WorldcupTheme implements KioskTheme {
   @override
   CustomPainter backgroundMarchPainter({required Listenable listenable}) {
     return FootballMarchPainter(seed: 1337, listenable: listenable);
+  }
+
+  @override
+  CustomPainter playingScenePainter({required double t}) {
+    return PenaltyScenePainter(
+      animation: PenaltySceneAnimation.idle,
+      t: t,
+    );
+  }
+
+  @override
+  CustomPainter resultScenePainter({
+    required VerdictKind verdict,
+    required double t,
+  }) {
+    return PenaltyScenePainter(
+      animation: _verdictToSceneAnimation(verdict),
+      t: t,
+    );
+  }
+
+  /// Map the gameplay verdict to the ball-trajectory animation.
+  /// VICTORIA -> ball into the net. CASI -> hits the post and
+  /// bounces back. NI POR ASOMO -> flies wide. TE PASASTE ->
+  /// sails over the crossbar.
+  PenaltySceneAnimation _verdictToSceneAnimation(VerdictKind kind) {
+    switch (kind) {
+      case VerdictKind.victoria:
+        return PenaltySceneAnimation.goal;
+      case VerdictKind.casi:
+        return PenaltySceneAnimation.post;
+      case VerdictKind.niPorAsomo:
+        return PenaltySceneAnimation.wide;
+      case VerdictKind.tePasaste:
+        return PenaltySceneAnimation.over;
+    }
   }
 
   @override

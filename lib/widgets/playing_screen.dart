@@ -36,12 +36,14 @@ class PlayingScreen extends StatefulWidget {
   State<PlayingScreen> createState() => _PlayingScreenState();
 }
 
-class _PlayingScreenState extends State<PlayingScreen> {
+class _PlayingScreenState extends State<PlayingScreen>
+    with TickerProviderStateMixin {
   Timer? _ticker;
   Timer? _timeoutGuard;
   Timer? _colorTimer;
   Timer? _cheerTimer;
   Timer? _countdownTimer;
+  late final AnimationController _sceneTicker;
 
   /// The stopwatch the visible chronograph reads. This is the
   /// parent's [StopwatchController] — the same one the [AppRoot]
@@ -79,6 +81,16 @@ class _PlayingScreenState extends State<PlayingScreen> {
     if (!kShowCountdown) {
       widget.controller.start();
     }
+
+    // Scene ticker: 4-second loop. Drives the idle animation
+    // of the penalty scene (ball wobble, goalkeeper sway).
+    // The scene painter subscribes via its own repaint cycle
+    // (see _sceneTicker below in the Stack) so this does not
+    // trigger widget rebuilds.
+    _sceneTicker = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
 
     _countdownTimer = Timer.periodic(const Duration(milliseconds: 250), (t) {
       if (!mounted) {
@@ -150,6 +162,7 @@ class _PlayingScreenState extends State<PlayingScreen> {
     _colorTimer?.cancel();
     _cheerTimer?.cancel();
     _countdownTimer?.cancel();
+    _sceneTicker.dispose();
     super.dispose();
   }
 
@@ -201,6 +214,26 @@ class _PlayingScreenState extends State<PlayingScreen> {
       backgroundColor: widget.theme.playingBackgroundColor,
       body: Stack(
         children: <Widget>[
+          // Themed scene behind the chronograph. The scene
+          // painter handles its own animation phase via the
+          // scene ticker (no widget rebuilds). Themes without
+          // a scene (classic) return an empty transparent
+          // painter — invisible. The chronograph stays
+          // readable on top because its background is white
+          // (or near-white) and the scene is painted as a
+          // SEPARATE layer underneath.
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _sceneTicker,
+              builder: (BuildContext context, Widget? _) {
+                return CustomPaint(
+                  painter: widget.theme.playingScenePainter(
+                    t: _sceneTicker.value,
+                  ),
+                );
+              },
+            ),
+          ),
           // Cheer message — bigger and more visible than before
           // because the user said the dim 48sp version "didn't
           // have much sense". During the urgency phase the

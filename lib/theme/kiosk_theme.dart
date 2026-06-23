@@ -102,6 +102,15 @@ abstract class KioskTheme {
   /// screen hands its [AnimationController] in.
   CustomPainter backgroundMarchPainter({required Listenable listenable});
 
+  /// Background painter shown BEHIND the chronograph on the
+  /// PLAYING screen. Themes that don't have a themed scene
+  /// (e.g. the classic Space Invaders look) return an empty
+  /// painter; themes with a scene (e.g. worldcup's penalty
+  /// scene) return their own implementation. The painter
+  /// receives a `t` value in `[0, 1]` so the scene can have
+  /// idle animation while the player is winding up.
+  CustomPainter playingScenePainter({required double t});
+
   /// Body sprite painter shown in the result screen for a given
   /// verdict. [pixelSize] is the size of a single "pixel" cell of
   /// the underlying bitmap (the painter handles scaling). [t] is
@@ -113,5 +122,17 @@ abstract class KioskTheme {
     required double pixelSize,
     required double t,
     required List<Color> colors,
+  });
+
+  /// Background scene painter shown on the RESULT screen,
+  /// behind the sprite. [verdict] picks the ball trajectory
+  /// (goal / post / wide / over); [t] is the animation phase
+  /// in `[0, 1]`. Themes without a themed scene (classic)
+  /// return an empty painter; themes with a scene (worldcup's
+  /// penalty scene) render the trajectory + shake / post-bounce
+  /// that matches the verdict.
+  CustomPainter resultScenePainter({
+    required VerdictKind verdict,
+    required double t,
   });
 }

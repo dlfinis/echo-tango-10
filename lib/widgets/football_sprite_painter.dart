@@ -189,48 +189,204 @@ class FootballSpritePainter extends CustomPainter {
   }
 
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
-    // Three-phase scare cycle. Identical phase boundaries to the
-    // classic invader so the screen-side animation timing is
-    // shared.
-    if (t < 0.1) {
-      // Neutral — pre-kick.
+    // 4-phase drama: kick → turn-around (mirrored) → red card
+    // brandished with the player shrinking → card slides out +
+    // text fades. Loops seamlessly at t=0/1.
+    if (t < 0.10) {
+      // Phase 1 — pre-kick pose.
       _drawShape(canvas, _niFrame0, body, cavity);
-    } else if (t < 0.4) {
-      // Mirrored — turn-around, looking where the ball went.
+      return;
+    }
+    if (t < 0.30) {
+      // Phase 2 — mirrored turn-around, looking where the
+      // ball went.
       _drawShapeMirrored(canvas, _niFrame0, body, cavity);
-    } else if (t < 0.95) {
-      // Shrink + ¡FUERA! overlay.
-      final double shrinkT = (t - 0.4) / 0.55; // 0..1
-      final double scale = 1.0 - shrinkT;
+      // Crowd boo zigzags fade in.
+      _drawBooZigzags(canvas, size, (t - 0.10) / 0.20);
+      return;
+    }
+    if (t < 0.45) {
+      // Phase 3a — player faces forward, hands on head. The
+      // pose is the same body silhouette but with a darker
+      // shade of body (sadder) and the cavity color "sweat"
+      // dots appearing.
+      _drawHandsOnHead(canvas, body, cavity);
+      _drawBooZigzags(canvas, size, 1.0);
+      return;
+    }
+    if (t < 0.85) {
+      // Phase 3b — RED CARD brandished. Player shrinks, card
+      // slides in from the right and is held up while
+      // pulsing slightly.
+      final double cardT = (t - 0.45) / 0.40; // 0..1
+      final double shrinkT = (t - 0.45) / 0.40; // 0..1
+      final double scale = 1.0 - shrinkT * 0.5;
       canvas.save();
-      canvas.translate(size.width / 2, size.height / 2);
+      canvas.translate(size.width / 2, size.height * 0.65);
       canvas.scale(scale);
-      canvas.translate(-size.width / 2, -size.height / 2);
-      _drawShape(canvas, _niFrame0, body, cavity);
+      canvas.translate(-size.width / 2, -size.height * 0.65);
+      _drawHandsOnHead(canvas, body, cavity);
       canvas.restore();
 
-      // Bouncy "¡FUERA!" text. Overshoots scale 1.2 then settles.
-      final double textScale = shrinkT < 0.5
-          ? shrinkT * 2 * 1.2
-          : 1.2 - (shrinkT - 0.5) * 2 * 0.2;
+      _drawRedCard(canvas, size, cardT);
+      // Big red ¡FUERA! pulsing text.
+      final double pulse =
+          1.0 + math.sin(cardT * math.pi * 4) * 0.08;
       _drawBigText(
         canvas,
         size,
         text: '¡FUERA!',
-        scale: textScale,
+        scale: 1.4 * pulse,
         color: const Color(0xFFCE1126),
       );
-    } else {
-      // t >= 0.95: player hidden, text fading.
-      final double fadeT = (t - 0.95) / 0.05; // 0..1
+      _drawBooZigzags(canvas, size, 1.0);
+      return;
+    }
+    if (t < 0.95) {
+      // Phase 4 — card slides out, text stays.
+      final double cardT = 1.0 - (t - 0.85) / 0.10; // 1..0
+      _drawRedCard(canvas, size, cardT);
       _drawBigText(
         canvas,
         size,
         text: '¡FUERA!',
-        scale: 1.0,
-        color: const Color(0xFFCE1126).withValues(alpha: 1.0 - fadeT),
+        scale: 1.4,
+        color: const Color(0xFFCE1126),
       );
+      return;
     }
+    // Phase 5 — text fades out.
+    final double fadeT = (t - 0.95) / 0.05; // 0..1
+    _drawBigText(
+      canvas,
+      size,
+      text: '¡FUERA!',
+      scale: 1.4,
+      color: const Color(0xFFCE1126).withValues(alpha: 1.0 - fadeT),
+    );
+  }
+
+  /// Player silhouette with hands on head — sad / "what did I
+  /// do?" pose. Same 11x8 grid; arms wrap the head, body
+  /// slumps forward.
+  void _drawHandsOnHead(Canvas canvas, Color body, Color cavity) {
+    final List<List<int>> sadPose = <List<int>>[
+      <int>[0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0], // arms wrapping head
+      <int>[1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0],
+      <int>[1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0], // head + hands
+      <int>[1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0], // head outline
+      <int>[0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0], // shoulders slumped
+      <int>[0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // body
+      <int>[0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0], // legs
+      <int>[0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0],
+    ];
+    _drawShape(canvas, sadPose, body, cavity);
+  }
+
+  /// Crowd boo zigzags — short "M" / "W" shapes around the
+  /// sprite that fade in to amplify the "miss" feeling.
+  void _drawBooZigzags(Canvas canvas, Size size, double alpha) {
+    final Paint paint = Paint()
+      ..color = const Color(0xFFFF5252).withValues(alpha: alpha * 0.75)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    final Path p1 = Path()
+      ..moveTo(size.width * 0.08, size.height * 0.25)
+      ..lineTo(size.width * 0.13, size.height * 0.15)
+      ..lineTo(size.width * 0.18, size.height * 0.25)
+      ..lineTo(size.width * 0.23, size.height * 0.15);
+    final Path p2 = Path()
+      ..moveTo(size.width * 0.82, size.height * 0.25)
+      ..lineTo(size.width * 0.87, size.height * 0.15)
+      ..lineTo(size.width * 0.92, size.height * 0.25)
+      ..lineTo(size.width * 0.97, size.height * 0.15);
+    final Path p3 = Path()
+      ..moveTo(size.width * 0.05, size.height * 0.55)
+      ..lineTo(size.width * 0.10, size.height * 0.45)
+      ..lineTo(size.width * 0.15, size.height * 0.55)
+      ..lineTo(size.width * 0.20, size.height * 0.45);
+    final Path p4 = Path()
+      ..moveTo(size.width * 0.80, size.height * 0.55)
+      ..lineTo(size.width * 0.85, size.height * 0.45)
+      ..lineTo(size.width * 0.90, size.height * 0.55)
+      ..lineTo(size.width * 0.95, size.height * 0.45);
+    canvas.drawPath(p1, paint);
+    canvas.drawPath(p2, paint);
+    canvas.drawPath(p3, paint);
+    canvas.drawPath(p4, paint);
+  }
+
+  /// Draws a red card (referé brandishes it) at a position
+  /// driven by `cardT`:
+  ///   * cardT < 0.3: card slides in from the right edge.
+  ///   * 0.3 ≤ cardT < 0.85: card is held up, slight wobble.
+  ///   * cardT ≥ 0.85: card slides back out to the right.
+  void _drawRedCard(Canvas canvas, Size size, double cardT) {
+    final double cardW = size.width * 0.18;
+    final double cardH = cardW * 1.5;
+    // X position: slides in from right edge to ~78% of width.
+    final double restingX = size.width * 0.78 - cardW / 2;
+    double x;
+    if (cardT < 0.3) {
+      x = size.width + cardW * (1 - cardT / 0.3);
+    } else if (cardT < 0.85) {
+      // Held position with a tiny wobble.
+      final double wobble = math.sin((cardT - 0.3) * math.pi * 6) *
+          cardW *
+          0.02;
+      x = restingX + wobble;
+    } else {
+      x = restingX + cardW * ((cardT - 0.85) / 0.15);
+    }
+    final double y = size.height * 0.18;
+    final Rect cardRect = Rect.fromLTWH(x, y, cardW, cardH);
+
+    // Shadow.
+    canvas.drawRect(
+      cardRect.shift(const Offset(4, 4)),
+      Paint()..color = const Color(0x66000000),
+    );
+    // Red body.
+    canvas.drawRect(
+      cardRect,
+      Paint()..color = const Color(0xFFCE1126),
+    );
+    // Black border.
+    canvas.drawRect(
+      cardRect,
+      Paint()
+        ..color = const Color(0xFF111111)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.0,
+    );
+    // "ROJA" label in white, centered on the card.
+    final TextPainter tp = TextPainter(
+      text: const TextSpan(
+        text: 'ROJA',
+        style: TextStyle(
+          color: Color(0xFFFFFFFF),
+          fontSize: 28,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(
+      canvas,
+      Offset(
+        cardRect.left + (cardW - tp.width) / 2,
+        cardRect.top + (cardH - tp.height) / 2,
+      ),
+    );
+    // Tiny diagonal stripe top-left for "shine".
+    canvas.drawLine(
+      Offset(cardRect.left + 6, cardRect.top + 6),
+      Offset(cardRect.left + 24, cardRect.top + 6),
+      Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.5)
+        ..strokeWidth = 2.0,
+    );
   }
 
   void _paintTePasaste(Canvas canvas, Size size, Color body, Color cavity) {

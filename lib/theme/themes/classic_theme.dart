@@ -164,6 +164,23 @@ class ClassicTheme implements KioskTheme {
   }
 
   @override
+  CustomPainter playingScenePainter({required double t}) {
+    // The classic theme keeps the pure-white "paper stopwatch"
+    // look on the PLAYING screen — no scene behind the
+    // chronograph. Returning an empty transparent painter
+    // preserves the v0.1.0-arcade behaviour.
+    return const _EmptyPainter();
+  }
+
+  @override
+  CustomPainter resultScenePainter({
+    required VerdictKind verdict,
+    required double t,
+  }) {
+    return const _EmptyPainter();
+  }
+
+  @override
   CustomPainter resultSpritePainter({
     required VerdictKind verdict,
     required double pixelSize,
@@ -190,4 +207,18 @@ class ClassicTheme implements KioskTheme {
         return InvaderExpression.tePasaste;
     }
   }
+}
+
+/// Minimal transparent painter used by themes that don't ship
+/// a themed scene behind the chronograph (classic: pure white).
+class _EmptyPainter extends CustomPainter {
+  const _EmptyPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // No-op — leaves the Scaffold background visible.
+  }
+
+  @override
+  bool shouldRepaint(_EmptyPainter old) => false;
 }
