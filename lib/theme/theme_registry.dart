@@ -11,18 +11,18 @@ library;
 
 import 'kiosk_theme.dart';
 import 'themes/classic_theme.dart';
+import 'themes/worldcup_theme.dart';
 
 /// Every theme shipped with the kiosk. Order = admin picker order.
-/// PR3 adds the `WorldcupTheme` here; until then the picker shows
-/// only the classic theme.
 final List<KioskTheme> allThemes = <KioskTheme>[
+  const WorldcupTheme(),
   const ClassicTheme(),
 ];
 
 /// Default theme id when the operator has never picked one
-/// (first boot, fresh SharedPreferences). PR3 will switch this to
-/// `'worldcup'` once the worldcup theme is shippable.
-const String kDefaultThemeId = 'classic';
+/// (first boot, fresh SharedPreferences). Worldcup is the default
+/// for the Colombian fair / World Cup period.
+const String kDefaultThemeId = 'worldcup';
 
 /// Returns the theme with the given [id], or the default theme
 /// if [id] is null, empty, or not registered. Never throws — the

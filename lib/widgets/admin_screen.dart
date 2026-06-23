@@ -1,6 +1,8 @@
 /// ADMIN screen — full config editor.
 ///
 /// Sections (top-to-bottom):
+///   0. Tema activo — dropdown to pick the active [KioskTheme]
+///      from every theme registered in [ThemeRegistry].
 ///   1. Mensajes de invitación — editable TextField list, add/remove.
 ///   2. Sub-frases (sub-taglines) — same pattern as mensajes.
 ///   3. Intervalos de rotación — three numeric fields (1..3600):
@@ -26,6 +28,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/config_store.dart';
 import '../services/leaderboard.dart';
+import '../theme/kiosk_theme.dart';
+import '../theme/theme_registry.dart';
 import '../utils/constants.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -35,6 +39,7 @@ class AdminScreen extends StatefulWidget {
     required this.leaderboard,
     required this.onExit,
     this.onConnectUsb,
+    this.onThemeChanged,
   });
 
   final ConfigStore configStore;
@@ -44,6 +49,13 @@ class AdminScreen extends StatefulWidget {
   /// Optional dev-only hook (see [AdminScreen._handleConnectUsb]).
   /// When null the "Connect USB (Web Serial)" button is hidden.
   final Future<void> Function()? onConnectUsb;
+
+  /// Optional callback fired after the operator changes the
+  /// active theme. The kiosk root uses this to re-resolve the
+  /// theme so the change applies on the next frame without a
+  /// restart. When null the change still persists — it just
+  /// takes effect on the next app launch.
+  final ValueChanged<String>? onThemeChanged;
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -436,11 +448,15 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ],
       ),
-      body: SafeArea(
+          body: SafeArea(
         child: Form(
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: <Widget>[
+              _sectionHeader('Tema activo'),
+              _buildThemePicker(),
+              const SizedBox(height: 24),
+
               _sectionHeader('Mensajes de invitación'),
               ..._buildMessagesSection(),
               const SizedBox(height: 24),
@@ -718,6 +734,39 @@ class _AdminScreenState extends State<AdminScreen> {
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  /// Theme picker dropdown. Lists every registered theme from
+  /// the [ThemeRegistry] (the canonical source of truth — adding
+  /// a theme there automatically surfaces it here). Persists on
+  /// selection and fires [widget.onThemeChanged] so the kiosk
+  /// root can re-resolve the active theme without a restart.
+  Widget _buildThemePicker() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DropdownButtonFormField<String>(
+        initialValue: widget.configStore.activeThemeId() ?? kDefaultThemeId,
+        decoration: const InputDecoration(
+          labelText: 'Tema visual',
+          helperText:
+              'Cambia colores, copy y painters. Se aplica al instante.',
+          border: OutlineInputBorder(),
+        ),
+        items: <DropdownMenuItem<String>>[
+          for (final KioskTheme t in allThemes)
+            DropdownMenuItem<String>(
+              value: t.id,
+              child: Text(t.displayName),
+            ),
+        ],
+        onChanged: (String? newId) async {
+          if (newId == null) return;
+          await widget.configStore.setActiveThemeId(newId);
+          if (!mounted) return;
+          widget.onThemeChanged?.call(newId);
+        },
       ),
     );
   }

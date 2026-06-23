@@ -223,6 +223,16 @@ class _AppRootState extends State<AppRoot> {
     setState(() => _state = next(_state, TimerEvent.acceptWinner));
   }
 
+  /// Called by the admin theme picker after the operator
+  /// switches the active theme. Re-resolves [KioskTheme] from
+  /// the registry and triggers a rebuild so the new theme
+  /// applies on the next frame.
+  void _handleThemeChanged(String themeId) {
+    setState(() {
+      _theme = themeFor(themeId);
+    });
+  }
+
   // USB connect entry point used by the admin "Connect" button.
   //
   // Behaviour by platform:
@@ -371,6 +381,7 @@ class _AppRootState extends State<AppRoot> {
           onConnectUsb: (kIsWeb || widget.input is UsbSerialInput)
               ? _connectUsbSerial
               : null,
+          onThemeChanged: _handleThemeChanged,
         );
     }
   }
