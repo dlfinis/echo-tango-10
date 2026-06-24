@@ -175,72 +175,29 @@ class PenaltyScenePainter extends CustomPainter {
   }
 
   void _drawNet(Canvas canvas, Rect goal, {required double shakeT}) {
-    // Interlaced black mesh — two sets of diagonal lines going
-    // in opposite directions create the "woven" look of a real
-    // net. The intersections are emphasized with tiny dark
-    // dots so the weave reads clearly at the small scale.
+    // Real-net look: two layers of interlaced diagonal strands
+    // — a slightly faded "back" layer (gives depth) and a
+    // sharper "front" layer on top, plus black knot-dots at
+    // every intersection so the weave reads at the small scale.
     final double w = goal.width;
     final double h = goal.height;
     final double cell = math.min(w, h) / 7; // mesh cell size
-    final Paint strand = Paint()
-      ..color = const Color(0xFF111111)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    // Strand set A — diagonals going down-right.
-    // We walk across the goal and draw a line from the top
-    // edge to the right edge (or bottom edge) at an angle.
-    for (double x = goal.left - h; x <= goal.right; x += cell) {
-      // Line from (x, goal.top) clipped to the goal rect.
-      final Offset start = Offset(math.max(goal.left, x), goal.top);
-      final Offset end = Offset(
-        math.min(goal.right, x + h),
-        math.min(goal.bottom, goal.top + h),
-      );
-      if (start.dx >= end.dx) continue;
-      _drawClippedLine(
-        canvas,
-        strand,
-        start,
-        end,
-        goal,
-      );
-    }
-    // Strand set B — diagonals going down-left.
-    for (double x = goal.left; x <= goal.right + h; x += cell) {
-      final Offset start = Offset(math.min(goal.right, x), goal.top);
-      final Offset end = Offset(
-        math.max(goal.left, x - h),
-        math.min(goal.bottom, goal.top + h),
-      );
-      if (start.dx <= end.dx) continue;
-      _drawClippedLine(
-        canvas,
-        strand,
-        start,
-        end,
-        goal,
-      );
-    }
-    // Knot dots at intersections — every cell intersection
-    // gets a small black square for a more "woven" look.
-    final Paint knot = Paint()..color = const Color(0xFF000000);
-    final int nx = (w / cell).round();
-    final int ny = (h / cell).round();
-    for (int i = 0; i <= nx; i++) {
-      for (int j = 0; j <= ny; j++) {
-        final double px = goal.left + (i * w / nx);
-        final double py = goal.top + (j * h / ny);
-        canvas.drawRect(
-          Rect.fromCenter(
-            center: Offset(px, py),
-            width: 1.5,
-            height: 1.5,
-          ),
-          knot,
-        );
-      }
-    }
+
+    // 1) BACK layer — slightly inset (the net recedes 1.5 px
+    //    in from the front goal frame) and drawn at lower alpha
+    //    to suggest the strands behind the front plane.
+    final Rect backRect = goal.deflate(1.5);
+    _drawInterlacedLayer(canvas, backRect, cell,
+        strandColor: const Color(0xFF000000).withValues(alpha: 0.45),
+        knotColor: const Color(0xFF000000).withValues(alpha: 0.45),
+        knotSize: 1.0);
+
+    // 2) FRONT layer — sharp, on the goal rect itself.
+    _drawInterlacedLayer(canvas, goal, cell,
+        strandColor: const Color(0xFF111111),
+        knotColor: const Color(0xFF000000),
+        knotSize: 1.5);
+
     if (shakeT > 0) {
       // Net shake (3 horizontal lines bowing in/out).
       final double amp = (1.0 - shakeT) * 4.0;
@@ -254,6 +211,64 @@ class PenaltyScenePainter extends CustomPainter {
           Offset(goal.left, y),
           Offset(goal.right, y),
           shake,
+        );
+      }
+    }
+  }
+
+  /// One layer of the interlaced black mesh. Two sets of
+  /// diagonals (\\ and //) clipped to [bounds], plus black
+  /// knot-dots at every intersection.
+  void _drawInterlacedLayer(
+    Canvas canvas,
+    Rect bounds,
+    double cell, {
+    required Color strandColor,
+    required Color knotColor,
+    required double knotSize,
+  }) {
+    final double w = bounds.width;
+    final double h = bounds.height;
+    final Paint strand = Paint()
+      ..color = strandColor
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    // Strand set A — diagonals going down-right.
+    for (double x = bounds.left - h; x <= bounds.right; x += cell) {
+      final Offset start = Offset(math.max(bounds.left, x), bounds.top);
+      final Offset end = Offset(
+        math.min(bounds.right, x + h),
+        math.min(bounds.bottom, bounds.top + h),
+      );
+      if (start.dx >= end.dx) continue;
+      _drawClippedLine(canvas, strand, start, end, bounds);
+    }
+    // Strand set B — diagonals going down-left.
+    for (double x = bounds.left; x <= bounds.right + h; x += cell) {
+      final Offset start = Offset(math.min(bounds.right, x), bounds.top);
+      final Offset end = Offset(
+        math.max(bounds.left, x - h),
+        math.min(bounds.bottom, bounds.top + h),
+      );
+      if (start.dx <= end.dx) continue;
+      _drawClippedLine(canvas, strand, start, end, bounds);
+    }
+    // Knot dots.
+    final Paint knot = Paint()..color = knotColor;
+    final int nx = (w / cell).round();
+    final int ny = (h / cell).round();
+    for (int i = 0; i <= nx; i++) {
+      for (int j = 0; j <= ny; j++) {
+        final double px = bounds.left + (i * w / nx);
+        final double py = bounds.top + (j * h / ny);
+        canvas.drawRect(
+          Rect.fromCenter(
+            center: Offset(px, py),
+            width: knotSize,
+            height: knotSize,
+          ),
+          knot,
         );
       }
     }
@@ -275,31 +290,100 @@ class PenaltyScenePainter extends CustomPainter {
   }
 
   void _drawGoalFrame(Canvas canvas, Rect goal) {
-    // 3D-look yellow goal frame: a thick outer rectangle in
-    // bright amarillo, a thinner inner darker line for depth.
+    // 3D-look yellow goal frame, drawn as a STROKE (not a
+    // fill) so the net behind it shows against the kiosk
+    // white background, not against yellow. Two-tone shading
+    // on the posts: a bright "highlight" on the right/top
+    // edges and a darker shadow on the left/bottom edges
+    // give the frame a 3D look.
     final double frameT = math.max(3.0, goal.width * 0.018);
-    final Paint outerPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: <Color>[_kAmarilloBandera, _kAmarilloOscuro],
-      ).createShader(goal.inflate(frameT / 2));
-    canvas.drawRect(goal.inflate(frameT / 2), outerPaint);
-    // Inner darker inset.
+    final Rect outer = goal.inflate(frameT / 2);
+    final Rect inner = goal.deflate(frameT * 0.1);
+
+    // --- Left post (with 3D shading) ---
+    // Highlight: bright amarillo thin line on the LEFT edge
+    // (the sun is on the left in this scene).
     canvas.drawRect(
-      goal,
-      Paint()
-        ..color = const Color(0xFF8A6A00)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
-    );
-    // Outer black border.
-    canvas.drawRect(
-      goal.inflate(frameT / 2),
+      outer,
       Paint()
         ..color = const Color(0xFF111111)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = frameT,
+    );
+    // Yellow fill on the LEFT half of each post/crossbar.
+    final Paint postHighlight = Paint()
+      ..color = _kAmarilloBandera
+      ..style = PaintingStyle.fill;
+    // Left post (vertical bar from top-left to bottom-left).
+    canvas.drawRect(
+      Rect.fromLTRB(
+        outer.left,
+        outer.top,
+        outer.left + frameT,
+        outer.bottom,
+      ),
+      postHighlight,
+    );
+    // Crossbar (horizontal bar from top-left to top-right).
+    canvas.drawRect(
+      Rect.fromLTRB(
+        outer.left,
+        outer.top,
+        outer.right,
+        outer.top + frameT,
+      ),
+      postHighlight,
+    );
+    // Right post (vertical bar from top-right to bottom-right).
+    canvas.drawRect(
+      Rect.fromLTRB(
+        outer.right - frameT,
+        outer.top,
+        outer.right,
+        outer.bottom,
+      ),
+      postHighlight,
+    );
+    // Yellow fill on the RIGHT half (slightly darker for the
+    // shadow side).
+    final Paint postShadow = Paint()
+      ..color = _kAmarilloOscuro
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromLTRB(
+        outer.left + frameT * 0.55,
+        outer.top + frameT * 0.55,
+        outer.left + frameT,
+        outer.bottom,
+      ),
+      postShadow,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(
+        outer.left + frameT * 0.55,
+        outer.top,
+        outer.right,
+        outer.top + frameT * 0.55,
+      ),
+      postShadow,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(
+        outer.right - frameT,
+        outer.top + frameT * 0.55,
+        outer.right - frameT * 0.55,
+        outer.bottom,
+      ),
+      postShadow,
+    );
+    // Inner darker rim (the "back" of the goal frame visible
+    // at the inner edge).
+    canvas.drawRect(
+      inner,
+      Paint()
+        ..color = const Color(0xFF5A4400)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
     );
   }
 
@@ -375,7 +459,8 @@ class PenaltyScenePainter extends CustomPainter {
     // Crouched kicker in the lower-left corner, behind the
     // ball. Always faces right (the goal is to the right).
     // Smaller now — ~70% of the previous scale so it doesn't
-    // crowd the ball + corner box.
+    // crowd the ball + corner box. BOTH legs connect to the
+    // body's hip edge (no gap).
     final double scale = size.height * 0.015;
     final double baseX = size.width * 0.28;
     final double baseY = size.height * 0.80;
@@ -386,11 +471,8 @@ class PenaltyScenePainter extends CustomPainter {
         : 1.0;
     final double breathe = math.sin(t * math.pi * bobRate) * scale * 1.2;
 
-    // Planted leg (forward)
-    _paintRect(canvas,
-        baseX + 1 * scale, baseY + 3 * scale + breathe,
-        2 * scale, 7 * scale, const Color(0xFF222222));
-    // Body (amarillo jersey, leaning forward)
+    // Body (amarillo jersey, leaning forward) — drawn first so
+    // the legs and shorts cover the body where they overlap.
     _paintRect(canvas,
         baseX - 3 * scale, baseY - 8 * scale + breathe,
         7 * scale, 11 * scale, _kAmarilloBandera);
@@ -398,22 +480,35 @@ class PenaltyScenePainter extends CustomPainter {
     _paintRect(canvas,
         baseX - 2 * scale, baseY - 5 * scale + breathe,
         5 * scale, 2 * scale, _kAzulBandera);
-    // Shorts (azul)
+    // Shorts (azul) — span the full hip.
     _paintRect(canvas,
         baseX - 3 * scale, baseY + 3 * scale + breathe,
         7 * scale, 4 * scale, _kAzulBandera);
-    // Kicking leg (drawn back, swinging oscillation)
-    final double backSwing = math.sin(t * 2 * math.pi) * scale * 1.5;
+    // LEFT leg (kicking, drawn back) — TOP edge (hip) at
+    // baseX-3 to baseX-1 so it connects to the body's LEFT
+    // edge. No gap with the body.
     _paintRect(canvas,
-        baseX - 6 * scale - backSwing, baseY + 4 * scale + breathe,
+        baseX - 3 * scale, baseY + 4 * scale + breathe,
         2 * scale, 6 * scale, const Color(0xFF222222));
-    // Head
+    // Planted (RIGHT) leg — TOP edge inside the body X range
+    // (baseX+1 to baseX+3). Connects to the body's RIGHT edge.
+    _paintRect(canvas,
+        baseX + 1 * scale, baseY + 3 * scale + breathe,
+        2 * scale, 7 * scale, const Color(0xFF222222));
+    // Hip joint — small dark dot at the right hip (the kicking
+    // hip is rotated back so the leg swings from there).
+    canvas.drawCircle(
+      Offset(baseX - 2 * scale, baseY + 4 * scale + breathe),
+      0.8 * scale,
+      Paint()..color = const Color(0xFF111111),
+    );
+    // Head.
     canvas.drawCircle(
       Offset(baseX, baseY - 12 * scale + breathe),
       3.5 * scale,
       Paint()..color = _kSkinTone,
     );
-    // Hair
+    // Hair.
     _paintRect(canvas,
         baseX - 3 * scale, baseY - 15 * scale + breathe,
         6 * scale, 2 * scale, const Color(0xFF222222));
