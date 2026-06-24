@@ -115,6 +115,17 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _netCell = 20.0;
   static const double _ballRadius = 35.0;
 
+  // -- Helper: sum of sines across prime frequencies.
+  //    Each sine has amplitude 1/N so the result is -1..1.
+  //    Using primes makes the LCM enormous → never repeats.
+  static double _multiSine(double t, List<double> hz) {
+    double sum = 0;
+    for (int i = 0; i < hz.length; i++) {
+      sum += math.sin(t * hz[i] * math.pi);
+    }
+    return sum / hz.length;
+  }
+
   // =====================================================================
 
   @override
@@ -296,6 +307,33 @@ class GoalBackdropPainter extends CustomPainter {
     canvas.restore();
   }
 
+  void _drawBallTrail(
+      Canvas canvas, Offset pos, double radius, double ox, double oy) {
+    // Comet-tail trail — the ball leaves a faint fading
+    // trail behind it in the direction it's moving. ox/oy
+    // are the normalised motion vectors (-1..1). The trail
+    // is 3-4 dots behind the ball at decreasing alpha.
+    final double speed =
+        math.sqrt(ox * ox + oy * oy); // 0..1
+    if (speed < 0.05) return; // ball barely moving — no trail
+
+    final double dotSize = radius * 0.35;
+    // Trail direction: opposite to movement (behind the ball).
+    final double dx = ox / speed; // unit vector
+    final double dy = oy / speed;
+    for (int i = 1; i <= 4; i++) {
+      final double behind = i * radius * 1.2;
+      final double alpha = (1.0 - i / 5.0) * speed * 0.50;
+      canvas.drawCircle(
+        Offset(pos.dx - dx * behind, pos.dy - dy * behind),
+        dotSize * (5 - i) / 5,
+        Paint()
+          ..color = _kAmarilloBandera.withValues(alpha: alpha)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+    }
+  }
+
   void _drawBall(Canvas canvas, Size size) {
     final double r = _ballRadius;
     double x = size.width * _penaltySpotX;
@@ -304,48 +342,44 @@ class GoalBackdropPainter extends CustomPainter {
     double alpha = 1.0;
 
     switch (mode) {
-      case BackdropMode.idle:
-        // Multi-wave idle: the ball sweeps the goal with
-        // a Lissajous base (2.8 Hz X, 3.3 Hz Y) whose
-        // AMPLITUDE slowly drifts over a longer cycle so
-        // the pattern never repeats identically. A small
-        // high-frequency jitter (17 Hz / 13 Hz) adds the
-        // "quiver" of a real ball. Rotation speed also
-        // varies — not a constant spin.
+      case BackdropMode.idle: {
+        // 5 prime-frequency sine waves (2,3,5,7,11 Hz) summed
+        // and normalised — the resulting Lissajous orbit never
+        // repeats during the kiosk's entire uptime. Amplitude
+        // breathes over a ~25s cycle via a slow modulator.
         final double goalW =
             size.width * (_postRight - _postLeft - _postWidth);
         final double goalH = size.height *
             (_postBottom - _crossbarTop - _crossbarThickness);
 
-        // Amplitude drift — cycles over 10 seconds so the
-        // sweep width slowly expands and contracts.
-        final double ampX =
-            0.35 + 0.12 * math.sin(t * 0.35 * math.pi);
-        final double ampY =
-            0.22 + 0.08 * math.cos(t * 0.55 * math.pi);
+        final double ox =
+            _multiSine(t, <double>[2.0, 3.0, 5.0, 7.0, 11.0]);
+        final double oy = _multiSine(
+            t + 0.73, <double>[2.4, 3.7, 5.1, 7.3, 11.5]);
 
-        // Primary Lissajous sweep.
-        final double primaryX =
-            math.sin(t * 2.8 * math.pi) * goalW * ampX;
-        final double primaryY =
-            math.cos(t * 3.3 * math.pi) * goalH * ampY;
+        // Amplitude drift: the orbit breathes over ~25s.
+        final double breath =
+            0.5 + 0.5 * math.sin(t * 0.13 * math.pi);
+        final double xAmp = 0.28 + 0.14 * breath;
+        final double yAmp = 0.18 + 0.10 * breath;
 
-        // High-frequency jitter — tiny, fast oscillations
-        // that make the ball look 'alive', not robotic.
-        final double jitterX =
-            math.cos(t * 17 * math.pi) * goalW * 0.015;
-        final double jitterY =
-            math.sin(t * 13 * math.pi) * goalH * 0.012;
+        // Jitter: ultra-fast, ultra-tiny.
+        final double jx = math.sin(t * 17 * math.pi) * 0.015;
+        final double jy = math.cos(t * 13 * math.pi) * 0.012;
 
-        x += primaryX + jitterX;
-        y += primaryY + jitterY;
+        x += (ox * xAmp + jx) * goalW;
+        y += (oy * yAmp + jy) * goalH;
 
-        // Rotation: speed varies between ~2π and ~10π.
+        // Spin speed breathes gently.
         rotation =
-            t * (4 + 3 * math.sin(t * 0.7 * math.pi)) * math.pi;
+            t * (4 + 3 * math.sin(t * 0.55 * math.pi)) * math.pi;
 
-        _drawBallGlow(canvas, Offset(x, y), r);
+        // Glow + comet-tail trail.
+        _drawBallGlow(canvas, Offset(x, y), r, ox, oy);
+        _drawBallTrail(canvas, Offset(x, y), r, ox, oy);
+
         break;
+      }
 
       case BackdropMode.goal:
         final Offset end = Offset(
@@ -482,25 +516,38 @@ class GoalBackdropPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawBallGlow(Canvas canvas, Offset pos, double radius) {
-    // Two-layer halo with asynchronous pulses so the glow
-    // never looks static. Each ring has its own frequency.
+  void _drawBallGlow(Canvas canvas, Offset pos, double radius,
+      double ox, double oy) {
+    // Two-layer halo with asynchronous pulses. Outer ring is
+    // large and soft — visible even from the kiosk distance.
     final double pulse1 = 0.5 + 0.5 * math.sin(t * 2.7 * math.pi);
     final double pulse2 = 0.5 + 0.5 * math.cos(t * 3.5 * math.pi);
-    final double outerR = radius * (2.2 + pulse1 * 0.6);
+
+    // Big outer halo — flows outward like a real ball glow.
     canvas.drawCircle(
       pos,
-      outerR,
+      radius * (3.2 + pulse1 * 1.0),                         // ← bigger!
       Paint()
-        ..color = _kAmarilloBandera.withValues(alpha: 0.15 + pulse1 * 0.14)
+        ..color =
+            _kAmarilloBandera.withValues(alpha: 0.12 + pulse1 * 0.10)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
+    // Mid ring.
+    canvas.drawCircle(
+      pos,
+      radius * (2.0 + pulse2 * 0.5),
+      Paint()
+        ..color =
+            _kAmarilloBandera.withValues(alpha: 0.22 + pulse2 * 0.16)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
-    final double innerR = radius * (1.4 + pulse2 * 0.4);
+    // Tight inner ring — bright, visible.
     canvas.drawCircle(
       pos,
-      innerR,
+      radius * (1.2 + pulse1 * 0.25),
       Paint()
-        ..color = _kAmarilloBandera.withValues(alpha: 0.32 + pulse2 * 0.22)
+        ..color =
+            _kAmarilloBandera.withValues(alpha: 0.38 + pulse1 * 0.18)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
     );
   }
