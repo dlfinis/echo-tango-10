@@ -93,16 +93,15 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.022;
   static const double _postBottom = 0.72;
 
-  // Keeper sits inside the goal, roughly centered.
-  static const double _keeperY = 0.25;
+  // Keeper sits inside the goal, centered.
+  static const double _keeperY = 0.28;
 
-  // Ball orbits near the MIDDLE of the goal (not at the bottom)
-  // — the ball is "targeting" where to shoot.
+  // Ball orbits through the goal.
   static const double _ballRestY = 0.48;
   static const double _penaltySpotX = 0.5;
 
-  // Grass strip.
-  static const double _grassTop = 0.88;
+  // Grass strip — higher up, more visible.
+  static const double _grassTop = 0.80;
 
   // Net.
   static const double _netAlpha = 0.20;
@@ -268,16 +267,18 @@ class GoalBackdropPainter extends CustomPainter {
   void _drawGoalkeeper(Canvas canvas, Size size) {
     final double cx = size.width * 0.5;
     final double cy = size.height * _keeperY;
-    final double pixelSize = size.height * 0.025; // ~20px at 800
+    final double pixelSize = size.height * 0.038; // ~30px at 800
     final int rows = _sprite.length;
     final int cols = _sprite[0].length;
 
-    // Subtle sway + bob.
-    final double swayX = math.sin(t * 2 * math.pi) * pixelSize * 0.8;
-    final double bobY = math.sin(t * 4 * math.pi) * pixelSize * 0.6;
+    // Only horizontal sway — no vertical bounce. The keeper
+    // slides side to side inside the goal. Wider amplitude
+    // so it actually reads as movement.
+    final double swayX =
+        math.sin(t * 2 * math.pi) * pixelSize * 1.8;
 
     canvas.save();
-    canvas.translate(cx + swayX, cy + bobY);
+    canvas.translate(cx + swayX, cy);
 
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
@@ -287,8 +288,8 @@ class GoalBackdropPainter extends CustomPainter {
           Rect.fromLTWH(
             (c - cols / 2) * pixelSize,
             (r - rows / 2) * pixelSize,
-            pixelSize - 0.5,
-            pixelSize - 0.5,
+            pixelSize - 1.0,
+            pixelSize - 1.0,
           ),
           Paint()..color = _palette[idx],
         );
