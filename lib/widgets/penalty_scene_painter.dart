@@ -71,12 +71,13 @@ class PenaltyScenePainter extends CustomPainter {
     // Crowd at the very top — small dots.
     _drawCrowd(canvas, size);
 
-    // Goal frame + net (top 55% of the corner box).
+    // Goal frame + net (top 40% of the corner box — smaller
+    // and higher so the bigger kicker has room below).
     final Rect goalRect = Rect.fromLTWH(
       size.width * 0.18,
-      size.height * 0.18,
+      size.height * 0.05,
       size.width * 0.64,
-      size.height * 0.45,
+      size.height * 0.35,
     );
     _drawNet(canvas, goalRect, shakeT: _netShakeT());
     _drawGoalFrame(canvas, goalRect);
@@ -96,12 +97,13 @@ class PenaltyScenePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
 
   void _drawGrassPatch(Canvas canvas, Size size) {
-    // Small green strip at the bottom 18% of the corner box.
+    // Bigger grass strip at the bottom 30% of the corner box
+    // so the ball + kicker have a real "field" to stand on.
     final Rect grassRect = Rect.fromLTWH(
       0,
-      size.height * 0.82,
+      size.height * 0.70,
       size.width,
-      size.height * 0.18,
+      size.height * 0.30,
     );
     canvas.drawRect(
       grassRect,
@@ -110,23 +112,50 @@ class PenaltyScenePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0xFFBFE3A2),
-            Color(0xFF7FB05A),
+            Color(0xFFA8D572),
+            Color(0xFF6BAA3D),
+            Color(0xFF3F8023),
           ],
         ).createShader(grassRect),
     );
-    // Grass texture — short vertical strokes.
-    final Paint grassStroke = Paint()
-      ..color = const Color(0xFF4F8A3F).withValues(alpha: 0.5)
-      ..strokeWidth = 1.0;
-    for (double x = 4; x < size.width; x += 6) {
-      final double h = 3 + _hash01(seed + x.toInt()) * 3;
-      canvas.drawLine(
-        Offset(x, grassRect.top + 2),
-        Offset(x, grassRect.top + 2 + h),
-        grassStroke,
+    // Mowed-grass stripes for a stadium feel.
+    final Paint stripePaint = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.06);
+    for (double y = grassRect.top; y < grassRect.bottom; y += 8) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, y, size.width, 4),
+        stripePaint,
       );
     }
+    // Grass blades — short vertical strokes, denser than before.
+    final Paint grassStroke = Paint()
+      ..color = const Color(0xFF2F6818).withValues(alpha: 0.7)
+      ..strokeWidth = 1.0;
+    final Paint grassStroke2 = Paint()
+      ..color = const Color(0xFF8FC85A).withValues(alpha: 0.5)
+      ..strokeWidth = 1.0;
+    for (double x = 3; x < size.width; x += 4) {
+      final double h = 3 + _hash01(seed + x.toInt()) * 3;
+      canvas.drawLine(
+        Offset(x, grassRect.top + 1),
+        Offset(x, grassRect.top + 1 + h),
+        grassStroke,
+      );
+      // Lighter highlight blade.
+      canvas.drawLine(
+        Offset(x + 1, grassRect.top + 2),
+        Offset(x + 1, grassRect.top + 2 + h * 0.7),
+        grassStroke2,
+      );
+    }
+    // Top edge of the grass — a darker line for definition.
+    canvas.drawLine(
+      Offset(0, grassRect.top),
+      Offset(size.width, grassRect.top),
+      Paint()
+        ..color = const Color(0xFF2F6818).withValues(alpha: 0.4)
+        ..strokeWidth = 0.5,
+    );
   }
 
   void _drawFrameBorder(Canvas canvas, Size size) {
@@ -456,62 +485,236 @@ class PenaltyScenePainter extends CustomPainter {
   }
 
   void _drawKicker(Canvas canvas, Size size) {
-    // Crouched kicker in the lower-left corner, behind the
-    // ball. Always faces right (the goal is to the right).
-    // Smaller now — ~70% of the previous scale so it doesn't
-    // crowd the ball + corner box. BOTH legs connect to the
-    // body's hip edge (no gap).
-    final double scale = size.height * 0.015;
+    // Detailed side-view kicker about to kick the ball. The
+    // kicker faces RIGHT (the goal is to the right). Same
+    // level of detail as the goalkeeper: head + hair + ears,
+    // skin-tone arms, jersey with chest stripe and Selección
+    // number, shorts with shading, socks, boots, kicking leg
+    // drawn back with the hip joint visible.
+    //
+    // Body parts (each rectangle is positioned in the same
+    // scale-units space; the size scale is the same as the
+    // goalkeeper's so they read as similar scale characters).
+    final double scale = size.height * 0.017;
     final double baseX = size.width * 0.28;
-    final double baseY = size.height * 0.80;
+    final double baseY = size.height * 0.92; // feet are HERE
     // Breathing bob — faster on idle, slower when ball is in
     // flight.
-    final double bobRate = animation == PenaltySceneAnimation.idle
-        ? 2.0
-        : 1.0;
-    final double breathe = math.sin(t * math.pi * bobRate) * scale * 1.2;
+    final double bobRate =
+        animation == PenaltySceneAnimation.idle ? 2.0 : 1.0;
+    final double breathe =
+        math.sin(t * math.pi * bobRate) * scale * 0.6;
 
-    // Body (amarillo jersey, leaning forward) — drawn first so
-    // the legs and shorts cover the body where they overlap.
-    _paintRect(canvas,
-        baseX - 3 * scale, baseY - 8 * scale + breathe,
-        7 * scale, 11 * scale, _kAmarilloBandera);
-    // Azule diagonal stripe on chest (the Selección number area)
-    _paintRect(canvas,
-        baseX - 2 * scale, baseY - 5 * scale + breathe,
-        5 * scale, 2 * scale, _kAzulBandera);
-    // Shorts (azul) — span the full hip.
-    _paintRect(canvas,
-        baseX - 3 * scale, baseY + 3 * scale + breathe,
-        7 * scale, 4 * scale, _kAzulBandera);
-    // LEFT leg (kicking, drawn back) — TOP edge (hip) at
-    // baseX-3 to baseX-1 so it connects to the body's LEFT
-    // edge. No gap with the body.
-    _paintRect(canvas,
-        baseX - 3 * scale, baseY + 4 * scale + breathe,
-        2 * scale, 6 * scale, const Color(0xFF222222));
-    // Planted (RIGHT) leg — TOP edge inside the body X range
-    // (baseX+1 to baseX+3). Connects to the body's RIGHT edge.
-    _paintRect(canvas,
-        baseX + 1 * scale, baseY + 3 * scale + breathe,
-        2 * scale, 7 * scale, const Color(0xFF222222));
-    // Hip joint — small dark dot at the right hip (the kicking
-    // hip is rotated back so the leg swings from there).
-    canvas.drawCircle(
-      Offset(baseX - 2 * scale, baseY + 4 * scale + breathe),
-      0.8 * scale,
-      Paint()..color = const Color(0xFF111111),
+    // -- BACK leg (kicking, drawn back) drawn first so the body
+    //    covers the hip joint.
+    final double backSwing = math.sin(t * 2 * math.pi) * scale * 1.2;
+    // Thigh (kicking): from hip going up-left, drawn back.
+    _paintRect(
+        canvas,
+        baseX - 2.5 * scale - backSwing,
+        baseY - 7 * scale + breathe,
+        2.5 * scale,
+        5 * scale,
+        const Color(0xFF0E1A4A)); // azul shorts
+    // Shin (kicking): from knee going down-left.
+    _paintRect(
+        canvas,
+        baseX - 4 * scale - backSwing,
+        baseY - 2.5 * scale + breathe,
+        2 * scale,
+        4 * scale,
+        const Color(0xFF222222));
+    // Sock (white band).
+    _paintRect(
+        canvas,
+        baseX - 4 * scale - backSwing,
+        baseY - 0.5 * scale + breathe,
+        2 * scale,
+        0.8 * scale,
+        const Color(0xFFFFFFFF));
+    // Boot (black, pointing left).
+    _paintRect(
+        canvas,
+        baseX - 5.5 * scale - backSwing,
+        baseY + 0.0 * scale + breathe,
+        2.5 * scale,
+        1.2 * scale,
+        const Color(0xFF111111));
+
+    // -- BODY (jersey) — leaning forward toward the ball.
+    _paintRect(
+        canvas,
+        baseX - 3.5 * scale,
+        baseY - 16 * scale + breathe,
+        7 * scale,
+        9 * scale,
+        _kAmarilloBandera);
+    // Jersey shadow on the right side (3D).
+    _paintRect(
+        canvas,
+        baseX + 2 * scale,
+        baseY - 16 * scale + breathe,
+        1.5 * scale,
+        9 * scale,
+        _kAmarilloOscuro);
+    // Chest stripe (azul).
+    _paintRect(
+        canvas,
+        baseX - 3 * scale,
+        baseY - 12 * scale + breathe,
+        6 * scale,
+        1.5 * scale,
+        _kAzulBandera);
+    // Selección number (10) on the back — small white "10"
+    // in the center of the jersey. Drawn as two thick strokes
+    // for legibility at this scale.
+    final Paint numberPaint = Paint()
+      ..color = const Color(0xFF1A1A1A)
+      ..strokeWidth = scale * 0.7
+      ..strokeCap = StrokeCap.round;
+    // Vertical of "1".
+    canvas.drawLine(
+      Offset(baseX - 0.5 * scale, baseY - 15 * scale + breathe),
+      Offset(baseX - 0.5 * scale, baseY - 11 * scale + breathe),
+      numberPaint,
     );
-    // Head.
+    // Diagonal flag of "1".
+    canvas.drawLine(
+      Offset(baseX - 1.2 * scale, baseY - 14 * scale + breathe),
+      Offset(baseX - 0.5 * scale, baseY - 15 * scale + breathe),
+      numberPaint,
+    );
+    // Oval of "0".
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(baseX + 1.2 * scale, baseY - 13 * scale + breathe),
+        width: 1.8 * scale,
+        height: 2.5 * scale,
+      ),
+      numberPaint,
+    );
+
+    // -- SHORTS (azul, with shadow on the right).
+    _paintRect(
+        canvas,
+        baseX - 3.5 * scale,
+        baseY - 7 * scale + breathe,
+        7 * scale,
+        3 * scale,
+        _kAzulBandera);
+    _paintRect(
+        canvas,
+        baseX + 2 * scale,
+        baseY - 7 * scale + breathe,
+        1.5 * scale,
+        3 * scale,
+        const Color(0xFF08102E));
+
+    // -- FRONT leg (planted, on the ground near the ball).
+    // Thigh.
+    _paintRect(
+        canvas,
+        baseX + 1.5 * scale,
+        baseY - 7 * scale + breathe,
+        2.5 * scale,
+        5 * scale,
+        _kAzulBandera);
+    // Shin.
+    _paintRect(
+        canvas,
+        baseX + 1.5 * scale,
+        baseY - 2.5 * scale + breathe,
+        2 * scale,
+        4 * scale,
+        const Color(0xFF222222));
+    // Sock (white band).
+    _paintRect(
+        canvas,
+        baseX + 1.5 * scale,
+        baseY - 0.5 * scale + breathe,
+        2 * scale,
+        0.8 * scale,
+        const Color(0xFFFFFFFF));
+    // Boot (black, pointing right toward the ball).
+    _paintRect(
+        canvas,
+        baseX + 1.5 * scale,
+        baseY + 0.0 * scale + breathe,
+        2.5 * scale,
+        1.2 * scale,
+        const Color(0xFF111111));
+
+    // -- ARMS.
+    // Back arm (left, for balance) — skin, behind the body.
+    _paintRect(
+        canvas,
+        baseX - 5 * scale,
+        baseY - 14 * scale + breathe,
+        1.5 * scale,
+        4 * scale,
+        _kSkinTone);
+    // Front arm (right, reaching toward the ball) — skin.
+    _paintRect(
+        canvas,
+        baseX + 3.5 * scale,
+        baseY - 14 * scale + breathe,
+        1.5 * scale,
+        4 * scale,
+        _kSkinTone);
+    // Front hand (skin-tone circle at the end of the front
+    // arm, near the ball).
     canvas.drawCircle(
-      Offset(baseX, baseY - 12 * scale + breathe),
-      3.5 * scale,
+      Offset(baseX + 4.2 * scale, baseY - 10.5 * scale + breathe),
+      0.8 * scale,
       Paint()..color = _kSkinTone,
     );
-    // Hair.
-    _paintRect(canvas,
-        baseX - 3 * scale, baseY - 15 * scale + breathe,
-        6 * scale, 2 * scale, const Color(0xFF222222));
+
+    // -- NECK (skin tone, between head and jersey).
+    _paintRect(
+        canvas,
+        baseX - 1.5 * scale,
+        baseY - 18 * scale + breathe,
+        3 * scale,
+        2 * scale,
+        _kSkinTone);
+
+    // -- HEAD.
+    // Hair (back layer, slightly larger than the head).
+    canvas.drawCircle(
+      Offset(baseX, baseY - 21 * scale + breathe),
+      3.5 * scale,
+      Paint()..color = const Color(0xFF1A1A1A),
+    );
+    // Face (skin).
+    canvas.drawCircle(
+      Offset(baseX + 0.3 * scale, baseY - 20.5 * scale + breathe),
+      3 * scale,
+      Paint()..color = _kSkinTone,
+    );
+    // Hair fringe (front, on top of the head).
+    _paintRect(
+        canvas,
+        baseX - 3 * scale,
+        baseY - 24 * scale + breathe,
+        6 * scale,
+        1.5 * scale,
+        const Color(0xFF1A1A1A));
+    // Ear (small skin bump on the back of the head).
+    canvas.drawCircle(
+      Offset(baseX - 3 * scale, baseY - 20.5 * scale + breathe),
+      0.8 * scale,
+      Paint()..color = const Color(0xFFB58560),
+    );
+    // Eye (small dark dot looking toward the ball — to the
+    // right).
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(baseX + 1.5 * scale, baseY - 20.5 * scale + breathe),
+        width: 0.5 * scale,
+        height: 0.5 * scale,
+      ),
+      Paint()..color = const Color(0xFF111111),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -521,8 +724,12 @@ class PenaltyScenePainter extends CustomPainter {
 
   void _drawBall(Canvas canvas, Size size) {
     final double ballRadius = size.width * 0.045;
-    final double spotY = size.height * 0.78;
-    final double startX = size.width * 0.46;
+    // Ball sits ON the grass, at the same Y as the kicker's
+    // feet. In a side view the ball is at ground level and
+    // the kicker is behind it. The kicker's planted foot
+    // reaches toward the ball from the left.
+    final double spotY = size.height * 0.88;
+    final double startX = size.width * 0.58;
     Offset pos;
     double rx = ballRadius;
     double ry = ballRadius;
@@ -541,9 +748,9 @@ class PenaltyScenePainter extends CustomPainter {
       case PenaltySceneAnimation.goal:
         final Rect goal = Rect.fromLTWH(
           size.width * 0.18,
-          size.height * 0.18,
+          size.height * 0.05,
           size.width * 0.64,
-          size.height * 0.45,
+          size.height * 0.35,
         );
         final Offset end = Offset(goal.center.dx, goal.center.dy);
         if (t < 0.6) {
@@ -563,9 +770,9 @@ class PenaltyScenePainter extends CustomPainter {
       case PenaltySceneAnimation.post:
         final Rect goal = Rect.fromLTWH(
           size.width * 0.18,
-          size.height * 0.18,
+          size.height * 0.05,
           size.width * 0.64,
-          size.height * 0.45,
+          size.height * 0.35,
         );
         final double postX = goal.left + 3;
         final double postY = goal.top + goal.height * 0.30;
@@ -597,9 +804,9 @@ class PenaltyScenePainter extends CustomPainter {
         final double dir = seed.isEven ? -1 : 1;
         final Rect goal = Rect.fromLTWH(
           size.width * 0.18,
-          size.height * 0.18,
+          size.height * 0.05,
           size.width * 0.64,
-          size.height * 0.45,
+          size.height * 0.35,
         );
         final double postX = dir < 0 ? goal.left - 4 : goal.right + 4;
         final double postY = goal.center.dy;
@@ -616,9 +823,9 @@ class PenaltyScenePainter extends CustomPainter {
       case PenaltySceneAnimation.over:
         final Rect goal = Rect.fromLTWH(
           size.width * 0.18,
-          size.height * 0.18,
+          size.height * 0.05,
           size.width * 0.64,
-          size.height * 0.45,
+          size.height * 0.35,
         );
         final double crossbarY = goal.top - ballRadius - 4;
         final double tt = t;
