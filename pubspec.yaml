@@ -1,7 +1,7 @@
 name: arcade_timer_10s
 description: "Arcade Timer 10s — kiosk game: stop a stopwatch at exactly 10.000s. Swappable themes (classic / Selección Colombia)."
 publish_to: "none"
-version: 0.2.6+7
+version: 0.2.7+8
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
