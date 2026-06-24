@@ -73,16 +73,16 @@ class GoalBackdropPainter extends CustomPainter {
   //    Head 2/12 rows (17%), body 4/12 (33%), shorts 2/12 (17%),
   //    legs 3/12 (25%), boots 1/12 (8%). Clean athletic figure.
   static const List<List<int>> _sprite = <List<int>>[
-    <int>[0, 0, 7, 7, 7, 7, 0, 0, 0, 0], // 0: hair (4 wide)
-    <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head (6 wide)
-    <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 2: head
+    <int>[0, 0, 0, 7, 7, 7, 7, 0, 0, 0], // 0: hair (4 wide)
+    <int>[0, 0, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head (6 wide)
+    <int>[0, 0, 1, 1, 1, 1, 1, 0, 0, 0], // 2: head
     <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 3: gloves out + shoulders (body 5 wide)
     <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 4: arms + jersey
     <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 5: chest
     <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 6: lower chest
     <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 7: shorts (5 wide)
     <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 8: shorts
-    <int>[0, 0, 5, 0, 5, 0, 5, 0, 0, 0], // 9: legs (3 columns!)
+    <int>[0, 0, 5, 0, 0, 0, 5, 0, 0, 0], // 9: legs (3 columns!)
     <int>[0, 0, 5, 0, 0, 0, 5, 0, 0, 0], // 10: legs
     <int>[0, 0, 6, 0, 0, 0, 6, 0, 0, 0], // 11: boots
   ];
@@ -106,14 +106,14 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.022;
   static const double _postBottom = 0.72;
 
-  static const double _keeperY = 0.45;
+  static const double _keeperY = 0.7;
 
-  static const double _ballRestY = 0.48;
-  static const double _penaltySpotX = 0.5;
-  static const double _grassTop = 0.80;
-  static const double _netAlpha = 0.20;
-  static const double _netCell = 24.0;
-  static const double _ballRadius = 24.0;
+  static const double _ballRestY = 0.45;
+  static const double _penaltySpotX = 0.35;
+  static const double _grassTop = 0.91;
+  static const double _netAlpha = 0.15;
+  static const double _netCell = 20.0;
+  static const double _ballRadius = 35.0;
 
   // =====================================================================
 
@@ -267,7 +267,7 @@ class GoalBackdropPainter extends CustomPainter {
     final double cy = size.height * _keeperY;
     // 12 rows filling ~45% of the goal height so the feet
     // are near the bottom of the goal, not floating.
-    final double pixelSize = size.height * 0.042;
+    final double pixelSize = size.height * 0.034;
     final int rows = _sprite.length;
     final int cols = _sprite[0].length;
 
