@@ -82,13 +82,12 @@ class PenaltyScenePainter extends CustomPainter {
     _drawNet(canvas, goalRect, shakeT: _netShakeT());
     _drawGoalFrame(canvas, goalRect);
 
-    // Goalkeeper in the goal (sways with verdict).
+    // Goalkeeper in the goal (sways + jumps with verdict).
     _drawGoalkeeper(canvas, goalRect);
 
-    // Kicker silhouette in the lower-left, crouched, breathing.
-    _drawKicker(canvas, size);
-
-    // Ball — animated by verdict. Idle has a glow halo.
+    // Ball — animated by verdict. Idle has a bigger glow halo
+    // and grass-kick-up particles for a dynamic, alive feel.
+    _drawGrassKickUp(canvas, size);
     _drawBall(canvas, size);
   }
 
@@ -422,10 +421,13 @@ class PenaltyScenePainter extends CustomPainter {
     final double scale = goal.height / 90.0;
 
     double swayX = 0;
-    double armRaise = 0;
+    double bobY = 0;
+    double armRaise = 0; // 0 = arms at sides, 1 = arms up
     switch (animation) {
       case PenaltySceneAnimation.idle:
-        swayX = math.sin(t * 2 * math.pi) * goal.width * 0.06;
+        swayX = math.sin(t * 2 * math.pi) * goal.width * 0.08;
+        // Subtle vertical bounce — the goalkeeper jumps a bit.
+        bobY = math.sin(t * 4 * math.pi) * goal.height * 0.06;
         break;
       case PenaltySceneAnimation.goal:
         swayX = math.sin(t * math.pi * 6) * goal.width * 0.04;
@@ -444,7 +446,7 @@ class PenaltyScenePainter extends CustomPainter {
     }
 
     canvas.save();
-    canvas.translate(cx + swayX, cy);
+    canvas.translate(cx + swayX, cy + bobY);
 
     // Body (amarillo jersey)
     _paintRect(canvas, 0, -10 * scale, 12 * scale, 22 * scale, _kAmarilloBandera);
@@ -484,128 +486,35 @@ class PenaltyScenePainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawKicker(Canvas canvas, Size size) {
-    // Clean silhouette of a kicker, built from overlapping
-    // ovals (no rectangles, no internal detail — just the
-    // outline reads as a figure). The brain connects the
-    // overlapping shapes into a body outline. Same as the
-    // goalkeeper: one dark colour, clean shapes.
-    final double scale = size.height * 0.017;
-    final double baseX = size.width * 0.28;
-    final double baseY = size.height * 0.92; // feet on grass
-    final double bobRate =
-        animation == PenaltySceneAnimation.idle ? 2.0 : 1.0;
-    final double breathe =
-        math.sin(t * math.pi * bobRate) * scale * 0.6;
-    final Paint shadow = Paint()..color = const Color(0xFF1A1A1A);
+  // -- DYNAMIC IDLE EFFECTS
 
-    // -- HEAD (circle).
-    canvas.drawCircle(
-      Offset(baseX, baseY - 21 * scale + breathe),
-      3.2 * scale,
-      shadow,
-    );
-
-    // -- TORSO (oval, slightly forward-leaning).
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(baseX + 0.5 * scale, baseY - 13 * scale + breathe),
-        width: 7.5 * scale,
-        height: 9 * scale,
-      ),
-      shadow,
-    );
-
-    // -- PLANTED LEG (oval going straight down).
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(baseX + 2 * scale, baseY - 2 * scale + breathe),
-        width: 2.8 * scale,
-        height: 7.5 * scale,
-      ),
-      shadow,
-    );
-    // Tiny oval for the planted foot (boot).
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(baseX + 2 * scale, baseY + 2 * scale + breathe),
-        width: 3 * scale,
-        height: 1.5 * scale,
-      ),
-      shadow,
-    );
-
-    // -- KICKING LEG (oval, rotated back, oscillates).
-    final double backSwing = math.sin(t * 2 * math.pi) * scale * 1.2;
-    canvas.save();
-    canvas.translate(baseX - 2 * scale - backSwing, baseY - 6 * scale + breathe);
-    canvas.rotate(-0.35);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(0, 2 * scale),
-        width: 2.8 * scale,
-        height: 8 * scale,
-      ),
-      shadow,
-    );
-    // Tiny oval for the kicking boot.
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(-1 * scale, 6 * scale),
-        width: 3 * scale,
-        height: 1.5 * scale,
-      ),
-      shadow,
-    );
-    canvas.restore();
-
-    // -- BACK ARM (thin oval, reaching back for balance).
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(baseX - 4.5 * scale, baseY - 14 * scale + breathe),
-        width: 4 * scale,
-        height: 1.6 * scale,
-      ),
-      shadow,
-    );
-
-    // -- FRONT ARM (thin oval, reaching toward the ball).
-    canvas.save();
-    canvas.translate(baseX + 3 * scale, baseY - 14 * scale + breathe);
-    canvas.rotate(-0.55);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(1.5 * scale, 0),
-        width: 5.5 * scale,
-        height: 1.6 * scale,
-      ),
-      shadow,
-    );
-    canvas.restore();
-
-    // -- JOINTS (tiny circles where arms/legs meet the torso,
-    //    so the ovals don't look "floating" — visually ties
-    //    the whole figure together).
-    canvas.drawCircle(
-      Offset(baseX - 2.5 * scale, baseY - 6 * scale + breathe),
-      scale * 1.0,
-      shadow,
-    ); // left hip joint
-    canvas.drawCircle(
-      Offset(baseX + 2 * scale, baseY - 6 * scale + breathe),
-      scale * 1.0,
-      shadow,
-    ); // right hip joint
-    canvas.drawCircle(
-      Offset(baseX - 2.5 * scale, baseY - 13 * scale + breathe),
-      scale * 0.8,
-      shadow,
-    ); // left shoulder
-    canvas.drawCircle(
-      Offset(baseX + 3 * scale, baseY - 13 * scale + breathe),
-      scale * 0.8,
-      shadow,
-    ); // right shoulder
+  /// Grass clippings / dust particles that fly up from the
+  /// field during idle — gives the impression that the
+  /// action is about to start. The particles orbit near the
+  /// ball position and fade in/out with `t`.
+  void _drawGrassKickUp(Canvas canvas, Size size) {
+    if (animation != PenaltySceneAnimation.idle) return;
+    final Paint particle = Paint()
+      ..color = const Color(0xFF4F8A3F).withValues(alpha: 0.7)
+      ..strokeCap = StrokeCap.round;
+    // 5 particles in slightly different phases.
+    for (int i = 0; i < 5; i++) {
+      final double phase =
+          (t + _hash01(seed + i * 97) * 6.28) % (2 * math.pi);
+      final double alpha =
+          (math.sin(phase) + 1) / 2; // 0..1
+      if (alpha < 0.1) continue;
+      final double x = size.width * 0.56 +
+          math.cos(phase * 1.3 + i) * size.width * 0.04;
+      final double y = size.height * 0.88 -
+          math.sin(phase * 1.7 + i) * size.height * 0.04;
+      particle.strokeWidth = 1.0 + alpha * 1.5;
+      canvas.drawLine(
+        Offset(x - 1, y - 1),
+        Offset(x + 1, y + 1),
+        particle,
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -629,10 +538,11 @@ class PenaltyScenePainter extends CustomPainter {
 
     switch (animation) {
       case PenaltySceneAnimation.idle:
-        // Subtle wobble + glow.
-        final double wobble = math.sin(t * 2 * math.pi) * ballRadius * 0.10;
+        // Bigger wobble + glow. The ball is the main visual —
+        // no kicker, so it needs to carry the animation.
+        final double wobble = math.sin(t * 2 * math.pi) * ballRadius * 0.20;
         pos = Offset(startX, spotY - ballRadius + wobble);
-        rotation = t * 2 * math.pi;
+        rotation = t * 3 * math.pi;
         _drawBallGlow(canvas, pos, ballRadius);
         break;
 
@@ -734,13 +644,28 @@ class PenaltyScenePainter extends CustomPainter {
   }
 
   void _drawBallGlow(Canvas canvas, Offset pos, double radius) {
-    // Pulsing yellow halo around the ball.
+    // Pulsing yellow halo around the ball — bigger and more
+    // dramatic now that the kicker is gone (the ball is the
+    // main visual anchor).
     final double pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
-    final double haloR = radius * (2.0 + pulse * 0.6);
-    final Paint halo = Paint()
-      ..color = _kAmarilloBandera.withValues(alpha: 0.25 + pulse * 0.20)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawCircle(pos, haloR, halo);
+    // Outer ring: large, soft, fades in/out.
+    final double outerR = radius * (2.5 + pulse * 0.8);
+    canvas.drawCircle(
+      pos,
+      outerR,
+      Paint()
+        ..color = _kAmarilloBandera.withValues(alpha: 0.15 + pulse * 0.12)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    // Inner ring: tighter, brighter.
+    final double innerR = radius * (1.5 + pulse * 0.4);
+    canvas.drawCircle(
+      pos,
+      innerR,
+      Paint()
+        ..color = _kAmarilloBandera.withValues(alpha: 0.35 + pulse * 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
   }
 
   void _drawSparks(Canvas canvas, Offset pos, double t) {
