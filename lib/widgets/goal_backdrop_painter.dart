@@ -61,19 +61,17 @@ class GoalBackdropPainter extends CustomPainter {
   static const Color _kAzulBandera = Color(0xFF0E1A4A);
   static const Color _kBallBlack = Color(0xFF111111);
 
-  // -- Goalkeeper sprite (12×10, same as the pixel-art from
-  //    the now-retired corner-box painter) --------------------------------
+  // -- Goalkeeper sprite (10×9, slim athletic proportions) ----------
   static const List<List<int>> _sprite = <List<int>>[
-    <int>[0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0], // 0: hair
-    <int>[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 1: head
-    <int>[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 2: head
-    <int>[3, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 3], // 3: gloves + shoulders
-    <int>[3, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 3], // 4: arms spread
-    <int>[0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0], // 5: chest
-    <int>[0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 0, 0], // 6: shorts
-    <int>[0, 0, 5, 5, 0, 0, 0, 0, 5, 5, 0, 0], // 7: legs
-    <int>[0, 0, 6, 6, 0, 0, 0, 0, 6, 6, 0, 0], // 8: boots
-    <int>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 9: ground
+    <int>[0, 0, 7, 7, 7, 7, 0, 0, 0, 0], // 0: hair (4 wide)
+    <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head + face (6 wide)
+    <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 2: head
+    <int>[3, 0, 2, 2, 2, 2, 0, 3, 0, 0], // 3: gloves out + jersey (4 wide)
+    <int>[3, 0, 2, 2, 2, 2, 0, 3, 0, 0], // 4: arms + slim jersey
+    <int>[0, 0, 2, 2, 2, 2, 0, 0, 0, 0], // 5: chest (4 wide)
+    <int>[0, 0, 4, 4, 4, 4, 0, 0, 0, 0], // 6: shorts (4 wide)
+    <int>[0, 0, 5, 0, 0, 5, 0, 0, 0, 0], // 7: legs
+    <int>[0, 0, 6, 0, 0, 6, 0, 0, 0, 0], // 8: boots
   ];
 
   static const List<Color> _palette = <Color>[
@@ -96,10 +94,11 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _postBottom = 0.72;
 
   // Keeper sits inside the goal, roughly centered.
-  static const double _keeperY = 0.28;
+  static const double _keeperY = 0.25;
 
-  // Ball orbits near the penalty spot (below the goal).
-  static const double _ballRestY = 0.82;
+  // Ball orbits near the MIDDLE of the goal (not at the bottom)
+  // — the ball is "targeting" where to shoot.
+  static const double _ballRestY = 0.48;
   static const double _penaltySpotX = 0.5;
 
   // Grass strip.
@@ -269,7 +268,7 @@ class GoalBackdropPainter extends CustomPainter {
   void _drawGoalkeeper(Canvas canvas, Size size) {
     final double cx = size.width * 0.5;
     final double cy = size.height * _keeperY;
-    final double pixelSize = size.width * 0.035; // ~45 px at 1280
+    final double pixelSize = size.height * 0.025; // ~20px at 800
     final int rows = _sprite.length;
     final int cols = _sprite[0].length;
 
@@ -307,11 +306,22 @@ class GoalBackdropPainter extends CustomPainter {
 
     switch (mode) {
       case BackdropMode.idle:
-        // Gentle orbit — the ball slowly circles the penalty
-        // spot so the operator gets the sense of "aiming".
-        x += math.cos(t * 2 * math.pi) * r * 1.2;
-        y += math.sin(t * 2 * math.pi) * r * 0.6;
-        rotation = t * 3 * math.pi;
+        // Bounce from post to post through the goal area.
+        // The ball is "aiming" — the operator watches it
+        // sweep across the goal and presses at 10s.
+        // A sine wave on X (post to post) and another on Y
+        // (up/down through the goal) at different frequencies
+        // creates a lively, unpredictable orbit.
+        final double goalW = size.width * (_postRight - _postLeft - _postWidth);
+        final double goalH =
+            size.height * (_postBottom - _crossbarTop - _crossbarThickness);
+        final double swayX =
+            math.sin(t * 2.8 * math.pi) * goalW * 0.38;
+        final double swayY =
+            math.cos(t * 3.3 * math.pi) * goalH * 0.25;
+        x += swayX;
+        y += swayY;
+        rotation = t * 4 * math.pi;
         _drawBallGlow(canvas, Offset(x, y), r);
         break;
 
