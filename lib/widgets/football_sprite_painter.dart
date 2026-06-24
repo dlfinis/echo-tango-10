@@ -175,70 +175,55 @@ class FootballSpritePainter extends CustomPainter {
   }
 
   void _paintNiPorAsomo(Canvas canvas, Size size, Color body, Color cavity) {
-    // A soccer ball DEFLATING. Starts round, gradually squashes
-    // vertically and shrinks, air leaks out (curved lines),
-    // and eventually vanishes — replaced by a "¡DESINFLÓ!"
-    // label that pulses. Loops seamlessly at t=0/1.
+    // A soccer ball SHRINKING. Stays round the whole time, just
+    // loses radius while air leaks out (curved red lines).
+    // Ends up almost invisible. Loops seamlessly: quick
+    // re-inflate at t=0.95..1.0 so t=0 == t=1.
     //
     // Phase map (t in [0, 1]):
     //   0.00..0.10  full ball at center
-    //   0.10..0.55  ball squashes + shrinks + air leaks out
-    //   0.55..0.85  ball is a flat oval; "¡DESINFLÓ!" pulses in
-    //   0.85..0.95  flat oval + label fades slightly
-    //   0.95..1.00  quick re-inflate so t=1 == t=0 (seamless)
+    //   0.10..0.55  ball shrinks, air leaks out
+    //   0.55..0.90  ball is tiny + holds
+    //   0.90..1.00  re-inflate so t=1 == t=0 (seamless)
     final Offset center = Offset(size.width / 2, size.height / 2);
     final double fullR = math.min(size.width, size.height) * 0.42;
 
-    // Map t → deflate amount.
-    //   0   = full ball (round, radius=fullR)
-    //   0.55= flat-ish (rx=fullR*0.65, ry=fullR*0.18)
-    //   1   = full ball again (re-inflate)
-    double rx, ry, alpha;
+    double r, alpha;
     if (t < 0.10) {
       // Full ball — slight wobble.
-      final double wobble = 1.0 + math.sin(t * 80) * 0.015;
-      rx = fullR * wobble;
-      ry = fullR * (2.0 - wobble);
+      r = fullR * (1.0 + math.sin(t * 80) * 0.015);
       alpha = 1.0;
     } else if (t < 0.55) {
-      // Deflating.
+      // Shrinking.
       final double dt = (t - 0.10) / 0.45; // 0..1
-      rx = fullR * (1.0 - dt * 0.40);
-      ry = fullR * (1.0 - dt * 0.85);
-      alpha = 1.0;
-    } else if (t < 0.85) {
-      // Flat — held.
-      rx = fullR * 0.55;
-      ry = fullR * 0.14;
-      alpha = 1.0;
-    } else if (t < 0.95) {
-      // Flat + label fading slightly.
-      rx = fullR * 0.55;
-      ry = fullR * 0.14;
-      alpha = 1.0 - (t - 0.85) / 0.10 * 0.20;
+      r = fullR * (1.0 - dt * 0.95);
+      alpha = 1.0 - dt * 0.30;
+    } else if (t < 0.90) {
+      // Tiny + held.
+      r = fullR * 0.06;
+      alpha = 0.70;
     } else {
-      // Quick re-inflate (0.95..1.0).
-      final double inflateT = (t - 0.95) / 0.05; // 0..1
-      rx = fullR * (0.55 + inflateT * 0.45);
-      ry = fullR * (0.14 + inflateT * 0.86);
-      alpha = 1.0;
+      // Quick re-inflate (0.90..1.0).
+      final double inflateT = (t - 0.90) / 0.10; // 0..1
+      r = fullR * (0.06 + inflateT * 0.94);
+      alpha = 0.70 + inflateT * 0.30;
     }
 
-    // Air leak — curved lines coming out of the ball during
-    // the deflation phase.
-    if (t > 0.05 && t < 0.65) {
+    // Air leak — curved red lines coming out of the ball while
+    // it's deflating.
+    if (t > 0.05 && t < 0.55) {
       final double leakAlpha = (math.sin((t - 0.05) * 8) + 1) / 2;
       final Paint leak = Paint()
-        ..color = const Color(0xFFCE1126).withValues(alpha: 0.6 * leakAlpha)
+        ..color = const Color(0xFFCE1126).withValues(alpha: 0.7 * leakAlpha)
         ..strokeWidth = 2.0
         ..strokeCap = StrokeCap.round;
-      final double leakR = fullR * 0.3;
+      final double leakR = fullR * 0.35;
       // Three curved leak streams at different angles.
       for (int i = 0; i < 3; i++) {
         final double angle = -math.pi / 2 + (i - 1) * 0.5;
         final Offset start = Offset(
-          center.dx + math.cos(angle) * rx * 0.4,
-          center.dy + math.sin(angle) * ry * 0.4,
+          center.dx + math.cos(angle) * r * 0.6,
+          center.dy + math.sin(angle) * r * 0.6,
         );
         final Offset end = Offset(
           start.dx + math.cos(angle) * leakR * (1.0 + i * 0.3),
@@ -256,94 +241,62 @@ class FootballSpritePainter extends CustomPainter {
       }
     }
 
-    // Draw the ball (oval that may be very flat).
+    // Draw the ball — CIRCLE that shrinks.
     canvas.save();
     canvas.translate(center.dx, center.dy);
-    final Rect ballRect = Rect.fromCenter(
-      center: Offset.zero,
-      width: rx * 2,
-      height: ry * 2,
-    );
-    // Body (white).
-    canvas.drawOval(
-      ballRect,
+    // Body.
+    canvas.drawCircle(
+      Offset.zero,
+      r,
       Paint()
         ..shader = RadialGradient(
           colors: <Color>[
             const Color(0xFFFFFFFF).withValues(alpha: alpha),
             const Color(0xFFE0E0E0).withValues(alpha: alpha),
           ],
-        ).createShader(ballRect.inflate(rx * 0.3)),
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: r * 1.3)),
     );
     // Outline.
-    canvas.drawOval(
-      ballRect,
+    canvas.drawCircle(
+      Offset.zero,
+      r,
       Paint()
         ..color = const Color(0xFF111111).withValues(alpha: alpha)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
-    // Pentagon (squashed along with the ball).
-    if (rx > fullR * 0.25) {
-      final double px = rx * 2 / 7;
+    // Pentagon (only when the ball is still big enough to see
+    // the pattern).
+    if (r > fullR * 0.25) {
+      final double px = r * 2 / 7;
       final Paint pentPaint = Paint()
         ..color = const Color(0xFF111111).withValues(alpha: alpha);
-      for (int r = 0; r < 7; r++) {
+      for (int r2 = 0; r2 < 7; r2++) {
         for (int c = 0; c < 7; c++) {
           final double dx = (c - 3) + 0.5;
-          final double dy = (r - 3) + 0.5;
+          final double dy = (r2 - 3) + 0.5;
           final double dist = math.sqrt(dx * dx + dy * dy);
           if (dist > 3.0) continue;
-          final bool isPent = (c == 3 && r == 3) ||
-              (c == 3 && r == 2) ||
-              (c == 2 && r == 3) ||
-              (c == 4 && r == 3) ||
-              (c == 3 && r == 4);
+          final bool isPent = (c == 3 && r2 == 3) ||
+              (c == 3 && r2 == 2) ||
+              (c == 2 && r2 == 3) ||
+              (c == 4 && r2 == 3) ||
+              (c == 3 && r2 == 4);
           if (isPent) {
-            canvas.save();
-            canvas.scale(1.0, ry / rx);
             canvas.drawRect(
               Rect.fromLTWH(
                 (c - 3) * px - px / 2,
-                (r - 3) * px - px / 2,
+                (r2 - 3) * px - px / 2,
                 px - 0.5,
                 px - 0.5,
               ),
               pentPaint,
             );
-            canvas.restore();
           }
         }
       }
     }
     canvas.restore();
-
-    // "¡DESINFLÓ!" label appears once the ball is mostly flat
-    // (after t=0.40) and pulses while held.
-    if (t > 0.40) {
-      double labelAlpha = 1.0;
-      if (t > 0.85) {
-        // Fade slightly with the ball (during the held-flat
-        // pre-re-inflate phase).
-        labelAlpha = 1.0 - (t - 0.85) / 0.10 * 0.20;
-      }
-      if (t > 0.95) {
-        // Hide during the re-inflate snap-back so the loop is
-        // seamless.
-        labelAlpha = 0.0;
-      }
-      if (labelAlpha > 0) {
-        final double pulse =
-            1.0 + math.sin((t - 0.40) * math.pi * 4) * 0.06;
-        _drawBigText(
-          canvas,
-          size,
-          text: '¡DESINFLÓ!',
-          scale: 1.1 * pulse,
-          color: const Color(0xFFCE1126).withValues(alpha: labelAlpha),
-        );
-      }
-    }
   }
 
   void _paintTePasaste(Canvas canvas, Size size, Color body, Color cavity) {

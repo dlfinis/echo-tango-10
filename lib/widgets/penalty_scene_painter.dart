@@ -175,23 +175,77 @@ class PenaltyScenePainter extends CustomPainter {
   }
 
   void _drawNet(Canvas canvas, Rect goal, {required double shakeT}) {
-    // Net grid — small horizontal + vertical lines.
-    final Paint netPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.75)
-      ..strokeWidth = 0.7;
-    final double dx = goal.width / 6;
-    final double dy = goal.height / 5;
-    for (double x = goal.left; x <= goal.right; x += dx) {
-      canvas.drawLine(Offset(x, goal.top), Offset(x, goal.bottom), netPaint);
+    // Interlaced black mesh — two sets of diagonal lines going
+    // in opposite directions create the "woven" look of a real
+    // net. The intersections are emphasized with tiny dark
+    // dots so the weave reads clearly at the small scale.
+    final double w = goal.width;
+    final double h = goal.height;
+    final double cell = math.min(w, h) / 7; // mesh cell size
+    final Paint strand = Paint()
+      ..color = const Color(0xFF111111)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    // Strand set A — diagonals going down-right.
+    // We walk across the goal and draw a line from the top
+    // edge to the right edge (or bottom edge) at an angle.
+    for (double x = goal.left - h; x <= goal.right; x += cell) {
+      // Line from (x, goal.top) clipped to the goal rect.
+      final Offset start = Offset(math.max(goal.left, x), goal.top);
+      final Offset end = Offset(
+        math.min(goal.right, x + h),
+        math.min(goal.bottom, goal.top + h),
+      );
+      if (start.dx >= end.dx) continue;
+      _drawClippedLine(
+        canvas,
+        strand,
+        start,
+        end,
+        goal,
+      );
     }
-    for (double y = goal.top; y <= goal.bottom; y += dy) {
-      canvas.drawLine(Offset(goal.left, y), Offset(goal.right, y), netPaint);
+    // Strand set B — diagonals going down-left.
+    for (double x = goal.left; x <= goal.right + h; x += cell) {
+      final Offset start = Offset(math.min(goal.right, x), goal.top);
+      final Offset end = Offset(
+        math.max(goal.left, x - h),
+        math.min(goal.bottom, goal.top + h),
+      );
+      if (start.dx <= end.dx) continue;
+      _drawClippedLine(
+        canvas,
+        strand,
+        start,
+        end,
+        goal,
+      );
+    }
+    // Knot dots at intersections — every cell intersection
+    // gets a small black square for a more "woven" look.
+    final Paint knot = Paint()..color = const Color(0xFF000000);
+    final int nx = (w / cell).round();
+    final int ny = (h / cell).round();
+    for (int i = 0; i <= nx; i++) {
+      for (int j = 0; j <= ny; j++) {
+        final double px = goal.left + (i * w / nx);
+        final double py = goal.top + (j * h / ny);
+        canvas.drawRect(
+          Rect.fromCenter(
+            center: Offset(px, py),
+            width: 1.5,
+            height: 1.5,
+          ),
+          knot,
+        );
+      }
     }
     if (shakeT > 0) {
       // Net shake (3 horizontal lines bowing in/out).
       final double amp = (1.0 - shakeT) * 4.0;
       final Paint shake = Paint()
-        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.7 * shakeT)
+        ..color = const Color(0xFF111111).withValues(alpha: 0.7 * shakeT)
         ..strokeWidth = 1.5;
       for (int i = 0; i < 3; i++) {
         final double y = goal.top + goal.height * (0.3 + i * 0.2) +
@@ -203,6 +257,21 @@ class PenaltyScenePainter extends CustomPainter {
         );
       }
     }
+  }
+
+  /// Draw a line clipped to [bounds] so the net strands don't
+  /// extend outside the goal rectangle.
+  void _drawClippedLine(
+    Canvas canvas,
+    Paint paint,
+    Offset start,
+    Offset end,
+    Rect bounds,
+  ) {
+    canvas.save();
+    canvas.clipRect(bounds);
+    canvas.drawLine(start, end, paint);
+    canvas.restore();
   }
 
   void _drawGoalFrame(Canvas canvas, Rect goal) {
@@ -305,9 +374,11 @@ class PenaltyScenePainter extends CustomPainter {
   void _drawKicker(Canvas canvas, Size size) {
     // Crouched kicker in the lower-left corner, behind the
     // ball. Always faces right (the goal is to the right).
-    final double scale = size.height * 0.022;
-    final double baseX = size.width * 0.30;
-    final double baseY = size.height * 0.78;
+    // Smaller now — ~70% of the previous scale so it doesn't
+    // crowd the ball + corner box.
+    final double scale = size.height * 0.015;
+    final double baseX = size.width * 0.28;
+    final double baseY = size.height * 0.80;
     // Breathing bob — faster on idle, slower when ball is in
     // flight.
     final double bobRate = animation == PenaltySceneAnimation.idle
