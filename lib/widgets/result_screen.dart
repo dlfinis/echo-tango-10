@@ -434,68 +434,51 @@ class _ResultScreenState extends State<ResultScreen>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 400),
           color: _verdictBg,
-          child: AnimatedBuilder(
-            animation: Listenable.merge(<Listenable>[
-              _glitchAnim,
-              _shakeAnim,
-              _scrollAnim,
-            ]),
-            builder: (BuildContext context, Widget? _) {
-              return LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  final Size viewport = constraints.biggest;
-                  final bool sceneIsVisible =
-                      widget.theme.id != 'classic';
-                  final double sceneW = viewport.width * 0.35;
-                  final double sceneH = viewport.height * 0.40;
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: <Widget>[
-                      // Themed result scene — small inset in
-                      // the UPPER-RIGHT corner. Drives the
-                      // ball trajectory that matches the
-                      // verdict.
-                      if (sceneIsVisible)
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          width: sceneW,
-                          height: sceneH,
-                          child: IgnorePointer(
-                            child: AnimatedBuilder(
-                              animation: _sceneController,
-                              builder: (BuildContext context, Widget? _) {
-                                return CustomPaint(
-                                  painter: widget.theme
-                                      .resultScenePainter(
-                                    verdict:
-                                        _toVerdictKind(_verdict),
-                                    t: _sceneController.value,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      _buildBody(
-                        glitchT: _glitchAnim.value,
-                        shakeT: _shakeAnim.value,
-                        scrollT: _scrollAnim.value,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              // Full-screen goal backdrop — the entire kiosk
+              // IS the goal. Ball trajectory matches the
+              // verdict via the scene controller.
+              IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _sceneController,
+                  builder: (BuildContext context, Widget? _) {
+                    return CustomPaint(
+                      painter: widget.theme.resultBackdropPainter(
+                        verdict: _toVerdictKind(_verdict),
+                        t: _sceneController.value,
                       ),
-                      // CRT scanlines overlay (worldcup only).
-                      if (widget.theme.appliesCrtOverlay)
-                        const Positioned.fill(
-                          child: IgnorePointer(
-                            child: CustomPaint(
-                              painter: CrtScanlinesPainter(),
-                            ),
-                          ),
-                        ),
-                    ],
+                      size: Size.infinite,
+                    );
+                  },
+                ),
+              ),
+              // Body (chronograph + verdict + sprite) on top.
+              AnimatedBuilder(
+                animation: Listenable.merge(<Listenable>[
+                  _glitchAnim,
+                  _shakeAnim,
+                  _scrollAnim,
+                ]),
+                builder: (BuildContext context, Widget? _) {
+                  return _buildBody(
+                    glitchT: _glitchAnim.value,
+                    shakeT: _shakeAnim.value,
+                    scrollT: _scrollAnim.value,
                   );
                 },
-              );
-            },
+              ),
+              // CRT scanlines.
+              if (widget.theme.appliesCrtOverlay)
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: CrtScanlinesPainter(),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

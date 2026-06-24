@@ -29,7 +29,7 @@ import 'package:flutter/material.dart';
 import '../kiosk_theme.dart';
 import '../../widgets/football_march_painter.dart';
 import '../../widgets/football_sprite_painter.dart';
-import '../../widgets/penalty_scene_painter.dart';
+import '../../widgets/goal_backdrop_painter.dart';
 
 /// Colombian flag blue — used as the primary background.
 const Color _kAzulBandera = Color(0xFF0E1A4A);
@@ -182,9 +182,20 @@ class WorldcupTheme implements KioskTheme {
   }
 
   @override
-  CustomPainter playingScenePainter({required double t}) {
-    return PenaltyScenePainter(
-      animation: PenaltySceneAnimation.idle,
+  CustomPainter playingBackdropPainter({required double t}) {
+    return GoalBackdropPainter(
+      mode: BackdropMode.idle,
+      t: t,
+    );
+  }
+
+  @override
+  CustomPainter resultBackdropPainter({
+    required VerdictKind verdict,
+    required double t,
+  }) {
+    return GoalBackdropPainter(
+      mode: _verdictToBackdropMode(verdict),
       t: t,
     );
   }
@@ -192,31 +203,17 @@ class WorldcupTheme implements KioskTheme {
   @override
   bool get appliesCrtOverlay => true;
 
-  @override
-  CustomPainter resultScenePainter({
-    required VerdictKind verdict,
-    required double t,
-  }) {
-    return PenaltyScenePainter(
-      animation: _verdictToSceneAnimation(verdict),
-      t: t,
-    );
-  }
-
   /// Map the gameplay verdict to the ball-trajectory animation.
-  /// VICTORIA -> ball into the net. CASI -> hits the post and
-  /// bounces back. NI POR ASOMO -> flies wide. TE PASASTE ->
-  /// sails over the crossbar.
-  PenaltySceneAnimation _verdictToSceneAnimation(VerdictKind kind) {
+  BackdropMode _verdictToBackdropMode(VerdictKind kind) {
     switch (kind) {
       case VerdictKind.victoria:
-        return PenaltySceneAnimation.goal;
+        return BackdropMode.goal;
       case VerdictKind.casi:
-        return PenaltySceneAnimation.post;
+        return BackdropMode.post;
       case VerdictKind.niPorAsomo:
-        return PenaltySceneAnimation.wide;
+        return BackdropMode.wide;
       case VerdictKind.tePasaste:
-        return PenaltySceneAnimation.over;
+        return BackdropMode.over;
     }
   }
 

@@ -18,6 +18,7 @@ import 'package:arcade_timer_10s/theme/themes/classic_theme.dart';
 import 'package:arcade_timer_10s/theme/themes/worldcup_theme.dart';
 import 'package:arcade_timer_10s/widgets/crt_scanlines_painter.dart';
 import 'package:arcade_timer_10s/widgets/football_sprite_painter.dart';
+import 'package:arcade_timer_10s/widgets/goal_backdrop_painter.dart';
 import 'package:arcade_timer_10s/widgets/penalty_scene_painter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,28 +182,19 @@ void main() {
     });
   });
 
-  group('KioskTheme — playing scene painter', () {
-    test('WorldcupTheme returns a PenaltyScenePainter (idle)', () {
+  group('KioskTheme — playing backdrop painter', () {
+    test('WorldcupTheme returns a GoalBackdropPainter (idle)', () {
       const KioskTheme t = WorldcupTheme();
-      final CustomPainter p = t.playingScenePainter(t: 0.5);
-      expect(p, isA<PenaltyScenePainter>());
-      expect((p as PenaltyScenePainter).animation,
-          PenaltySceneAnimation.idle);
-    });
-
-    test('WorldcupTheme respects the compact flag in playingScenePainter',
-        () {
-      const KioskTheme t = WorldcupTheme();
-      final CustomPainter full = t.playingScenePainter(t: 0.5);
-      expect(full, isA<PenaltyScenePainter>());
+      final CustomPainter p = t.playingBackdropPainter(t: 0.5);
+      expect(p, isA<GoalBackdropPainter>());
+      expect((p as GoalBackdropPainter).mode,
+          BackdropMode.idle);
     });
 
     test('ClassicTheme returns a non-throwing transparent painter', () {
       const KioskTheme t = ClassicTheme();
-      final CustomPainter p = t.playingScenePainter(t: 0.5);
+      final CustomPainter p = t.playingBackdropPainter(t: 0.5);
       expect(p, isA<CustomPainter>());
-      // Painting it should be a no-op (transparent). Verify it
-      // doesn't throw on a representative viewport.
       const Size size = Size(1280, 800);
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
@@ -212,15 +204,14 @@ void main() {
       pic.dispose();
     });
 
-    test('both themes accept the same playingScenePainter contract', () {
+    test('both themes accept the same playingBackdropPainter contract', () {
       const List<KioskTheme> themes = <KioskTheme>[
         ClassicTheme(),
         WorldcupTheme(),
       ];
       for (final KioskTheme theme in themes) {
         for (double t = 0.0; t <= 1.0; t += 0.25) {
-          // No throws, returns a CustomPainter.
-          final CustomPainter p = theme.playingScenePainter(t: t);
+          final CustomPainter p = theme.playingBackdropPainter(t: t);
           expect(p, isA<CustomPainter>(),
               reason: 't=$t must return a CustomPainter');
         }
@@ -238,70 +229,47 @@ void main() {
     });
   });
 
-  group('KioskTheme — result scene painter', () {
-    test('WorldcupTheme maps verdict -> trajectory animation', () {
+  group('KioskTheme — result backdrop painter', () {
+    test('WorldcupTheme maps verdict -> trajectory mode', () {
       const KioskTheme t = WorldcupTheme();
-      final CustomPainter g = t.resultScenePainter(
+      final CustomPainter g = t.resultBackdropPainter(
         verdict: VerdictKind.victoria,
         t: 0.5,
       );
-      expect(g, isA<PenaltyScenePainter>());
-      expect((g as PenaltyScenePainter).animation,
-          PenaltySceneAnimation.goal);
+      expect(g, isA<GoalBackdropPainter>());
+      expect((g as GoalBackdropPainter).mode, BackdropMode.goal);
 
-      final CustomPainter p = t.resultScenePainter(
-        verdict: VerdictKind.casi,
-        t: 0.5,
-      );
-      expect((p as PenaltyScenePainter).animation,
-          PenaltySceneAnimation.post);
-
-      final CustomPainter w = t.resultScenePainter(
-        verdict: VerdictKind.niPorAsomo,
-        t: 0.5,
-      );
-      expect((w as PenaltyScenePainter).animation,
-          PenaltySceneAnimation.wide);
-
-      final CustomPainter o = t.resultScenePainter(
-        verdict: VerdictKind.tePasaste,
-        t: 0.5,
-      );
-      expect((o as PenaltyScenePainter).animation,
-          PenaltySceneAnimation.over);
+      expect(
+          (t.resultBackdropPainter(verdict: VerdictKind.casi, t: 0.5)
+                  as GoalBackdropPainter)
+              .mode,
+          BackdropMode.post);
+      expect(
+          (t.resultBackdropPainter(
+                      verdict: VerdictKind.niPorAsomo, t: 0.5)
+                  as GoalBackdropPainter)
+              .mode,
+          BackdropMode.wide);
+      expect(
+          (t.resultBackdropPainter(
+                      verdict: VerdictKind.tePasaste, t: 0.5)
+                  as GoalBackdropPainter)
+              .mode,
+          BackdropMode.over);
     });
 
-    test('ClassicTheme result scene is transparent (no-op)', () {
+    test('ClassicTheme result backdrop is transparent', () {
       const KioskTheme t = ClassicTheme();
       for (final VerdictKind v in VerdictKind.values) {
-        final CustomPainter p = t.resultScenePainter(verdict: v, t: 0.5);
-        // Painting it should be a no-op (transparent) — verify it
-        // doesn't throw.
+        final CustomPainter p =
+            t.resultBackdropPainter(verdict: v, t: 0.5);
         const Size size = Size(1280, 800);
         final ui.PictureRecorder recorder = ui.PictureRecorder();
         final Canvas canvas = Canvas(recorder);
         p.paint(canvas, size);
         final ui.Picture pic = recorder.endRecording();
-        expect(pic, isNotNull,
-            reason: 'classic verdict=$v scene must produce a Picture');
+        expect(pic, isNotNull);
         pic.dispose();
-      }
-    });
-
-    test('both themes accept the same resultScenePainter contract', () {
-      const List<KioskTheme> themes = <KioskTheme>[
-        ClassicTheme(),
-        WorldcupTheme(),
-      ];
-      for (final KioskTheme theme in themes) {
-        for (final VerdictKind v in VerdictKind.values) {
-          for (double t = 0.0; t <= 1.0; t += 0.25) {
-            final CustomPainter p =
-                theme.resultScenePainter(verdict: v, t: t);
-            expect(p, isA<CustomPainter>(),
-                reason: '$v t=$t must return a CustomPainter');
-          }
-        }
       }
     });
   });

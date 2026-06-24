@@ -102,15 +102,19 @@ abstract class KioskTheme {
   /// screen hands its [AnimationController] in.
   CustomPainter backgroundMarchPainter({required Listenable listenable});
 
-  /// Background painter shown as a small inset in the upper
-  /// right corner of the PLAYING screen. Themes that don't
-  /// have a themed scene (e.g. the classic Space Invaders
-  /// look) return an empty painter; themes with a scene
-  /// (e.g. worldcup's penalty scene) return their own
-  /// implementation. The painter receives a `t` value in
-  /// `[0, 1]` so the scene can have idle animation while the
-  /// player is winding up.
-  CustomPainter playingScenePainter({required double t});
+  /// Full-screen goal backdrop shown behind the chronograph
+  /// during PLAYING. Replaces the old corner-box scene.
+  /// The entire kiosk screen IS the goal. [t] drives the idle
+  /// ball orbit and the goalkeeper sway.
+  CustomPainter playingBackdropPainter({required double t});
+
+  /// Full-screen goal backdrop shown on the RESULT screen.
+  /// [verdict] drives the ball trajectory; [t] is the animation
+  /// phase from the screen's scene controller.
+  CustomPainter resultBackdropPainter({
+    required VerdictKind verdict,
+    required double t,
+  });
 
   /// True if the theme wants the CRT scanlines overlay drawn
   /// over the PLAYING / RESULT screens. Worldcup = true
@@ -129,17 +133,5 @@ abstract class KioskTheme {
     required double pixelSize,
     required double t,
     required List<Color> colors,
-  });
-
-  /// Background scene painter shown on the RESULT screen,
-  /// behind the sprite. [verdict] picks the ball trajectory
-  /// (goal / post / wide / over); [t] is the animation phase
-  /// in `[0, 1]`. Themes without a themed scene (classic)
-  /// return an empty painter; themes with a scene (worldcup's
-  /// penalty scene) render the trajectory + shake / post-bounce
-  /// that matches the verdict.
-  CustomPainter resultScenePainter({
-    required VerdictKind verdict,
-    required double t,
   });
 }

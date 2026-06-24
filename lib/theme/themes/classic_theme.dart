@@ -164,24 +164,20 @@ class ClassicTheme implements KioskTheme {
   }
 
   @override
-  CustomPainter playingScenePainter({required double t}) {
-    // The classic theme keeps the pure-white "paper stopwatch"
-    // look on the PLAYING screen — no scene behind the
-    // chronograph. Returning an empty transparent painter
-    // preserves the v0.1.0-arcade behaviour.
+  CustomPainter playingBackdropPainter({required double t}) {
     return const _EmptyPainter();
   }
 
   @override
-  bool get appliesCrtOverlay => false;
-
-  @override
-  CustomPainter resultScenePainter({
+  CustomPainter resultBackdropPainter({
     required VerdictKind verdict,
     required double t,
   }) {
     return const _EmptyPainter();
   }
+
+  @override
+  bool get appliesCrtOverlay => false;
 
   @override
   CustomPainter resultSpritePainter({

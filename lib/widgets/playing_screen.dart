@@ -213,70 +213,43 @@ class _PlayingScreenState extends State<PlayingScreen>
 
     return Scaffold(
       backgroundColor: widget.theme.playingBackgroundColor,
-      // Layout: white kiosk background everywhere. The themed
-      // penalty scene sits as a small INSET in the UPPER-RIGHT
-      // CORNER (35% width × 40% height). The chronograph
-      // occupies the full viewport, centered. CRT scanlines
-      // (if the theme requests them) are drawn over the
-      // whole screen as the last layer.
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final Size viewport = constraints.biggest;
-          final bool sceneIsVisible =
-              widget.theme.id != 'classic';
-          // Scene inset — upper-right corner, 35% wide, 40%
-          // tall, with a small inset margin.
-          final double sceneW = viewport.width * 0.35;
-          final double sceneH = viewport.height * 0.40;
-          final EdgeInsets sceneMargin = const EdgeInsets.only(
-            top: 16,
-            right: 16,
-          );
-          return Stack(
-            children: <Widget>[
-              // White background fills the entire viewport.
-              // (Already the Scaffold backgroundColor; redundant
-              // Positioned.fill keeps the order explicit.)
-              if (sceneIsVisible)
-                Positioned(
-                  top: sceneMargin.top,
-                  right: sceneMargin.right,
-                  width: sceneW,
-                  height: sceneH,
-                  child: AnimatedBuilder(
-                    animation: _sceneTicker,
-                    builder: (BuildContext context, Widget? _) {
-                      return CustomPaint(
-                        painter: widget.theme.playingScenePainter(
-                          t: _sceneTicker.value,
-                        ),
-                      );
-                    },
-                  ),
+      // Full-screen goal backdrop (worldcup) or transparent
+      // (classic). The painter handles the idle ball orbit +
+      // goalkeeper animation via the scene ticker.
+      body: Stack(
+        children: <Widget>[
+          // Goal backdrop — fills the entire screen. Behind
+          // the chronograph.
+          AnimatedBuilder(
+            animation: _sceneTicker,
+            builder: (BuildContext context, Widget? _) {
+              return CustomPaint(
+                painter: widget.theme.playingBackdropPainter(
+                  t: _sceneTicker.value,
                 ),
-              // Chronograph area — full viewport (the scene is
-              // a small overlay, the chronograph is the main
-              // visual).
-              Positioned.fill(
-                child: _buildChronographArea(
-                  baseColor: baseColor,
-                  digitColor: digitColor,
-                  urgency: urgency,
-                  cheer: cheer,
+                size: Size.infinite,
+              );
+            },
+          ),
+          // Chronograph area — on top of the backdrop.
+          Positioned.fill(
+            child: _buildChronographArea(
+              baseColor: baseColor,
+              digitColor: digitColor,
+              urgency: urgency,
+              cheer: cheer,
+            ),
+          ),
+          // CRT scanlines (worldcup only).
+          if (widget.theme.appliesCrtOverlay)
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: CrtScanlinesPainter(),
                 ),
               ),
-              // CRT scanlines overlay (worldcup only).
-              if (widget.theme.appliesCrtOverlay)
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: CrtScanlinesPainter(),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
+            ),
+        ],
       ),
     );
   }
