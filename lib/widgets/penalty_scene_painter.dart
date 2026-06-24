@@ -50,9 +50,37 @@ class PenaltyScenePainter extends CustomPainter {
   static const Color _kAzulBandera = Color(0xFF0E1A4A);
   static const Color _kAmarilloBandera = Color(0xFFFFCD00);
   static const Color _kAmarilloOscuro = Color(0xFFE8B400);
-  static const Color _kRojoBandera = Color(0xFFCE1126);
   static const Color _kBallBlack = Color(0xFF111111);
   static const Color _kSkinTone = Color(0xFFE0AC77);
+
+  // Goalkeeper pixel-art sprite — 12 columns × 10 rows,
+  // coloured with 6 palette entries. Values reference
+  // _kGoalkeeperPalette below (index 0 = transparent).
+  static const List<List<int>> _goalkeeperSprite = <List<int>>[
+    <int>[0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0], // 0: hair
+    <int>[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 1: head
+    <int>[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 2: head
+    <int>[3, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 3], // 3: gloves + shoulders
+    <int>[3, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 3], // 4: arms spread
+    <int>[0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0], // 5: chest
+    <int>[0, 0, 4, 4, 4, 4, 4, 4, 4, 4, 0, 0], // 6: shorts
+    <int>[0, 0, 5, 5, 0, 0, 0, 0, 5, 5, 0, 0], // 7: legs
+    <int>[0, 0, 6, 6, 0, 0, 0, 0, 6, 6, 0, 0], // 8: boots
+    <int>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 9: ground
+  ];
+
+  /// Palette matching the indices in [_goalkeeperSprite].
+  /// Index 0 = transparent (not drawn).
+  static const List<Color> _goalkeeperPalette = <Color>[
+    Color(0x00000000), // 0: transparent
+    _kSkinTone, // 1: head / skin
+    _kAmarilloBandera, // 2: jersey
+    Color(0xFFFFFFFF), // 3: gloves
+    _kAzulBandera, // 4: shorts
+    Color(0xFF222222), // 5: legs
+    Color(0xFF111111), // 6: boots
+    Color(0xFF1A1A1A), // 7: hair
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -417,16 +445,16 @@ class PenaltyScenePainter extends CustomPainter {
 
   void _drawGoalkeeper(Canvas canvas, Rect goal) {
     final double cx = goal.center.dx;
-    final double cy = goal.bottom - goal.height * 0.10;
-    final double scale = goal.height / 90.0;
+    final double cy = goal.bottom - goal.height * 0.15;
+    final double pixelSize = goal.height / _goalkeeperSprite.length;
+    final int rows = _goalkeeperSprite.length;
+    final int cols = _goalkeeperSprite[0].length;
 
     double swayX = 0;
     double bobY = 0;
-    double armRaise = 0; // 0 = arms at sides, 1 = arms up
     switch (animation) {
       case PenaltySceneAnimation.idle:
-        swayX = math.sin(t * 2 * math.pi) * goal.width * 0.08;
-        // Subtle vertical bounce — the goalkeeper jumps a bit.
+        swayX = math.sin(t * 2 * math.pi) * goal.width * 0.06;
         bobY = math.sin(t * 4 * math.pi) * goal.height * 0.06;
         break;
       case PenaltySceneAnimation.goal:
@@ -437,7 +465,6 @@ class PenaltyScenePainter extends CustomPainter {
         swayX = dir * (goal.width * 0.30) * (t < 0.5 ? t * 2 : 1.0);
         break;
       case PenaltySceneAnimation.over:
-        armRaise = math.sin(t * math.pi) * 1.0;
         swayX = math.sin(t * math.pi * 2) * goal.width * 0.04;
         break;
       case PenaltySceneAnimation.post:
@@ -448,41 +475,23 @@ class PenaltyScenePainter extends CustomPainter {
     canvas.save();
     canvas.translate(cx + swayX, cy + bobY);
 
-    // Body (amarillo jersey)
-    _paintRect(canvas, 0, -10 * scale, 12 * scale, 22 * scale, _kAmarilloBandera);
-    // Azule detail on the chest
-    _paintRect(canvas, -3 * scale, -4 * scale, 6 * scale, 2 * scale, _kAzulBandera);
-    // Shorts (azul)
-    _paintRect(canvas, -5 * scale, 12 * scale, 10 * scale, 8 * scale, _kAzulBandera);
-    // Legs
-    _paintRect(canvas, -4 * scale, 20 * scale, 3 * scale, 12 * scale, const Color(0xFF222222));
-    _paintRect(canvas, 1 * scale, 20 * scale, 3 * scale, 12 * scale, const Color(0xFF222222));
-    // Head (skin)
-    canvas.drawCircle(Offset(0, -16 * scale), 5 * scale, Paint()..color = _kSkinTone);
-    // Hair (dark)
-    _paintRect(canvas, -4 * scale, -21 * scale, 8 * scale, 3 * scale, const Color(0xFF222222));
-    // Gloves (white) — at sides normally, raised up on 'over'.
-    final double gloveY = -8 * scale - armRaise * 16 * scale;
-    canvas.drawCircle(
-        Offset(-9 * scale, gloveY), 3 * scale, Paint()..color = const Color(0xFFFFFFFF));
-    canvas.drawCircle(
-        Offset(9 * scale, gloveY), 3 * scale, Paint()..color = const Color(0xFFFFFFFF));
-    // Arms (skin) connecting shoulders to gloves.
-    final Paint arm = Paint()
-      ..color = _kSkinTone
-      ..strokeWidth = 2.5 * scale
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(-5 * scale, -6 * scale),
-      Offset(-9 * scale, gloveY),
-      arm,
-    );
-    canvas.drawLine(
-      Offset(5 * scale, -6 * scale),
-      Offset(9 * scale, gloveY),
-      arm,
-    );
-
+    // Render the goalkeeper as pixel-art cells — each cell is a
+    // coloured rectangle. Index 0 = transparent (not drawn).
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        final int idx = _goalkeeperSprite[r][c];
+        if (idx == 0) continue;
+        canvas.drawRect(
+          Rect.fromLTWH(
+            (c - cols / 2) * pixelSize,
+            (r - rows / 2) * pixelSize,
+            pixelSize - 0.3,
+            pixelSize - 0.3,
+          ),
+          Paint()..color = _goalkeeperPalette[idx],
+        );
+      }
+    }
     canvas.restore();
   }
 
@@ -771,10 +780,6 @@ class PenaltyScenePainter extends CustomPainter {
       }
     }
     canvas.restore();
-  }
-
-  void _paintRect(Canvas canvas, double x, double y, double w, double h, Color color) {
-    canvas.drawRect(Rect.fromLTWH(x, y, w, h), Paint()..color = color);
   }
 
   double _netShakeT() {
