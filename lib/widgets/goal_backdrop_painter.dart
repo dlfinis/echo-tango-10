@@ -106,7 +106,7 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.022;
   static const double _postBottom = 0.72;
 
-  static const double _keeperY = 0.7;
+  static const double _keeperY = 0.60;
 
   static const double _ballRestY = 0.45;
   static const double _penaltySpotX = 0.35;
@@ -305,22 +305,45 @@ class GoalBackdropPainter extends CustomPainter {
 
     switch (mode) {
       case BackdropMode.idle:
-        // Bounce from post to post through the goal area.
-        // The ball is "aiming" — the operator watches it
-        // sweep across the goal and presses at 10s.
-        // A sine wave on X (post to post) and another on Y
-        // (up/down through the goal) at different frequencies
-        // creates a lively, unpredictable orbit.
-        final double goalW = size.width * (_postRight - _postLeft - _postWidth);
-        final double goalH =
-            size.height * (_postBottom - _crossbarTop - _crossbarThickness);
-        final double swayX =
-            math.sin(t * 2.8 * math.pi) * goalW * 0.38;
-        final double swayY =
-            math.cos(t * 3.3 * math.pi) * goalH * 0.25;
-        x += swayX;
-        y += swayY;
-        rotation = t * 4 * math.pi;
+        // Multi-wave idle: the ball sweeps the goal with
+        // a Lissajous base (2.8 Hz X, 3.3 Hz Y) whose
+        // AMPLITUDE slowly drifts over a longer cycle so
+        // the pattern never repeats identically. A small
+        // high-frequency jitter (17 Hz / 13 Hz) adds the
+        // "quiver" of a real ball. Rotation speed also
+        // varies — not a constant spin.
+        final double goalW =
+            size.width * (_postRight - _postLeft - _postWidth);
+        final double goalH = size.height *
+            (_postBottom - _crossbarTop - _crossbarThickness);
+
+        // Amplitude drift — cycles over 10 seconds so the
+        // sweep width slowly expands and contracts.
+        final double ampX =
+            0.35 + 0.12 * math.sin(t * 0.35 * math.pi);
+        final double ampY =
+            0.22 + 0.08 * math.cos(t * 0.55 * math.pi);
+
+        // Primary Lissajous sweep.
+        final double primaryX =
+            math.sin(t * 2.8 * math.pi) * goalW * ampX;
+        final double primaryY =
+            math.cos(t * 3.3 * math.pi) * goalH * ampY;
+
+        // High-frequency jitter — tiny, fast oscillations
+        // that make the ball look 'alive', not robotic.
+        final double jitterX =
+            math.cos(t * 17 * math.pi) * goalW * 0.015;
+        final double jitterY =
+            math.sin(t * 13 * math.pi) * goalH * 0.012;
+
+        x += primaryX + jitterX;
+        y += primaryY + jitterY;
+
+        // Rotation: speed varies between ~2π and ~10π.
+        rotation =
+            t * (4 + 3 * math.sin(t * 0.7 * math.pi)) * math.pi;
+
         _drawBallGlow(canvas, Offset(x, y), r);
         break;
 
@@ -394,61 +417,90 @@ class GoalBackdropPainter extends CustomPainter {
           ],
         ).createShader(ballRect.inflate(r * 0.3)),
     );
-    // Outline.
+    // Outline — thicker, reads better at distance.
     canvas.drawOval(
       ballRect,
       Paint()
-        ..color = const Color(0xFF111111).withValues(alpha: alpha)
+        ..color = const Color(0xFF222222).withValues(alpha: alpha)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 2.5,
     );
-    // Pentagon.
-    final double px = r * 2 / 7;
-    final Paint pentPaint = Paint()
-      ..color = _kBallBlack.withValues(alpha: alpha);
-    for (int ri = 0; ri < 7; ri++) {
-      for (int ci = 0; ci < 7; ci++) {
-        final double dx = (ci - 3) + 0.5;
-        final double dy = (ri - 3) + 0.5;
-        final double dist = math.sqrt(dx * dx + dy * dy);
-        if (dist > 3.0) continue;
-        final bool isPent = (ci == 3 && ri == 3) ||
-            (ci == 3 && ri == 2) ||
-            (ci == 2 && ri == 3) ||
-            (ci == 4 && ri == 3) ||
-            (ci == 3 && ri == 4);
-        if (isPent) {
-          canvas.drawRect(
-            Rect.fromLTWH(
-              (ci - 3) * px - px / 2,
-              (ri - 3) * px - px / 2,
-              px - 0.5,
-              px - 0.5,
-            ),
-            pentPaint,
-          );
-        }
-      }
+
+    // Pentagon — drawn as a real pentagon path (5 sides),
+    // much more recognizable than the old 5-cell grid-cross.
+    // The pentagon is centered and sized at ~40% of the
+    // ball radius so the white hexagons around it are
+    // implied by the white ball body.
+    final double pentR = r * 0.42;
+    final Path pent = Path();
+    pent.moveTo(0, -pentR);
+    for (int i = 0; i < 5; i++) {
+      final double a = (i * 2 + 1) * math.pi / 5 - math.pi / 2;
+      pent.lineTo(math.cos(a) * pentR, math.sin(a) * pentR);
     }
+    pent.close();
+    final Paint pentFill = Paint()
+      ..color = _kBallBlack.withValues(alpha: alpha);
+    canvas.drawPath(pent, pentFill);
+    // Thin dark outline on the pentagon for definition.
+    canvas.drawPath(
+      pent,
+      Paint()
+        ..color = const Color(0xFF333333).withValues(alpha: alpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+
+    // Seam lines — 5 short white-ish curved lines radiating
+    // from each vertex of the pentagon. These are the seams
+    // where the white hexagons and black pentagon meet —
+    // classic soccer-ball detail.
+    final Paint seam = Paint()
+      ..color = const Color(0xFFAAAAAA).withValues(alpha: alpha * 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+    for (int i = 0; i < 5; i++) {
+      final double a = (i * 2 + 1) * math.pi / 5 - math.pi / 2;
+      final Offset v = Offset(math.cos(a) * (pentR + 0.5), math.sin(a) * (pentR + 0.5));
+      final Offset out = Offset(math.cos(a) * (r * 0.65), math.sin(a) * (r * 0.65));
+      canvas.drawLine(v, out, seam);
+    }
+
+    // 12-oclock highlight arc on the ball body — subtle 3D.
+    canvas.drawArc(
+      ballRect.deflate(4),
+      -math.pi * 0.55,
+      math.pi * 0.55,
+      false,
+      Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: alpha * 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round,
+    );
     canvas.restore();
   }
 
   void _drawBallGlow(Canvas canvas, Offset pos, double radius) {
-    final double pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
-    final double outerR = radius * (2.2 + pulse * 0.6);
+    // Two-layer halo with asynchronous pulses so the glow
+    // never looks static. Each ring has its own frequency.
+    final double pulse1 = 0.5 + 0.5 * math.sin(t * 2.7 * math.pi);
+    final double pulse2 = 0.5 + 0.5 * math.cos(t * 3.5 * math.pi);
+    final double outerR = radius * (2.2 + pulse1 * 0.6);
     canvas.drawCircle(
       pos,
       outerR,
       Paint()
-        ..color = _kAmarilloBandera.withValues(alpha: 0.18 + pulse * 0.14)
+        ..color = _kAmarilloBandera.withValues(alpha: 0.15 + pulse1 * 0.14)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
-    final double innerR = radius * (1.4 + pulse * 0.3);
+    final double innerR = radius * (1.4 + pulse2 * 0.4);
     canvas.drawCircle(
       pos,
       innerR,
       Paint()
-        ..color = _kAmarilloBandera.withValues(alpha: 0.35 + pulse * 0.22)
+        ..color = _kAmarilloBandera.withValues(alpha: 0.32 + pulse2 * 0.22)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
     );
   }
