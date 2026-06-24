@@ -47,11 +47,18 @@ class GoalBackdropPainter extends CustomPainter {
   GoalBackdropPainter({
     required this.mode,
     required this.t,
+    this.showField = true,
     this.seed = 1337,
   });
 
   final BackdropMode mode;
   final double t;
+
+  /// When false (RESULT screen), only draw the net + ball
+  /// trajectory. Skip grass, goal frame, and goalkeeper —
+  /// the result screen's tinted background handles the mood.
+  final bool showField;
+
   final int seed;
 
   // -- Colours ------------------------------------------------------------
@@ -60,32 +67,38 @@ class GoalBackdropPainter extends CustomPainter {
   static const Color _kSkinTone = Color(0xFFE0AC77);
   static const Color _kAzulBandera = Color(0xFF0E1A4A);
   static const Color _kBallBlack = Color(0xFF111111);
+  static const Color _kGloveRed = Color(0xFFE04040);
 
-  // -- Goalkeeper sprite (10×9, slim athletic proportions) ----------
+  // -- Goalkeeper sprite (10×12, tall athletic proportions) ------
+  //    Head 2/12 rows (17%), body 4/12 (33%), shorts 2/12 (17%),
+  //    legs 3/12 (25%), boots 1/12 (8%). Clean athletic figure.
   static const List<List<int>> _sprite = <List<int>>[
     <int>[0, 0, 7, 7, 7, 7, 0, 0, 0, 0], // 0: hair (4 wide)
-    <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head + face (6 wide)
+    <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head (6 wide)
     <int>[0, 1, 1, 1, 1, 1, 1, 0, 0, 0], // 2: head
-    <int>[3, 0, 2, 2, 2, 2, 0, 3, 0, 0], // 3: gloves out + jersey (4 wide)
-    <int>[3, 0, 2, 2, 2, 2, 0, 3, 0, 0], // 4: arms + slim jersey
-    <int>[0, 0, 2, 2, 2, 2, 0, 0, 0, 0], // 5: chest (4 wide)
-    <int>[0, 0, 4, 4, 4, 4, 0, 0, 0, 0], // 6: shorts (4 wide)
-    <int>[0, 0, 5, 0, 0, 5, 0, 0, 0, 0], // 7: legs
-    <int>[0, 0, 6, 0, 0, 6, 0, 0, 0, 0], // 8: boots
+    <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 3: gloves out + shoulders (body 5 wide)
+    <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 4: arms + jersey
+    <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 5: chest
+    <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 6: lower chest
+    <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 7: shorts (5 wide)
+    <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 8: shorts
+    <int>[0, 0, 5, 0, 5, 0, 5, 0, 0, 0], // 9: legs (3 columns!)
+    <int>[0, 0, 5, 0, 0, 0, 5, 0, 0, 0], // 10: legs
+    <int>[0, 0, 6, 0, 0, 0, 6, 0, 0, 0], // 11: boots
   ];
 
   static const List<Color> _palette = <Color>[
     Color(0x00000000), // 0: transparent
     _kSkinTone, // 1: skin
     _kAmarilloBandera, // 2: jersey
-    Color(0xFFFFFFFF), // 3: gloves
+    _kGloveRed, // 3: gloves (red, like real keeper gloves)
     _kAzulBandera, // 4: shorts
     Color(0xFF222222), // 5: legs
     Color(0xFF111111), // 6: boots
     Color(0xFF1A1A1A), // 7: hair
   ];
 
-  // -- Layout fractions (proportions of the viewport) --------------------
+  // -- Layout fractions ------------------------------------------------
   static const double _postWidth = 0.035;
   static const double _postLeft = 0.06;
   static const double _postRight = 0.91;
@@ -93,43 +106,28 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.022;
   static const double _postBottom = 0.72;
 
-  // Keeper sits inside the goal, centered.
-  static const double _keeperY = 0.28;
+  static const double _keeperY = 0.45;
 
-  // Ball orbits through the goal.
   static const double _ballRestY = 0.48;
   static const double _penaltySpotX = 0.5;
-
-  // Grass strip — higher up, more visible.
   static const double _grassTop = 0.80;
-
-  // Net.
   static const double _netAlpha = 0.20;
-  static const double _netCell = 24.0; // px
-
-  // Ball.
-  static const double _ballRadius = 24.0; // px
+  static const double _netCell = 24.0;
+  static const double _ballRadius = 24.0;
 
   // =====================================================================
 
   @override
   void paint(Canvas canvas, Size size) {
-    // White background (the kiosk background shines through).
-    // (Screen's Scaffold handles this.)
-
-    // 1) Grass patch at the bottom.
-    _drawGrass(canvas, size);
-
-    // 2) Net filling the goal area.
+    // Net — always shown (subtle backdrop).
     _drawNet(canvas, size);
 
-    // 3) Goal frame (posts + crossbar).
-    _drawGoalFrame(canvas, size);
+    if (showField) {
+      _drawGrass(canvas, size);
+      _drawGoalFrame(canvas, size);
+      _drawGoalkeeper(canvas, size);
+    }
 
-    // 4) Goalkeeper centered in the goal.
-    _drawGoalkeeper(canvas, size);
-
-    // 5) Ball with trajectory.
     _drawBall(canvas, size);
   }
 
@@ -267,15 +265,15 @@ class GoalBackdropPainter extends CustomPainter {
   void _drawGoalkeeper(Canvas canvas, Size size) {
     final double cx = size.width * 0.5;
     final double cy = size.height * _keeperY;
-    final double pixelSize = size.height * 0.038; // ~30px at 800
+    // 12 rows filling ~45% of the goal height so the feet
+    // are near the bottom of the goal, not floating.
+    final double pixelSize = size.height * 0.042;
     final int rows = _sprite.length;
     final int cols = _sprite[0].length;
 
-    // Only horizontal sway — no vertical bounce. The keeper
-    // slides side to side inside the goal. Wider amplitude
-    // so it actually reads as movement.
+    // Horizontal sway only — wider amplitude.
     final double swayX =
-        math.sin(t * 2 * math.pi) * pixelSize * 1.8;
+        math.sin(t * 2 * math.pi) * pixelSize * 1.5;
 
     canvas.save();
     canvas.translate(cx + swayX, cy);
@@ -457,5 +455,5 @@ class GoalBackdropPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(GoalBackdropPainter old) =>
-      old.mode != mode || old.t != t;
+      old.mode != mode || old.t != t || old.showField != showField;
 }

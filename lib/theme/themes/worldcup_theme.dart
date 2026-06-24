@@ -186,6 +186,7 @@ class WorldcupTheme implements KioskTheme {
     return GoalBackdropPainter(
       mode: BackdropMode.idle,
       t: t,
+      showField: true,
     );
   }
 
@@ -197,6 +198,7 @@ class WorldcupTheme implements KioskTheme {
     return GoalBackdropPainter(
       mode: _verdictToBackdropMode(verdict),
       t: t,
+      showField: false,
     );
   }
 

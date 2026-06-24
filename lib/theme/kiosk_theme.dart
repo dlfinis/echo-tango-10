@@ -103,14 +103,15 @@ abstract class KioskTheme {
   CustomPainter backgroundMarchPainter({required Listenable listenable});
 
   /// Full-screen goal backdrop shown behind the chronograph
-  /// during PLAYING. Replaces the old corner-box scene.
-  /// The entire kiosk screen IS the goal. [t] drives the idle
-  /// ball orbit and the goalkeeper sway.
+  /// during PLAYING. The painter renders grass + goal frame
+  /// + keeper + ball (showField = true).
   CustomPainter playingBackdropPainter({required double t});
 
   /// Full-screen goal backdrop shown on the RESULT screen.
-  /// [verdict] drives the ball trajectory; [t] is the animation
-  /// phase from the screen's scene controller.
+  /// The painter skips grass + goal frame + keeper
+  /// (showField = false) because the result screen's tinted
+  /// background handles the mood. Only the net + ball
+  /// trajectory are rendered.
   CustomPainter resultBackdropPainter({
     required VerdictKind verdict,
     required double t,
