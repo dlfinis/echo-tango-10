@@ -420,24 +420,34 @@ class GoalBackdropPainter extends CustomPainter {
 
     switch (mode) {
       case BackdropMode.idle: {
-        // HEARTBEAT pulse at the penalty spot — the ball
-        // rhythmically expands/shrinks with expanding sonar
-        // rings. MUCH more readable at kiosk distance than
-        // a complex multi-wave orbit. The expanding rings
-        // create a clear visual "PRESS NOW!" moment.
-        // Cycle: ~1.5s (ball breathes 0..1 smoothly).
-        final double beat = (math.sin(t * 4.2 * math.pi) + 1) / 2; // 0..1
+        // Heartbeat pulse + wide net sweep. The ball
+        // scales 0.7-1.25 (the 'thump') WHILE sweeping
+        // left↔right through the goal at ~1.1Hz plus a
+        // slow up/down drift. Sonar rings expand from
+        // wherever the ball is. Much more visible movement
+        // through the net — the operator watches the ball
+        // sweep the goal and presses at 10s.
+        final double goalW =
+            size.width * (_postRight - _postLeft - _postWidth);
+        final double goalH = size.height *
+            (_postBottom - _crossbarTop - _crossbarThickness);
 
-        // Ball scales between 0.7x and 1.25x.
+        final double beat =
+            (math.sin(t * 4.2 * math.pi) + 1) / 2;
         final double scale = 0.7 + beat * 0.55;
 
-        // Position: stays at the penalty spot — no orbit.
-        // The ball is dead center so the operator can focus
-        // on the chronograph above it.
-        x += math.sin(t * 0.7 * math.pi) * r * 0.4; // tiny drift
-        rotation = t * 1.5 * math.pi; // very slow spin
+        // Horizontal sweep: from near left post to near
+        // right post at ~1.1 Hz.
+        final double sweepX =
+            math.sin(t * 2.2 * math.pi) * goalW * 0.30;
+        // Vertical drift: slow up/down at ~1.4 Hz.
+        final double driftY =
+            math.cos(t * 2.8 * math.pi) * goalH * 0.12;
 
-        // Draw scaled ball + glow + expanding rings.
+        x += sweepX;
+        y += driftY;
+        rotation = t * 1.5 * math.pi;
+
         _drawHeartbeatBall(canvas, Offset(x, y), r, scale);
         _drawSonarRings(canvas, Offset(x, y), r, beat);
         _drawBallTrailSimple(canvas, Offset(x, y), r);

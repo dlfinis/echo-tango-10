@@ -309,7 +309,7 @@ class _WaitingScreenState extends State<WaitingScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: widget.theme.textColor,
-                      fontSize: 680,
+                      fontSize: 900,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0,
                       height: 0.95,
@@ -319,14 +319,14 @@ class _WaitingScreenState extends State<WaitingScreen>
                         // Outer neon glow — accent colour.
                         Shadow(
                           color: widget.theme.accentColor
-                              .withValues(alpha: 0.55 * pulse),
-                          blurRadius: 32,
+                              .withValues(alpha: 0.65 * pulse),
+                          blurRadius: 30,
                         ),
                         // Mid glow.
                         Shadow(
                           color: widget.theme.accentColor
                               .withValues(alpha: 0.35 * pulse),
-                          blurRadius: 18,
+                          blurRadius: 15,
                         ),
                         // Tight white inner glow.
                         Shadow(
@@ -354,9 +354,9 @@ class _WaitingScreenState extends State<WaitingScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: widget.theme.accentColor,
-                    fontSize: 320,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    fontSize: 700,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 5,
                     fontFamily: 'BungeeInline',
                     fontFamilyFallback: <String>['Bungee'],
                     shadows: const <Shadow>[
