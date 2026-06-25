@@ -431,17 +431,17 @@ class GoalBackdropPainter extends CustomPainter {
         // Heartbeat pulse (2 Hz, integer → seamless).
         final double beat =
             (math.sin(t * 2 * math.pi * 2) + 1) / 2;
-        final double scale = 0.68 + beat * 0.57;
+        final double scale = 0.65 + beat * 0.55;
 
         // Undulating horizontal wave (1 Hz) — smooth,
         // visible sweep from post to post.
         final double waveX =
-            math.sin(t * 2 * math.pi * 1) * goalW * 0.35;
+            math.sin(t * 2 * math.pi * 1) * goalW * 0.501;
 
         // Gentle vertical bob (3 Hz) — keeps the ball
         // 'alive' without distracting.
         final double bobY =
-            math.cos(t * 2 * math.pi * 3) * goalH * 0.10;
+            math.cos(t * 2 * math.pi * 3) * goalH * 0.175;
 
         x += waveX;
         y += bobY;
