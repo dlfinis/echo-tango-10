@@ -38,7 +38,6 @@
 library;
 
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -358,38 +357,6 @@ class FootballSpritePainter extends CustomPainter {
         }
       }
     }
-  }
-
-  void _drawBigText(
-    Canvas canvas,
-    Size size, {
-    required String text,
-    required double scale,
-    required Color color,
-  }) {
-    final ui.ParagraphBuilder pb = ui.ParagraphBuilder(
-      ui.ParagraphStyle(
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-      ),
-    );
-    pb.pushStyle(ui.TextStyle(
-      color: color,
-      fontSize: pixelSize * 2.5,
-      fontWeight: ui.FontWeight.w900,
-      letterSpacing: 1.5,
-    ));
-    pb.addText(text);
-    final ui.Paragraph p = pb.build()
-      ..layout(ui.ParagraphConstraints(width: size.width));
-    canvas.save();
-    canvas.translate(
-      (size.width - p.maxIntrinsicWidth) / 2,
-      (size.height - p.height) / 2,
-    );
-    canvas.scale(scale);
-    canvas.drawParagraph(p, Offset.zero);
-    canvas.restore();
   }
 
   @override

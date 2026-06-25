@@ -589,42 +589,6 @@ class GoalBackdropPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawBallGlow(Canvas canvas, Offset pos, double radius,
-      double ox, double oy) {
-    // Two-layer halo with asynchronous pulses. Outer ring is
-    // large and soft — visible even from the kiosk distance.
-    final double pulse1 = 0.5 + 0.5 * math.sin(t * 2.7 * math.pi);
-    final double pulse2 = 0.5 + 0.5 * math.cos(t * 3.5 * math.pi);
-
-    // Big outer halo — flows outward like a real ball glow.
-    canvas.drawCircle(
-      pos,
-      radius * (3.2 + pulse1 * 1.0),                         // ← bigger!
-      Paint()
-        ..color =
-            _kAmarilloBandera.withValues(alpha: 0.12 + pulse1 * 0.10)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-    );
-    // Mid ring.
-    canvas.drawCircle(
-      pos,
-      radius * (2.0 + pulse2 * 0.5),
-      Paint()
-        ..color =
-            _kAmarilloBandera.withValues(alpha: 0.22 + pulse2 * 0.16)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
-    // Tight inner ring — bright, visible.
-    canvas.drawCircle(
-      pos,
-      radius * (1.2 + pulse1 * 0.25),
-      Paint()
-        ..color =
-            _kAmarilloBandera.withValues(alpha: 0.38 + pulse1 * 0.18)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
-    );
-  }
-
   @override
   bool shouldRepaint(GoalBackdropPainter old) =>
       old.mode != mode || old.t != t || old.showField != showField;
