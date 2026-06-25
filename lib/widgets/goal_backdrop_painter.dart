@@ -106,11 +106,11 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.022;
   static const double _postBottom = 0.72;
 
-  static const double _keeperY = 0.57;
+  static const double _keeperY = 0.55;
 
   static const double _ballRestY = 0.45;
-  static const double _penaltySpotX = 0.65;
-  static const double _grassTop = 0.91;
+  static const double _penaltySpotX = 0.45;
+  static const double _grassTop = 0.92;
   static const double _netAlpha = 0.15;
   static const double _netCell = 20.0;
   static const double _ballRadius = 35.0;
@@ -420,33 +420,32 @@ class GoalBackdropPainter extends CustomPainter {
 
     switch (mode) {
       case BackdropMode.idle: {
-        // Heartbeat pulse + wide net sweep. The ball
-        // scales 0.7-1.25 (the 'thump') WHILE sweeping
-        // left↔right through the goal at ~1.1Hz plus a
-        // slow up/down drift. Sonar rings expand from
-        // wherever the ball is. Much more visible movement
-        // through the net — the operator watches the ball
-        // sweep the goal and presses at 10s.
+        // Smooth sinusoidal wave — no flicker at loop reset
+        // because ALL frequencies are INTEGERS (2π·freq·t
+        // always returns to sin(0)=cos(1) at t=1).
         final double goalW =
             size.width * (_postRight - _postLeft - _postWidth);
         final double goalH = size.height *
             (_postBottom - _crossbarTop - _crossbarThickness);
 
+        // Heartbeat pulse (2 Hz, integer → seamless).
         final double beat =
-            (math.sin(t * 4.2 * math.pi) + 1) / 2;
-        final double scale = 0.7 + beat * 0.55;
+            (math.sin(t * 2 * math.pi * 2) + 1) / 2;
+        final double scale = 0.68 + beat * 0.57;
 
-        // Horizontal sweep: from near left post to near
-        // right post at ~1.1 Hz.
-        final double sweepX =
-            math.sin(t * 2.2 * math.pi) * goalW * 0.30;
-        // Vertical drift: slow up/down at ~1.4 Hz.
-        final double driftY =
-            math.cos(t * 2.8 * math.pi) * goalH * 0.12;
+        // Undulating horizontal wave (1 Hz) — smooth,
+        // visible sweep from post to post.
+        final double waveX =
+            math.sin(t * 2 * math.pi * 1) * goalW * 0.35;
 
-        x += sweepX;
-        y += driftY;
-        rotation = t * 1.5 * math.pi;
+        // Gentle vertical bob (3 Hz) — keeps the ball
+        // 'alive' without distracting.
+        final double bobY =
+            math.cos(t * 2 * math.pi * 3) * goalH * 0.10;
+
+        x += waveX;
+        y += bobY;
+        rotation = t * 2 * math.pi * 0.5;
 
         _drawHeartbeatBall(canvas, Offset(x, y), r, scale);
         _drawSonarRings(canvas, Offset(x, y), r, beat);

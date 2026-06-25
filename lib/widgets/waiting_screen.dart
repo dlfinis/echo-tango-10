@@ -355,7 +355,7 @@ class _WaitingScreenState extends State<WaitingScreen>
                   style: TextStyle(
                     color: widget.theme.accentColor,
                     fontSize: 700,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 5,
                     fontFamily: 'BungeeInline',
                     fontFamilyFallback: <String>['Bungee'],
