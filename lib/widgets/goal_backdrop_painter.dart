@@ -106,25 +106,14 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.022;
   static const double _postBottom = 0.72;
 
-  static const double _keeperY = 0.60;
+  static const double _keeperY = 0.57;
 
   static const double _ballRestY = 0.45;
-  static const double _penaltySpotX = 0.35;
+  static const double _penaltySpotX = 0.65;
   static const double _grassTop = 0.91;
   static const double _netAlpha = 0.15;
   static const double _netCell = 20.0;
   static const double _ballRadius = 35.0;
-
-  // -- Helper: sum of sines across prime frequencies.
-  //    Each sine has amplitude 1/N so the result is -1..1.
-  //    Using primes makes the LCM enormous → never repeats.
-  static double _multiSine(double t, List<double> hz) {
-    double sum = 0;
-    for (int i = 0; i < hz.length; i++) {
-      sum += math.sin(t * hz[i] * math.pi);
-    }
-    return sum / hz.length;
-  }
 
   // =====================================================================
 
@@ -307,28 +296,116 @@ class GoalBackdropPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawBallTrail(
-      Canvas canvas, Offset pos, double radius, double ox, double oy) {
-    // Comet-tail trail — the ball leaves a faint fading
-    // trail behind it in the direction it's moving. ox/oy
-    // are the normalised motion vectors (-1..1). The trail
-    // is 3-4 dots behind the ball at decreasing alpha.
-    final double speed =
-        math.sqrt(ox * ox + oy * oy); // 0..1
-    if (speed < 0.05) return; // ball barely moving — no trail
+  void _drawHeartbeatBall(
+      Canvas canvas, Offset pos, double r, double scale) {
+    // Scaled ball body + pentagon. The scale breathes 0.7-1.25
+    // so the ball visibly 'thumps'. At peak expansion the ball
+    // is 25% larger — reads as "now is the moment".
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
 
-    final double dotSize = radius * 0.35;
-    // Trail direction: opposite to movement (behind the ball).
-    final double dx = ox / speed; // unit vector
-    final double dy = oy / speed;
-    for (int i = 1; i <= 4; i++) {
-      final double behind = i * radius * 1.2;
-      final double alpha = (1.0 - i / 5.0) * speed * 0.50;
+    final double sr = r * scale;
+    final Rect ballRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: sr * 2,
+      height: sr * 2,
+    );
+    // Body — gradient.
+    canvas.drawOval(
+      ballRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: const <Color>[
+            Color(0xFFFFFFFF),
+            Color(0xFFE0E0E0),
+          ],
+        ).createShader(ballRect.inflate(sr * 0.3)),
+    );
+    // Outline — thicker.
+    canvas.drawOval(
+      ballRect,
+      Paint()
+        ..color = const Color(0xFF222222)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+    // Pentagon (drawn as a real pentagon path).
+    final double pentR = sr * 0.42;
+    final Path pent = Path();
+    pent.moveTo(0, -pentR);
+    for (int i = 0; i < 5; i++) {
+      final double a = (i * 2 + 1) * math.pi / 5 - math.pi / 2;
+      pent.lineTo(math.cos(a) * pentR, math.sin(a) * pentR);
+    }
+    pent.close();
+    canvas.drawPath(pent, Paint()..color = _kBallBlack);
+    // Seam lines radiating from pentagon vertices.
+    final Paint seam = Paint()
+      ..color = const Color(0xFFAAAAAA).withValues(alpha: 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+    for (int i = 0; i < 5; i++) {
+      final double a = (i * 2 + 1) * math.pi / 5 - math.pi / 2;
+      final Offset v =
+          Offset(math.cos(a) * (pentR + 0.5), math.sin(a) * (pentR + 0.5));
+      final Offset out =
+          Offset(math.cos(a) * (sr * 0.65), math.sin(a) * (sr * 0.65));
+      canvas.drawLine(v, out, seam);
+    }
+    // 12-oclock highlight.
+    canvas.drawArc(
+      ballRect.deflate(4),
+      -math.pi * 0.55,
+      math.pi * 0.55,
+      false,
+      Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.restore();
+  }
+
+  void _drawSonarRings(Canvas canvas, Offset pos, double r, double beat) {
+    // Expanding sonar rings — like a radar or EKG. 3 rings
+    // at phases 0, 0.33, 0.66 of the beat cycle. Each ring
+    // grows outward and fades. Creates a "heartbeat" visual.
+    for (int i = 0; i < 3; i++) {
+      final double phase = (beat + i / 3.0) % 1.0; // 0..1
+      final double expand = 1.2 + phase * 4.0; // ring radius in ball-radii
+      final double alpha = (1.0 - phase) * 0.55;
       canvas.drawCircle(
-        Offset(pos.dx - dx * behind, pos.dy - dy * behind),
-        dotSize * (5 - i) / 5,
+        pos,
+        r * expand,
         Paint()
           ..color = _kAmarilloBandera.withValues(alpha: alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5,
+      );
+    }
+    // Ball glow ring — pulses with beat.
+    canvas.drawCircle(
+      pos,
+      r * (1.5 + beat * 1.2),
+      Paint()
+        ..color = _kAmarilloBandera.withValues(alpha: 0.20 + beat * 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+  }
+
+  void _drawBallTrailSimple(Canvas canvas, Offset pos, double r) {
+    // Subtle horizontal streak behind the ball — like motion
+    // blur from the tiny drift.
+    for (int i = 1; i <= 3; i++) {
+      final double alpha = (4 - i) / 4.0 * 0.30;
+      canvas.drawCircle(
+        Offset(pos.dx - i * r * 0.5, pos.dy),
+        r * 0.3 * (4 - i) / 4,
+        Paint()
+          ..color =
+              _kAmarilloBandera.withValues(alpha: alpha)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
     }
@@ -343,40 +420,27 @@ class GoalBackdropPainter extends CustomPainter {
 
     switch (mode) {
       case BackdropMode.idle: {
-        // 5 prime-frequency sine waves (2,3,5,7,11 Hz) summed
-        // and normalised — the resulting Lissajous orbit never
-        // repeats during the kiosk's entire uptime. Amplitude
-        // breathes over a ~25s cycle via a slow modulator.
-        final double goalW =
-            size.width * (_postRight - _postLeft - _postWidth);
-        final double goalH = size.height *
-            (_postBottom - _crossbarTop - _crossbarThickness);
+        // HEARTBEAT pulse at the penalty spot — the ball
+        // rhythmically expands/shrinks with expanding sonar
+        // rings. MUCH more readable at kiosk distance than
+        // a complex multi-wave orbit. The expanding rings
+        // create a clear visual "PRESS NOW!" moment.
+        // Cycle: ~1.5s (ball breathes 0..1 smoothly).
+        final double beat = (math.sin(t * 4.2 * math.pi) + 1) / 2; // 0..1
 
-        final double ox =
-            _multiSine(t, <double>[2.0, 3.0, 5.0, 7.0, 11.0]);
-        final double oy = _multiSine(
-            t + 0.73, <double>[2.4, 3.7, 5.1, 7.3, 11.5]);
+        // Ball scales between 0.7x and 1.25x.
+        final double scale = 0.7 + beat * 0.55;
 
-        // Amplitude drift: the orbit breathes over ~25s.
-        final double breath =
-            0.5 + 0.5 * math.sin(t * 0.13 * math.pi);
-        final double xAmp = 0.28 + 0.14 * breath;
-        final double yAmp = 0.18 + 0.10 * breath;
+        // Position: stays at the penalty spot — no orbit.
+        // The ball is dead center so the operator can focus
+        // on the chronograph above it.
+        x += math.sin(t * 0.7 * math.pi) * r * 0.4; // tiny drift
+        rotation = t * 1.5 * math.pi; // very slow spin
 
-        // Jitter: ultra-fast, ultra-tiny.
-        final double jx = math.sin(t * 17 * math.pi) * 0.015;
-        final double jy = math.cos(t * 13 * math.pi) * 0.012;
-
-        x += (ox * xAmp + jx) * goalW;
-        y += (oy * yAmp + jy) * goalH;
-
-        // Spin speed breathes gently.
-        rotation =
-            t * (4 + 3 * math.sin(t * 0.55 * math.pi)) * math.pi;
-
-        // Glow + comet-tail trail.
-        _drawBallGlow(canvas, Offset(x, y), r, ox, oy);
-        _drawBallTrail(canvas, Offset(x, y), r, ox, oy);
+        // Draw scaled ball + glow + expanding rings.
+        _drawHeartbeatBall(canvas, Offset(x, y), r, scale);
+        _drawSonarRings(canvas, Offset(x, y), r, beat);
+        _drawBallTrailSimple(canvas, Offset(x, y), r);
 
         break;
       }

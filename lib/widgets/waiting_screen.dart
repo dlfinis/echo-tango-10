@@ -295,21 +295,57 @@ class _WaitingScreenState extends State<WaitingScreen>
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              // Main message — larger so it dominates the screen.
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: widget.theme.textColor,
-                  fontSize: 480,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  height: 1.0,
-                  fontFamily: 'BungeeInline',
-                  fontFamilyFallback: <String>['Bungee'],
-                ),
+              // Main message — neon glow + drop shadow for kiosk
+              // impact. The glow pulses gently via a tweened
+              // opacity in the shadow layers. Bigger font and
+              // tighter letter spacing for BungeeInline readability.
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0.6, end: 1.0),
+                duration: const Duration(milliseconds: 1800),
+                curve: Curves.easeInOut,
+                builder: (BuildContext context, double pulse, Widget? _) {
+                  return Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: widget.theme.textColor,
+                      fontSize: 680,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                      height: 0.95,
+                      fontFamily: 'BungeeInline',
+                      fontFamilyFallback: <String>['Bungee'],
+                      shadows: <Shadow>[
+                        // Outer neon glow — accent colour.
+                        Shadow(
+                          color: widget.theme.accentColor
+                              .withValues(alpha: 0.55 * pulse),
+                          blurRadius: 32,
+                        ),
+                        // Mid glow.
+                        Shadow(
+                          color: widget.theme.accentColor
+                              .withValues(alpha: 0.35 * pulse),
+                          blurRadius: 18,
+                        ),
+                        // Tight white inner glow.
+                        Shadow(
+                          color: const Color(0xFFFFFFFF)
+                              .withValues(alpha: 0.70 * pulse),
+                          blurRadius: 6,
+                        ),
+                        // Hard drop shadow for depth.
+                        const Shadow(
+                          color: Color(0xCC000000),
+                          blurRadius: 0,
+                          offset: Offset(6, 6),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 child: Text(
@@ -318,11 +354,18 @@ class _WaitingScreenState extends State<WaitingScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: widget.theme.accentColor,
-                    fontSize: 220,
+                    fontSize: 320,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
+                    letterSpacing: 2,
                     fontFamily: 'BungeeInline',
                     fontFamilyFallback: <String>['Bungee'],
+                    shadows: const <Shadow>[
+                      Shadow(
+                        color: Color(0x99000000),
+                        blurRadius: 0,
+                        offset: Offset(4, 4),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -363,11 +406,22 @@ class _WaitingScreenState extends State<WaitingScreen>
                 'ÚLTIMOS GANADORES',
                 style: TextStyle(
                   color: widget.theme.accentColor,
-                  fontSize: 80,
+                  fontSize: 120,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
+                  letterSpacing: 2,
                   fontFamily: 'BungeeInline',
                   fontFamilyFallback: <String>['Bungee'],
+                  shadows: const <Shadow>[
+                    Shadow(
+                      color: Color(0xAA000000),
+                      blurRadius: 0,
+                      offset: Offset(4, 4),
+                    ),
+                    Shadow(
+                      color: Color(0x4400FF00),
+                      blurRadius: 16,
+                    ),
+                  ],
                 ),
               ),
             ),
