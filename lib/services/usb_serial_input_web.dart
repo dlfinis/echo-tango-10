@@ -35,6 +35,13 @@ class UsbSerialInputImpl implements InputService {
     _callback = cb;
   }
 
+  @override
+  void triggerPulse() {
+    if (_debounce.tryPulse()) {
+      _callback?.call();
+    }
+  }
+
   /// Always throws on Web — USB serial is Android-only.
   Future<bool> connect() async {
     throw UnsupportedError(

@@ -74,13 +74,14 @@ class UsbSerialInputImpl implements InputService {
   void _onData(Uint8List data) {
     for (final int byte in data) {
       if (byte == 0x01) {
-        _triggerPulse();
+        triggerPulse();
         return; // one pulse per chunk is enough
       }
     }
   }
 
-  bool _triggerPulse() {
+  @override
+  bool triggerPulse() {
     if (!_debounce.tryPulse()) return false;
     _callback?.call();
     return true;
