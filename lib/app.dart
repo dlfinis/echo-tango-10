@@ -52,6 +52,8 @@ class _AppRootState extends State<AppRoot> {
   AppState _state = AppState.waiting;
   final StopwatchController _stopwatch = StopwatchController();
   double _lastElapsedSeconds = 0.0;
+  final ValueNotifier<int> _pulseCountNotifier = ValueNotifier<int>(0);
+  FocusNode? _volumeUpFallbackFocusNode;
 
   // Persistence — null until [ConfigStore.load] resolves on the first
   // post-frame callback. The build method renders a thin loader while
@@ -84,6 +86,10 @@ class _AppRootState extends State<AppRoot> {
 
     widget.input.onPulse(_handlePulse);
 
+    if (!kIsWeb && kDebugMode) {
+      _volumeUpFallbackFocusNode = FocusNode(debugLabel: 'volume-up-fallback');
+    }
+
     // Async init — SharedPreferences is async, so we can't await it in
     // initState. Defer to the first post-frame callback.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -111,6 +117,7 @@ class _AppRootState extends State<AppRoot> {
   }
 
   void _handlePulse() {
+    _pulseCountNotifier.value++;
     // Audio feedback for the physical button press. Fired BEFORE
     // the debounce check so the operator hears something even on a
     // rejected double-tap.
@@ -258,6 +265,8 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   void dispose() {
+    _volumeUpFallbackFocusNode?.dispose();
+    _pulseCountNotifier.dispose();
     widget.input.dispose();
     _stopwatch.dispose();
     super.dispose();
@@ -321,6 +330,23 @@ class _AppRootState extends State<AppRoot> {
         child: child,
       );
     }
+
+    if (!kIsWeb && kDebugMode) {
+      return Focus(
+        focusNode: _volumeUpFallbackFocusNode!,
+        autofocus: true,
+        onKeyEvent: (FocusNode node, KeyEvent event) {
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          if (event.logicalKey != LogicalKeyboardKey.volumeUp) {
+            return KeyEventResult.ignored;
+          }
+          widget.input.triggerPulse();
+          return KeyEventResult.handled;
+        },
+        child: child,
+      );
+    }
+
     return child;
   }
 
@@ -382,6 +408,11 @@ class _AppRootState extends State<AppRoot> {
               ? _connectUsbSerial
               : null,
           onThemeChanged: _handleThemeChanged,
+          arduinoConnected: (widget.input is UsbSerialInput)
+              ? (widget.input as UsbSerialInput).isConnected
+              : null,
+          arduinoPulseCountNotifier: _pulseCountNotifier,
+          onTestPulse: widget.input.triggerPulse,
         );
     }
   }

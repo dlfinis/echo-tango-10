@@ -40,6 +40,9 @@ class AdminScreen extends StatefulWidget {
     required this.onExit,
     this.onConnectUsb,
     this.onThemeChanged,
+    this.arduinoConnected,
+    this.arduinoPulseCountNotifier,
+    this.onTestPulse,
   });
 
   final ConfigStore configStore;
@@ -56,6 +59,15 @@ class AdminScreen extends StatefulWidget {
   /// restart. When null the change still persists — it just
   /// takes effect on the next app launch.
   final ValueChanged<String>? onThemeChanged;
+
+  /// Arduino connection status for the debug panel.
+  final bool? arduinoConnected;
+
+  /// Live pulse counter so the debug panel updates in real time.
+  final ValueNotifier<int>? arduinoPulseCountNotifier;
+
+  /// Fires a test pulse through the InputService.
+  final VoidCallback? onTestPulse;
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -608,6 +620,75 @@ class _AdminScreenState extends State<AdminScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
+                const SizedBox(height: 24),
+              ],
+
+              // Arduino Debug section — only when we have connection status
+              if (widget.arduinoConnected != null) ...<Widget>[
+                _sectionHeader('Arduino Debug'),
+                Row(
+                  children: <Widget>[
+                    Icon(
+                      widget.arduinoConnected!
+                          ? Icons.check_circle
+                          : Icons.error,
+                      color: widget.arduinoConnected!
+                          ? const Color(0xFF4CAF50)
+                          : const Color(0xFFFF1744),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.arduinoConnected!
+                          ? 'Arduino conectado'
+                          : 'Arduino desconectado',
+                      style: const TextStyle(
+                        color: Color(kDefaultTextColorHex),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (widget.arduinoPulseCountNotifier != null)
+                  ValueListenableBuilder<int>(
+                    valueListenable: widget.arduinoPulseCountNotifier!,
+                    builder: (BuildContext ctx, int count, Widget? _) {
+                      return Text(
+                        'Pulsos recibidos: $count',
+                        style: const TextStyle(
+                          color: Color(kDefaultTextColorHex),
+                          fontSize: 16,
+                        ),
+                      );
+                    },
+                  )
+                else
+                  Text(
+                    'Pulsos recibidos: —',
+                    style: const TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontSize: 16,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                if (widget.onTestPulse != null)
+                  OutlinedButton.icon(
+                    onPressed: widget.onTestPulse,
+                    icon: const Icon(Icons.touch_app,
+                        color: Color(kDefaultAccentColorHex)),
+                    label: const Text(
+                      'Simular pulso',
+                      style: TextStyle(
+                        color: Color(kDefaultAccentColorHex),
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: Color(kDefaultAccentColorHex),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
                 const SizedBox(height: 24),
               ],
 

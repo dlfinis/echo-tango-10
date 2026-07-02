@@ -15,6 +15,12 @@ abstract class InputService {
   /// invoking [cb] (see spec requirement 2: "Bounce suppressed").
   void onPulse(void Function() cb);
 
+  /// Manually triggers a pulse through the debounce gate.
+  ///
+  /// Exposed for debug fallbacks (volume key) and admin test button.
+  /// Default implementation is a no-op; concrete services override it.
+  void triggerPulse() {}
+
   /// Releases listeners, timers, native resources. Idempotent.
   void dispose();
 }
