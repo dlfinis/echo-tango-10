@@ -33,6 +33,7 @@ class KeyboardInput implements InputService {
 
   /// Pumps a key event through the debounce gate. Returns whether the
   /// pulse was accepted (true) or suppressed (false).
+  @override
   bool triggerPulse() {
     if (!_debounce.tryPulse()) return false;
     _callback?.call();

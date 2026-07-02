@@ -337,7 +337,7 @@ class _AppRootState extends State<AppRoot> {
         autofocus: true,
         onKeyEvent: (FocusNode node, KeyEvent event) {
           if (event is! KeyDownEvent) return KeyEventResult.ignored;
-          if (event.logicalKey != LogicalKeyboardKey.volumeUp) {
+          if (event.logicalKey != LogicalKeyboardKey.audioVolumeUp) {
             return KeyEventResult.ignored;
           }
           widget.input.triggerPulse();
