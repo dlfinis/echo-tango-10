@@ -689,6 +689,40 @@ class _AdminScreenState extends State<AdminScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text(
+                    'Botón táctil de respaldo',
+                    style: TextStyle(
+                      color: Color(kDefaultTextColorHex),
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Muestra un botón rojo en pantalla cuando el '
+                    'Arduino no está conectado',
+                    style: TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontSize: 13,
+                    ),
+                  ),
+                  value: widget.configStore.touchFallbackEnabled(),
+                  onChanged: (bool value) async {
+                    await widget.configStore.setTouchFallbackEnabled(value);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          value
+                              ? 'Botón táctil activado'
+                              : 'Botón táctil desactivado',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  activeColor: const Color(kDefaultAccentColorHex),
+                ),
                 const SizedBox(height: 24),
               ],
 

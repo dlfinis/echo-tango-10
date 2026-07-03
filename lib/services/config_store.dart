@@ -76,6 +76,7 @@ class ConfigStore {
   static const String kKeyVictoryRangeStart = 'victory_range_start';
   static const String kKeyVictoryRangeEnd = 'victory_range_end';
   static const String kKeyActiveThemeId = 'active_theme_id';
+  static const String kKeyTouchFallbackEnabled = 'touch_fallback_enabled';
 
   // ---------------------------------------------------------------------------
   // Active theme
@@ -265,6 +266,17 @@ class ConfigStore {
     }
     await _prefs.setDouble(kKeyVictoryRangeStart, start);
     await _prefs.setDouble(kKeyVictoryRangeEnd, end);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Touch fallback button
+  // ---------------------------------------------------------------------------
+
+  bool touchFallbackEnabled() =>
+      _prefs.getBool(kKeyTouchFallbackEnabled) ?? true;
+
+  Future<void> setTouchFallbackEnabled(bool value) async {
+    await _prefs.setBool(kKeyTouchFallbackEnabled, value);
   }
 
   // ---------------------------------------------------------------------------

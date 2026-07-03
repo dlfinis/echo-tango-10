@@ -53,7 +53,6 @@ class _AppRootState extends State<AppRoot> {
   final StopwatchController _stopwatch = StopwatchController();
   double _lastElapsedSeconds = 0.0;
   final ValueNotifier<int> _pulseCountNotifier = ValueNotifier<int>(0);
-  FocusNode? _volumeUpFallbackFocusNode;
 
   // Persistence — null until [ConfigStore.load] resolves on the first
   // post-frame callback. The build method renders a thin loader while
@@ -85,10 +84,6 @@ class _AppRootState extends State<AppRoot> {
     }
 
     widget.input.onPulse(_handlePulse);
-
-    if (!kIsWeb && kDebugMode) {
-      _volumeUpFallbackFocusNode = FocusNode(debugLabel: 'volume-up-fallback');
-    }
 
     // Async init — SharedPreferences is async, so we can't await it in
     // initState. Defer to the first post-frame callback.
@@ -265,7 +260,6 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   void dispose() {
-    _volumeUpFallbackFocusNode?.dispose();
     _pulseCountNotifier.dispose();
     widget.input.dispose();
     _stopwatch.dispose();
@@ -323,6 +317,17 @@ class _AppRootState extends State<AppRoot> {
   /// On Web this mounts the keyboard listener so Space keys reach the
   /// [InputService]. On Android PR1 the layer is a no-op until PR3 wires
   /// the USB serial listener.
+  bool get _showTouchFallback {
+    if (kIsWeb) return false;
+    if (_configStore == null) return false;
+    if (!_configStore!.touchFallbackEnabled()) return false;
+    if (widget.input is UsbSerialInput &&
+        (widget.input as UsbSerialInput).isConnected) {
+      return false;
+    }
+    return true;
+  }
+
   Widget _buildInputLayer({required Widget child}) {
     if (widget.input is KeyboardInput) {
       return KeyboardInputWidget(
@@ -331,19 +336,39 @@ class _AppRootState extends State<AppRoot> {
       );
     }
 
-    if (!kIsWeb && kDebugMode) {
-      return Focus(
-        focusNode: _volumeUpFallbackFocusNode!,
-        autofocus: true,
-        onKeyEvent: (FocusNode node, KeyEvent event) {
-          if (event is! KeyDownEvent) return KeyEventResult.ignored;
-          if (event.logicalKey != LogicalKeyboardKey.audioVolumeUp) {
-            return KeyEventResult.ignored;
-          }
-          widget.input.triggerPulse();
-          return KeyEventResult.handled;
-        },
-        child: child,
+    if (_showTouchFallback) {
+      return Stack(
+        children: <Widget>[
+          child,
+          Positioned(
+            left: 12,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () => widget.input.triggerPulse(),
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withAlpha(153),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.white.withAlpha(76),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.touch_app,
+                      color: Colors.white, size: 32),
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
