@@ -164,6 +164,12 @@ class _AppRootState extends State<AppRoot> {
     if (!mounted) return;
     final AppState prevState = _state;
     setState(() => _state = nextState);
+    // Start/stop gameplay music on state transitions.
+    if (prevState == AppState.waiting && nextState == AppState.playing) {
+      widget.audio.startGameplayMusic();
+    } else if (prevState == AppState.playing && nextState == AppState.result) {
+      widget.audio.stopGameplayMusic();
+    }
     // Audio cue when transitioning INTO the result screen. We
     // classify against the same range passed to ResultScreen so the
     // sound matches the verdict label the player sees.
@@ -205,6 +211,7 @@ class _AppRootState extends State<AppRoot> {
 
   void _handlePlayingTimeout() {
     if (_state != AppState.playing) return;
+    widget.audio.stopGameplayMusic();
     _stopwatch.reset();
     if (!mounted) return;
     setState(() => _state = next(_state, TimerEvent.timeout));
@@ -341,15 +348,13 @@ class _AppRootState extends State<AppRoot> {
         children: <Widget>[
           child,
           Positioned(
-            left: 12,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: () => widget.input.triggerPulse(),
-                child: Container(
-                  width: 64,
-                  height: 64,
+            left: 16,
+            bottom: 24,
+            child: GestureDetector(
+              onTap: () => widget.input.triggerPulse(),
+              child: Container(
+                width: 64,
+                height: 64,
                   decoration: BoxDecoration(
                     color: Colors.red.withAlpha(153),
                     shape: BoxShape.circle,
@@ -367,7 +372,6 @@ class _AppRootState extends State<AppRoot> {
                 ),
               ),
             ),
-          ),
         ],
       );
     }

@@ -22,6 +22,7 @@ class AudioService {
   final AudioPlayer _casi = AudioPlayer();
   final AudioPlayer _niPorAsomo = AudioPlayer();
   final AudioPlayer _tePasaste = AudioPlayer();
+  final AudioPlayer _gameplay = AudioPlayer();
 
   bool _preloaded = false;
 
@@ -61,6 +62,24 @@ class AudioService {
     }
   }
 
+  Future<void> startGameplayMusic() async {
+    try {
+      await _gameplay.setSource(AssetSource('sounds/gameplay_loop.wav'));
+      _gameplay.setReleaseMode(ReleaseMode.loop);
+      await _gameplay.resume();
+    } on Object catch (e) {
+      debugPrint('AudioService: gameplay music failed: $e');
+    }
+  }
+
+  Future<void> stopGameplayMusic() async {
+    try {
+      await _gameplay.stop();
+    } on Object catch (e) {
+      debugPrint('AudioService: stop gameplay failed: $e');
+    }
+  }
+
   Future<void> dispose() async {
     await Future.wait(<Future<void>>[
       _pulse.dispose(),
@@ -68,6 +87,7 @@ class AudioService {
       _casi.dispose(),
       _niPorAsomo.dispose(),
       _tePasaste.dispose(),
+      _gameplay.dispose(),
     ]);
   }
 }

@@ -272,7 +272,7 @@ class _PlayingScreenState extends State<PlayingScreen>
         // color is the accent (green) so it really pops.
         Positioned(
           right: 32,
-          bottom: 32,
+          bottom: 16,
           child: IgnorePointer(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
@@ -300,9 +300,13 @@ class _PlayingScreenState extends State<PlayingScreen>
         // via Opacity. Format: `SS.mmm` (full size) + `u`
         // (60% size + 0.6 alpha) so the last digit reads as a
         // "secondary, advancing" hint instead of competing with
-        // the main digits.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
+        // the main digits. Positioned with bottom:160 to leave
+        // room for the cheer message below.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 160,
           child: Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,
