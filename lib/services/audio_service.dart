@@ -2,7 +2,8 @@
 /// or a result transition. The actual `.wav` files live under
 /// `assets/sounds/` — sourced from "Retro game sound effects" by
 /// Vircon32 (Carra), CC-BY 4.0, https://opengameart.org/content/
-/// retro-game-sound-effects.
+/// retro-game-sound-effects. Background music from SubspaceAudio
+/// (Juhani Junkala), CC0, https://opengameart.org/content/5-chiptunes-action.
 ///
 /// **Asset behaviour**: if an asset is missing, the play call logs a
 /// debugPrint warning and continues silently. The kiosk works without
@@ -22,6 +23,7 @@ class AudioService {
   final AudioPlayer _casi = AudioPlayer();
   final AudioPlayer _niPorAsomo = AudioPlayer();
   final AudioPlayer _tePasaste = AudioPlayer();
+  final AudioPlayer _waiting = AudioPlayer();
   final AudioPlayer _gameplay = AudioPlayer();
 
   bool _preloaded = false;
@@ -62,26 +64,39 @@ class AudioService {
     }
   }
 
-  /// Starts the background music loop. Idempotent — safe to call
-  /// multiple times (only sets source on the first call).
-  Future<void> startMusic() async {
+  /// Starts the waiting-screen music loop. Idempotent.
+  Future<void> startWaitingMusic() async {
     try {
-      if (_gameplay.state != PlayerState.playing) {
-        await _gameplay.setSource(AssetSource('sounds/gameplay_loop.wav'));
-        _gameplay.setReleaseMode(ReleaseMode.loop);
-        await _gameplay.resume();
+      if (_waiting.state != PlayerState.playing) {
+        await _waiting.setSource(AssetSource('sounds/waiting_loop.wav'));
+        _waiting.setReleaseMode(ReleaseMode.loop);
+        await _waiting.resume();
       }
     } on Object catch (e) {
-      debugPrint('AudioService: gameplay music failed: $e');
+      debugPrint('AudioService: waiting music failed: $e');
     }
   }
 
-  /// Stops the background music.
+  /// Switches from waiting music to gameplay music. Stops the waiting
+  /// loop and starts the gameplay loop from the beginning.
+  Future<void> switchToGameplayMusic() async {
+    try {
+      await _waiting.stop();
+      await _gameplay.setSource(AssetSource('sounds/gameplay_loop.wav'));
+      _gameplay.setReleaseMode(ReleaseMode.loop);
+      await _gameplay.resume();
+    } on Object catch (e) {
+      debugPrint('AudioService: switch to gameplay failed: $e');
+    }
+  }
+
+  /// Stops all background music.
   Future<void> stopMusic() async {
     try {
+      await _waiting.stop();
       await _gameplay.stop();
     } on Object catch (e) {
-      debugPrint('AudioService: stop gameplay failed: $e');
+      debugPrint('AudioService: stop music failed: $e');
     }
   }
 
@@ -92,6 +107,7 @@ class AudioService {
       _casi.dispose(),
       _niPorAsomo.dispose(),
       _tePasaste.dispose(),
+      _waiting.dispose(),
       _gameplay.dispose(),
     ]);
   }

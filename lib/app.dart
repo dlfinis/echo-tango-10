@@ -165,7 +165,9 @@ class _AppRootState extends State<AppRoot> {
     final AppState prevState = _state;
     setState(() => _state = nextState);
     // Start/stop gameplay music on state transitions.
-    if (prevState == AppState.playing && nextState == AppState.result) {
+    if (prevState == AppState.waiting && nextState == AppState.playing) {
+      widget.audio.switchToGameplayMusic();
+    } else if (prevState == AppState.playing && nextState == AppState.result) {
       widget.audio.stopMusic();
     }
     // Audio cue when transitioning INTO the result screen. We
