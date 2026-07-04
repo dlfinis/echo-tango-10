@@ -165,10 +165,8 @@ class _AppRootState extends State<AppRoot> {
     final AppState prevState = _state;
     setState(() => _state = nextState);
     // Start/stop gameplay music on state transitions.
-    if (prevState == AppState.waiting && nextState == AppState.playing) {
-      widget.audio.startGameplayMusic();
-    } else if (prevState == AppState.playing && nextState == AppState.result) {
-      widget.audio.stopGameplayMusic();
+    if (prevState == AppState.playing && nextState == AppState.result) {
+      widget.audio.stopMusic();
     }
     // Audio cue when transitioning INTO the result screen. We
     // classify against the same range passed to ResultScreen so the
@@ -211,7 +209,7 @@ class _AppRootState extends State<AppRoot> {
 
   void _handlePlayingTimeout() {
     if (_state != AppState.playing) return;
-    widget.audio.stopGameplayMusic();
+    widget.audio.stopMusic();
     _stopwatch.reset();
     if (!mounted) return;
     setState(() => _state = next(_state, TimerEvent.timeout));

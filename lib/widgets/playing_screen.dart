@@ -293,20 +293,11 @@ class _PlayingScreenState extends State<PlayingScreen>
             ),
           ),
         ),
-        // Main chronograph — THREE text widgets in a simple Row
-        // (no Transforms, no multi-font-size wizardry other than
-        // the final decimicro digit). The FittedBox scales the
-        // whole Row to fit the viewport. Hidden during countdown
-        // via Opacity. Format: `SS.mmm` (full size) + `u`
-        // (60% size + 0.6 alpha) so the last digit reads as a
-        // "secondary, advancing" hint instead of competing with
-        // the main digits. Positioned with bottom:160 to leave
-        // room for the cheer message below.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 160,
+                // Main chronograph — shifted up via Transform.translate
+        // so the cheer message fits below without constraining
+        // the chronograph's size.
+        Transform.translate(
+          offset: const Offset(0, -80),
           child: Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,

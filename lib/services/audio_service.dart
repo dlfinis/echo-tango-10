@@ -62,17 +62,22 @@ class AudioService {
     }
   }
 
-  Future<void> startGameplayMusic() async {
+  /// Starts the background music loop. Idempotent — safe to call
+  /// multiple times (only sets source on the first call).
+  Future<void> startMusic() async {
     try {
-      await _gameplay.setSource(AssetSource('sounds/gameplay_loop.wav'));
-      _gameplay.setReleaseMode(ReleaseMode.loop);
-      await _gameplay.resume();
+      if (_gameplay.state != PlayerState.playing) {
+        await _gameplay.setSource(AssetSource('sounds/gameplay_loop.wav'));
+        _gameplay.setReleaseMode(ReleaseMode.loop);
+        await _gameplay.resume();
+      }
     } on Object catch (e) {
       debugPrint('AudioService: gameplay music failed: $e');
     }
   }
 
-  Future<void> stopGameplayMusic() async {
+  /// Stops the background music.
+  Future<void> stopMusic() async {
     try {
       await _gameplay.stop();
     } on Object catch (e) {
