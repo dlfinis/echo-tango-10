@@ -43,6 +43,7 @@ class AdminScreen extends StatefulWidget {
     this.arduinoConnected,
     this.arduinoPulseCountNotifier,
     this.onTestPulse,
+    this.onStopWaitingMusic,
   });
 
   final ConfigStore configStore;
@@ -68,6 +69,9 @@ class AdminScreen extends StatefulWidget {
 
   /// Fires a test pulse through the InputService.
   final VoidCallback? onTestPulse;
+
+  /// Called when waiting music is disabled from admin.
+  final VoidCallback? onStopWaitingMusic;
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -716,6 +720,43 @@ class _AdminScreenState extends State<AdminScreen> {
                           value
                               ? 'Botón táctil activado'
                               : 'Botón táctil desactivado',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  activeColor: const Color(kDefaultAccentColorHex),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text(
+                    'Música de espera',
+                    style: TextStyle(
+                      color: Color(kDefaultTextColorHex),
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Música de fondo en la pantalla de espera. '
+                    'No afecta los efectos de juego.',
+                    style: TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontSize: 13,
+                    ),
+                  ),
+                  value: widget.configStore.waitingMusicEnabled(),
+                  onChanged: (bool value) async {
+                    await widget.configStore.setWaitingMusicEnabled(value);
+                    if (!value) {
+                      widget.onStopWaitingMusic?.call();
+                    }
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          value
+                              ? 'Música de espera activada'
+                              : 'Música de espera desactivada',
                         ),
                         duration: const Duration(seconds: 2),
                       ),

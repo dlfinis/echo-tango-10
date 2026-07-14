@@ -171,7 +171,7 @@ class _AppRootState extends State<AppRoot> {
       widget.audio.stopMusic();
     }
     if (nextState == AppState.waiting) {
-      widget.audio.startWaitingMusic();
+      _maybeStartWaitingMusic();
     }
     // Audio cue when transitioning INTO the result screen. We
     // classify against the same range passed to ResultScreen so the
@@ -212,13 +212,18 @@ class _AppRootState extends State<AppRoot> {
     return newDeltaAbs < top.last.deltaAbs;
   }
 
+  void _maybeStartWaitingMusic() {
+    if (_configStore != null && !_configStore!.waitingMusicEnabled()) return;
+    _maybeStartWaitingMusic();
+  }
+
   void _handlePlayingTimeout() {
     if (_state != AppState.playing) return;
     widget.audio.stopMusic();
     _stopwatch.reset();
     if (!mounted) return;
     setState(() => _state = next(_state, TimerEvent.timeout));
-    widget.audio.startWaitingMusic();
+    _maybeStartWaitingMusic();
   }
 
   void _openAdmin() {
@@ -229,13 +234,13 @@ class _AppRootState extends State<AppRoot> {
   void _exitAdmin() {
     if (_state != AppState.admin) return;
     setState(() => _state = next(_state, TimerEvent.exitAdmin));
-    widget.audio.startWaitingMusic();
+    _maybeStartWaitingMusic();
   }
 
   void _handleAcceptWinner() {
     if (_state != AppState.winnerName) return;
     setState(() => _state = next(_state, TimerEvent.acceptWinner));
-    widget.audio.startWaitingMusic();
+    _maybeStartWaitingMusic();
   }
 
   /// Called by the admin theme picker after the operator
@@ -448,6 +453,7 @@ class _AppRootState extends State<AppRoot> {
               : null,
           arduinoPulseCountNotifier: _pulseCountNotifier,
           onTestPulse: widget.input.triggerPulse,
+          onStopWaitingMusic: () => widget.audio.stopMusic(),
         );
     }
   }
