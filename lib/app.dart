@@ -170,6 +170,9 @@ class _AppRootState extends State<AppRoot> {
     } else if (prevState == AppState.playing && nextState == AppState.result) {
       widget.audio.stopMusic();
     }
+    if (nextState == AppState.waiting) {
+      widget.audio.startWaitingMusic();
+    }
     // Audio cue when transitioning INTO the result screen. We
     // classify against the same range passed to ResultScreen so the
     // sound matches the verdict label the player sees.
@@ -215,6 +218,7 @@ class _AppRootState extends State<AppRoot> {
     _stopwatch.reset();
     if (!mounted) return;
     setState(() => _state = next(_state, TimerEvent.timeout));
+    widget.audio.startWaitingMusic();
   }
 
   void _openAdmin() {
@@ -225,11 +229,13 @@ class _AppRootState extends State<AppRoot> {
   void _exitAdmin() {
     if (_state != AppState.admin) return;
     setState(() => _state = next(_state, TimerEvent.exitAdmin));
+    widget.audio.startWaitingMusic();
   }
 
   void _handleAcceptWinner() {
     if (_state != AppState.winnerName) return;
     setState(() => _state = next(_state, TimerEvent.acceptWinner));
+    widget.audio.startWaitingMusic();
   }
 
   /// Called by the admin theme picker after the operator

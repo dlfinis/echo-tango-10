@@ -39,6 +39,8 @@ class AudioService {
       _safeSetSource(_casi, 'sounds/casi.wav'),
       _safeSetSource(_niPorAsomo, 'sounds/ni_por_asomo.wav'),
       _safeSetSource(_tePasaste, 'sounds/te_pasaste.wav'),
+      _safeSetSource(_waiting, 'sounds/waiting_loop.wav'),
+      _safeSetSource(_gameplay, 'sounds/gameplay_loop.wav'),
     ]);
   }
 
@@ -58,6 +60,7 @@ class AudioService {
 
   Future<void> _safePlay(AudioPlayer player) async {
     try {
+      await player.stop();
       await player.resume();
     } on Object catch (e) {
       debugPrint('AudioService: play failed: $e');
@@ -68,7 +71,6 @@ class AudioService {
   Future<void> startWaitingMusic() async {
     try {
       if (_waiting.state != PlayerState.playing) {
-        await _waiting.setSource(AssetSource('sounds/waiting_loop.wav'));
         _waiting.setReleaseMode(ReleaseMode.loop);
         await _waiting.resume();
       }
@@ -82,7 +84,6 @@ class AudioService {
   Future<void> switchToGameplayMusic() async {
     try {
       await _waiting.stop();
-      await _gameplay.setSource(AssetSource('sounds/gameplay_loop.wav'));
       _gameplay.setReleaseMode(ReleaseMode.loop);
       await _gameplay.resume();
     } on Object catch (e) {
