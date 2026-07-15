@@ -214,7 +214,7 @@ class _AppRootState extends State<AppRoot> {
 
   void _maybeStartWaitingMusic() {
     if (_configStore != null && !_configStore!.waitingMusicEnabled()) return;
-    _maybeStartWaitingMusic();
+    widget.audio.startWaitingMusic();
   }
 
   void _handlePlayingTimeout() {
