@@ -286,7 +286,7 @@ class _WaitingScreenState extends State<WaitingScreen>
     // down to fill — but the natural size keeps growing on
     // bigger screens.
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
       child: SizedBox.expand(
         child: FittedBox(
           fit: BoxFit.contain,
@@ -309,7 +309,7 @@ class _WaitingScreenState extends State<WaitingScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: widget.theme.textColor,
-                      fontSize: 900,
+                      fontSize: 1200,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0,
                       height: 0.95,

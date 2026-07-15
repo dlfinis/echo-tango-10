@@ -99,9 +99,9 @@ class WorldcupTheme implements KioskTheme {
 
   @override
   List<String> get invitationMessages => const <String>[
-        '¡Metés el gol a los 10s exactos!',
-        '¡10s, un penal, hacelo perfecto!',
-        '¡Hincha, demostrá tu pegada!',
+        '¡Gol, en 10s exactos!',
+        '¡10s, penal!',
+        '¡Demostrá tu pegada!',
       ];
 
   @override
@@ -109,7 +109,7 @@ class WorldcupTheme implements KioskTheme {
         '¡GOOOOL!',
         '¡ERES EL CRACK!',
         '¡METÉ ESE GOL!',
-        '¡DALE SELECCIÓN!',
+        '¡DALE CON FE!',
         '¡TIRÁ EL PENAL!',
       ];
 
@@ -119,16 +119,17 @@ class WorldcupTheme implements KioskTheme {
         'ENFOQUE',
         'FALTA POCO',
         'PODÉS',
-        'PREPARATE',
+        'RESPIRA',
+        'PREPARA',
       ];
 
   @override
   List<String> get playingUrgencyMessages => const <String>[
-        '¡PEGALE!',
+        '¡PEGALÉ!',
         '¡DISPARÁ!',
         '¡AHORA!',
         '¡TIRÁ!',
-        '¡DALE!',
+        '¡DALÉ!',
       ];
 
   @override
