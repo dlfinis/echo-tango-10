@@ -101,6 +101,14 @@ class AudioService {
     }
   }
 
+  /// Sets the music volume (0.0 to 1.0) for both waiting and gameplay
+  /// players. Does not affect sound effects (pulse, victory, etc.).
+  void setMusicVolume(double volume) {
+    final double v = volume.clamp(0.0, 1.0);
+    _waiting.setVolume(v);
+    _gameplay.setVolume(v);
+  }
+
   Future<void> dispose() async {
     await Future.wait(<Future<void>>[
       _pulse.dispose(),

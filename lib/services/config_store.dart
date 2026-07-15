@@ -78,6 +78,8 @@ class ConfigStore {
   static const String kKeyActiveThemeId = 'active_theme_id';
   static const String kKeyTouchFallbackEnabled = 'touch_fallback_enabled';
   static const String kKeyWaitingMusicEnabled = 'waiting_music_enabled';
+  static const String kKeyGameplayMusicEnabled = 'gameplay_music_enabled';
+  static const String kKeyMusicVolume = 'music_volume';
 
   // ---------------------------------------------------------------------------
   // Active theme
@@ -285,6 +287,20 @@ class ConfigStore {
 
   Future<void> setWaitingMusicEnabled(bool value) async {
     await _prefs.setBool(kKeyWaitingMusicEnabled, value);
+  }
+
+  bool gameplayMusicEnabled() =>
+      _prefs.getBool(kKeyGameplayMusicEnabled) ?? true;
+
+  Future<void> setGameplayMusicEnabled(bool value) async {
+    await _prefs.setBool(kKeyGameplayMusicEnabled, value);
+  }
+
+  double musicVolume() =>
+      _prefs.getDouble(kKeyMusicVolume) ?? 1.0;
+
+  Future<void> setMusicVolume(double value) async {
+    await _prefs.setDouble(kKeyMusicVolume, value.clamp(0.0, 1.0));
   }
 
   // ---------------------------------------------------------------------------

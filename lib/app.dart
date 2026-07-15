@@ -102,6 +102,7 @@ class _AppRootState extends State<AppRoot> {
         _theme = themeFor(store.activeThemeId());
         _bootStatus = _BootStatus.ready;
       });
+      widget.audio.setMusicVolume(_configStore!.musicVolume());
     } on Object catch (e) {
       if (!mounted) return;
       setState(() {
@@ -166,7 +167,7 @@ class _AppRootState extends State<AppRoot> {
     setState(() => _state = nextState);
     // Start/stop gameplay music on state transitions.
     if (prevState == AppState.waiting && nextState == AppState.playing) {
-      widget.audio.switchToGameplayMusic();
+      _maybeSwitchToGameplayMusic();
     } else if (prevState == AppState.playing && nextState == AppState.result) {
       widget.audio.stopMusic();
     }
@@ -215,6 +216,11 @@ class _AppRootState extends State<AppRoot> {
   void _maybeStartWaitingMusic() {
     if (_configStore != null && !_configStore!.waitingMusicEnabled()) return;
     widget.audio.startWaitingMusic();
+  }
+
+  void _maybeSwitchToGameplayMusic() {
+    if (_configStore != null && !_configStore!.gameplayMusicEnabled()) return;
+    widget.audio.switchToGameplayMusic();
   }
 
   void _handlePlayingTimeout() {
@@ -454,6 +460,9 @@ class _AppRootState extends State<AppRoot> {
           arduinoPulseCountNotifier: _pulseCountNotifier,
           onTestPulse: widget.input.triggerPulse,
           onStopWaitingMusic: () => widget.audio.stopMusic(),
+          onSetMusicVolume: (double v) {
+            widget.audio.setMusicVolume(v);
+          },
         );
     }
   }

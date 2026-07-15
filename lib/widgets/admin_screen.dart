@@ -44,6 +44,7 @@ class AdminScreen extends StatefulWidget {
     this.arduinoPulseCountNotifier,
     this.onTestPulse,
     this.onStopWaitingMusic,
+    this.onSetMusicVolume,
   });
 
   final ConfigStore configStore;
@@ -72,6 +73,9 @@ class AdminScreen extends StatefulWidget {
 
   /// Called when waiting music is disabled from admin.
   final VoidCallback? onStopWaitingMusic;
+
+  /// Called when the music volume slider changes.
+  final ValueChanged<double>? onSetMusicVolume;
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -763,6 +767,89 @@ class _AdminScreenState extends State<AdminScreen> {
                     );
                   },
                   activeColor: const Color(kDefaultAccentColorHex),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text(
+                    'Música de juego',
+                    style: TextStyle(
+                      color: Color(kDefaultTextColorHex),
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Música de acción durante los 10 segundos de juego. '
+                    'No afecta los efectos.',
+                    style: TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontSize: 13,
+                    ),
+                  ),
+                  value: widget.configStore.gameplayMusicEnabled(),
+                  onChanged: (bool value) async {
+                    await widget.configStore.setGameplayMusicEnabled(value);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          value
+                              ? 'Música de juego activada'
+                              : 'Música de juego desactivada',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  activeColor: const Color(kDefaultAccentColorHex),
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'Volumen de música',
+                      style: TextStyle(
+                        color: Color(kDefaultTextColorHex),
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: <Widget>[
+                        const Icon(Icons.volume_down,
+                            color: Color(kDefaultTextColorHex), size: 24),
+                        Expanded(
+                          child: Slider(
+                            value: widget.configStore.musicVolume(),
+                            min: 0.0,
+                            max: 1.0,
+                            activeColor: const Color(kDefaultAccentColorHex),
+                            onChanged: widget.onSetMusicVolume == null
+                                ? null
+                                : (double value) {
+                                    widget.onSetMusicVolume!.call(value);
+                                  },
+                            onChangeEnd: (double value) async {
+                              await widget.configStore.setMusicVolume(value);
+                            },
+                          ),
+                        ),
+                        const Icon(Icons.volume_up,
+                            color: Color(kDefaultTextColorHex), size: 24),
+                      ],
+                    ),
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(left: 32, bottom: 4),
+                      child: Text(
+                        '${(widget.configStore.musicVolume() * 100).round()}%',
+                        style: const TextStyle(
+                          color: Color(0xFFAAAAAA),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
               ],
