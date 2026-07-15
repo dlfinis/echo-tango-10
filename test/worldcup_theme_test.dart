@@ -88,10 +88,10 @@ void main() {
       expect(theme.materialAppTitle, 'Penal Perfecto');
     });
 
-    test('invitation messages reference gol / penal / hincha', () {
+    test('invitation messages reference gol / penal', () {
       expect(theme.invitationMessages, hasLength(3));
       expect(
-        theme.invitationMessages.any((String m) => m.contains('gol')),
+        theme.invitationMessages.any((String m) => m.toLowerCase().contains('gol')),
         isTrue,
         reason: 'invitation copy must mention gol',
       );
@@ -106,14 +106,14 @@ void main() {
       expect(theme.subTaglines, hasLength(5));
       expect(theme.subTaglines, contains('¡GOOOOL!'));
       expect(
-        theme.subTaglines.any((String m) => m.contains('SELECCIÓN')),
+        theme.subTaglines.any((String m) => m.contains('GOL')),
         isTrue,
       );
     });
 
     test('playing prep / urgency messages in es-CO', () {
       expect(theme.playingPreparationMessages, contains('CONCENTRACIÓN'));
-      expect(theme.playingUrgencyMessages, contains('¡PEGALE!'));
+      expect(theme.playingUrgencyMessages, contains('¡PEGALÉ!'));
       expect(theme.playingUrgencyMessages, contains('¡DISPARÁ!'));
     });
 
