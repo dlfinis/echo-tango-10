@@ -76,13 +76,13 @@ class GoalBackdropPainter extends CustomPainter {
     <int>[0, 0, 0, 7, 7, 7, 7, 0, 0, 0], // 0: hair (4 wide)
     <int>[0, 0, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head (6 wide)
     <int>[0, 0, 1, 1, 1, 1, 1, 0, 0, 0], // 2: head
-    <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 3: gloves out + shoulders (body 5 wide)
+    <int>[1, 2, 2, 2, 2, 2, 2, 2, 1, 0], // 3: gloves out + shoulders (body 5 wide)
     <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 4: arms + jersey
-    <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 5: chest
+    <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 5: chest
     <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 6: lower chest
     <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 7: shorts (5 wide)
     <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 8: shorts
-    <int>[0, 0, 5, 0, 0, 0, 5, 0, 0, 0], // 9: legs (3 columns!)
+    <int>[0, 0, 1, 0, 0, 0, 1, 0, 0, 0], // 9: legs (3 columns!)
     <int>[0, 0, 5, 0, 0, 0, 5, 0, 0, 0], // 10: legs
     <int>[0, 0, 6, 0, 0, 0, 6, 0, 0, 0], // 11: boots
   ];
@@ -99,20 +99,20 @@ class GoalBackdropPainter extends CustomPainter {
   ];
 
   // -- Layout fractions ------------------------------------------------
-  static const double _postWidth = 0.035;
-  static const double _postLeft = 0.06;
-  static const double _postRight = 0.91;
-  static const double _crossbarTop = 0.06;
-  static const double _crossbarThickness = 0.022;
-  static const double _postBottom = 0.72;
+  static const double _postWidth = 0.036;
+  static const double _postLeft = 0.020;
+  static const double _postRight = 0.945;
+  static const double _crossbarTop = 0.15;
+  static const double _crossbarThickness = 0.035;
+  static const double _postBottom = 0.79;
 
-  static const double _keeperY = 0.55;
+  static const double _keeperY = 0.62;
 
   static const double _ballRestY = 0.45;
   static const double _penaltySpotX = 0.45;
-  static const double _grassTop = 0.92;
-  static const double _netAlpha = 0.15;
-  static const double _netCell = 20.0;
+  static const double _grassTop = 0.90;
+  static const double _netAlpha = 0.13;
+  static const double _netCell = 25.0;
   static const double _ballRadius = 35.0;
 
   // =====================================================================

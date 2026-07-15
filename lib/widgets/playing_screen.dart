@@ -271,11 +271,11 @@ class _PlayingScreenState extends State<PlayingScreen>
         // have much sense". During the urgency phase the
         // color is the accent (green) so it really pops.
         Positioned(
-          right: 32,
-          bottom: 16,
+          right: 25,
+          top: 7,
           child: IgnorePointer(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
+              duration: const Duration(milliseconds: 350),
               child: Text(
                 cheer,
                 key: ValueKey<String>(cheer),
@@ -283,7 +283,7 @@ class _PlayingScreenState extends State<PlayingScreen>
                   color: urgency
                       ? widget.theme.accentColor
                       : baseColor.withValues(alpha: 0.55),
-                  fontSize: 75,
+                  fontSize: 59,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 4,
                   fontFamily: 'BungeeInline',
@@ -293,11 +293,11 @@ class _PlayingScreenState extends State<PlayingScreen>
             ),
           ),
         ),
-                // Main chronograph — shifted up via Transform.translate
+        // Main chronograph — shifted up via Transform.translate
         // so the cheer message fits below without constraining
         // the chronograph's size.
         Transform.translate(
-          offset: const Offset(0, -80),
+          offset: const Offset(-15, -10),
           child: Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,

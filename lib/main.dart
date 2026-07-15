@@ -29,7 +29,6 @@ void main() async {
   // Best-effort preload. Missing assets are tolerated by the
   // service (it just logs); the kiosk works without audio.
   await audio.preload();
-  await audio.startWaitingMusic();
 
   runApp(AppRoot(input: input, audio: audio));
 }
