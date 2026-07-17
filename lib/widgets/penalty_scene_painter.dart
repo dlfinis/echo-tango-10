@@ -346,100 +346,152 @@ class PenaltyScenePainter extends CustomPainter {
   }
 
   void _drawGoalFrame(Canvas canvas, Rect goal) {
-    // 3D-look yellow goal frame, drawn as a STROKE (not a
-    // fill) so the net behind it shows against the kiosk
-    // white background, not against yellow. Two-tone shading
-    // on the posts: a bright "highlight" on the right/top
-    // edges and a darker shadow on the left/bottom edges
-    // give the frame a 3D look.
+    // 3D-perspective yellow goal frame — trapezoid shape where
+    // the base is wider than the top, giving a subtle depth
+    // effect. Two-tone shading on posts + depth lines from
+    // the top corners suggest the goal recedes into the field.
     final double frameT = math.max(3.0, goal.width * 0.018);
-    final Rect outer = goal.inflate(frameT / 2);
-    final Rect inner = goal.deflate(frameT * 0.1);
 
-    // --- Left post (with 3D shading) ---
-    // Highlight: bright amarillo thin line on the LEFT edge
-    // (the sun is on the left in this scene).
-    canvas.drawRect(
-      outer,
+    // Trapezoid inset — the top is inset by this amount on
+    // each side so the crossbar appears narrower than the base.
+    final double trapInset = goal.width * 0.06;
+
+    // --- Trapezoid points (outer frame) ---
+    final Offset outerTopLeft = Offset(goal.left + trapInset, goal.top);
+    final Offset outerTopRight = Offset(goal.right - trapInset, goal.top);
+    final Offset outerBottomRight = Offset(goal.right, goal.bottom);
+    final Offset outerBottomLeft = Offset(goal.left, goal.bottom);
+
+    // --- Trapezoid points (inner frame, for thickness) ---
+    final double innerInset = frameT * 0.8;
+    final Offset innerTopLeft = Offset(
+      outerTopLeft.dx + innerInset,
+      outerTopLeft.dy + innerInset,
+    );
+    final Offset innerTopRight = Offset(
+      outerTopRight.dx - innerInset,
+      outerTopRight.dy + innerInset,
+    );
+    final Offset innerBottomRight = Offset(
+      outerBottomRight.dx - innerInset,
+      outerBottomRight.dy - innerInset,
+    );
+    final Offset innerBottomLeft = Offset(
+      outerBottomLeft.dx + innerInset,
+      outerBottomLeft.dy - innerInset,
+    );
+
+    // --- Draw the trapezoid outline (dark stroke) ---
+    final Path outerPath = Path()
+      ..moveTo(outerTopLeft.dx, outerTopLeft.dy)
+      ..lineTo(outerTopRight.dx, outerTopRight.dy)
+      ..lineTo(outerBottomRight.dx, outerBottomRight.dy)
+      ..lineTo(outerBottomLeft.dx, outerBottomLeft.dy)
+      ..close();
+
+    canvas.drawPath(
+      outerPath,
       Paint()
         ..color = const Color(0xFF111111)
         ..style = PaintingStyle.stroke
         ..strokeWidth = frameT,
     );
-    // Yellow fill on the LEFT half of each post/crossbar.
+
+    // --- Yellow highlights on left post + crossbar ---
     final Paint postHighlight = Paint()
       ..color = _kAmarilloBandera
       ..style = PaintingStyle.fill;
-    // Left post (vertical bar from top-left to bottom-left).
-    canvas.drawRect(
-      Rect.fromLTRB(
-        outer.left,
-        outer.top,
-        outer.left + frameT,
-        outer.bottom,
-      ),
-      postHighlight,
-    );
-    // Crossbar (horizontal bar from top-left to top-right).
-    canvas.drawRect(
-      Rect.fromLTRB(
-        outer.left,
-        outer.top,
-        outer.right,
-        outer.top + frameT,
-      ),
-      postHighlight,
-    );
-    // Right post (vertical bar from top-right to bottom-right).
-    canvas.drawRect(
-      Rect.fromLTRB(
-        outer.right - frameT,
-        outer.top,
-        outer.right,
-        outer.bottom,
-      ),
-      postHighlight,
-    );
-    // Yellow fill on the RIGHT half (slightly darker for the
-    // shadow side).
+
+    // Left post — filled trapezoid strip on the left edge.
+    final Path leftPost = Path()
+      ..moveTo(outerTopLeft.dx, outerTopLeft.dy)
+      ..lineTo(outerTopLeft.dx + frameT, outerTopLeft.dy + frameT)
+      ..lineTo(outerBottomLeft.dx + frameT, outerBottomLeft.dy - frameT)
+      ..lineTo(outerBottomLeft.dx, outerBottomLeft.dy)
+      ..close();
+    canvas.drawPath(leftPost, postHighlight);
+
+    // Crossbar — filled trapezoid strip on the top edge.
+    final Path crossbar = Path()
+      ..moveTo(outerTopLeft.dx, outerTopLeft.dy)
+      ..lineTo(outerTopRight.dx, outerTopRight.dy)
+      ..lineTo(outerTopRight.dx - frameT, outerTopRight.dy + frameT)
+      ..lineTo(outerTopLeft.dx + frameT, outerTopLeft.dy + frameT)
+      ..close();
+    canvas.drawPath(crossbar, postHighlight);
+
+    // Right post — filled trapezoid strip on the right edge.
+    final Path rightPost = Path()
+      ..moveTo(outerTopRight.dx, outerTopRight.dy)
+      ..lineTo(outerBottomRight.dx, outerBottomRight.dy)
+      ..lineTo(outerBottomRight.dx - frameT, outerBottomRight.dy - frameT)
+      ..lineTo(outerTopRight.dx - frameT, outerTopRight.dy + frameT)
+      ..close();
+    canvas.drawPath(rightPost, postHighlight);
+
+    // --- Shadow shading (darker yellow on right/bottom) ---
     final Paint postShadow = Paint()
       ..color = _kAmarilloOscuro
       ..style = PaintingStyle.fill;
-    canvas.drawRect(
-      Rect.fromLTRB(
-        outer.left + frameT * 0.55,
-        outer.top + frameT * 0.55,
-        outer.left + frameT,
-        outer.bottom,
-      ),
-      postShadow,
-    );
-    canvas.drawRect(
-      Rect.fromLTRB(
-        outer.left + frameT * 0.55,
-        outer.top,
-        outer.right,
-        outer.top + frameT * 0.55,
-      ),
-      postShadow,
-    );
-    canvas.drawRect(
-      Rect.fromLTRB(
-        outer.right - frameT,
-        outer.top + frameT * 0.55,
-        outer.right - frameT * 0.55,
-        outer.bottom,
-      ),
-      postShadow,
-    );
-    // Inner darker rim (the "back" of the goal frame visible
-    // at the inner edge).
-    canvas.drawRect(
-      inner,
+
+    // Right post shadow (inner half).
+    final Path rightShadow = Path()
+      ..moveTo(outerTopRight.dx - frameT * 0.5, outerTopRight.dy + frameT * 0.5)
+      ..lineTo(outerTopRight.dx - frameT, outerTopRight.dy + frameT)
+      ..lineTo(outerBottomRight.dx - frameT, outerBottomRight.dy - frameT)
+      ..lineTo(outerBottomRight.dx - frameT * 0.5, outerBottomRight.dy - frameT * 0.5)
+      ..close();
+    canvas.drawPath(rightShadow, postShadow);
+
+    // Crossbar shadow (bottom half).
+    final Path crossbarShadow = Path()
+      ..moveTo(outerTopLeft.dx + frameT * 0.5, outerTopLeft.dy + frameT * 0.5)
+      ..lineTo(outerTopRight.dx - frameT * 0.5, outerTopRight.dy + frameT * 0.5)
+      ..lineTo(outerTopRight.dx - frameT, outerTopRight.dy + frameT)
+      ..lineTo(outerTopLeft.dx + frameT, outerTopLeft.dy + frameT)
+      ..close();
+    canvas.drawPath(crossbarShadow, postShadow);
+
+    // --- Inner darker rim ---
+    final Path innerPath = Path()
+      ..moveTo(innerTopLeft.dx, innerTopLeft.dy)
+      ..lineTo(innerTopRight.dx, innerTopRight.dy)
+      ..lineTo(innerBottomRight.dx, innerBottomRight.dy)
+      ..lineTo(innerBottomLeft.dx, innerBottomLeft.dy)
+      ..close();
+
+    canvas.drawPath(
+      innerPath,
       Paint()
         ..color = const Color(0xFF5A4400)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0,
+    );
+
+    // --- Depth lines from top corners (perspective) ---
+    final double depthLen = goal.height * 0.12;
+    final Paint depthPaint = Paint()
+      ..color = const Color(0xFF111111).withValues(alpha: 0.6)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    // Left depth line — goes up-left from top-left corner.
+    canvas.drawLine(
+      outerTopLeft,
+      Offset(outerTopLeft.dx - depthLen * 0.3, outerTopLeft.dy - depthLen),
+      depthPaint,
+    );
+    // Right depth line — goes up-right from top-right corner.
+    canvas.drawLine(
+      outerTopRight,
+      Offset(outerTopRight.dx + depthLen * 0.3, outerTopRight.dy - depthLen),
+      depthPaint,
+    );
+    // Horizontal back bar connecting the depth lines.
+    canvas.drawLine(
+      Offset(outerTopLeft.dx - depthLen * 0.3, outerTopLeft.dy - depthLen),
+      Offset(outerTopRight.dx + depthLen * 0.3, outerTopRight.dy - depthLen),
+      depthPaint..color = const Color(0xFF111111).withValues(alpha: 0.4),
     );
   }
 

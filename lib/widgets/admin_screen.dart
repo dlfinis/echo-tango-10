@@ -639,6 +639,10 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 24),
               ],
 
+              _sectionHeader('Audio'),
+              ..._buildAudioControls(),
+              const SizedBox(height: 24),
+
               // Arduino Debug section — only when we have connection status
               if (widget.arduinoConnected != null) ...<Widget>[
                 _sectionHeader('Arduino Debug'),
@@ -705,172 +709,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text(
-                    'Botón táctil de respaldo',
-                    style: TextStyle(
-                      color: Color(kDefaultTextColorHex),
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Muestra un botón rojo en pantalla cuando el '
-                    'Arduino no está conectado',
-                    style: TextStyle(
-                      color: Color(0xFFAAAAAA),
-                      fontSize: 13,
-                    ),
-                  ),
-                  value: _touchFallbackEnabled,
-                  onChanged: (bool value) async {
-                    setState(() {
-                      _touchFallbackEnabled = value;
-                    });
-                    await widget.configStore.setTouchFallbackEnabled(value);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          value
-                              ? 'Botón táctil activado'
-                              : 'Botón táctil desactivado',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  activeColor: const Color(kDefaultAccentColorHex),
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text(
-                    'Música de espera',
-                    style: TextStyle(
-                      color: Color(kDefaultTextColorHex),
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Música de fondo en la pantalla de espera. '
-                    'No afecta los efectos de juego.',
-                    style: TextStyle(
-                      color: Color(0xFFAAAAAA),
-                      fontSize: 13,
-                    ),
-                  ),
-                  value: _waitingMusicEnabled,
-                  onChanged: (bool value) async {
-                    setState(() {
-                      _waitingMusicEnabled = value;
-                    });
-                    await widget.configStore.setWaitingMusicEnabled(value);
-                    if (!value) {
-                      widget.onStopWaitingMusic?.call();
-                    }
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          value
-                              ? 'Música de espera activada'
-                              : 'Música de espera desactivada',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  activeColor: const Color(kDefaultAccentColorHex),
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text(
-                    'Música de juego',
-                    style: TextStyle(
-                      color: Color(kDefaultTextColorHex),
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Música de acción durante los 10 segundos de juego. '
-                    'No afecta los efectos.',
-                    style: TextStyle(
-                      color: Color(0xFFAAAAAA),
-                      fontSize: 13,
-                    ),
-                  ),
-                  value: _gameplayMusicEnabled,
-                  onChanged: (bool value) async {
-                    setState(() {
-                      _gameplayMusicEnabled = value;
-                    });
-                    await widget.configStore.setGameplayMusicEnabled(value);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          value
-                              ? 'Música de juego activada'
-                              : 'Música de juego desactivada',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  activeColor: const Color(kDefaultAccentColorHex),
-                ),
-                const SizedBox(height: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const Text(
-                      'Volumen de música',
-                      style: TextStyle(
-                        color: Color(kDefaultTextColorHex),
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: <Widget>[
-                        const Icon(Icons.volume_down,
-                            color: Color(kDefaultTextColorHex), size: 24),
-                        Expanded(
-                          child: Slider(
-                            value: _musicVolume,
-                            min: 0.0,
-                            max: 1.0,
-                            activeColor: const Color(kDefaultAccentColorHex),
-                            onChanged: widget.onSetMusicVolume == null
-                                ? null
-                                  : (double value) {
-                                      setState(() {
-                                        _musicVolume = value;
-                                      });
-                                      widget.onSetMusicVolume!.call(value);
-                                    },
-                            onChangeEnd: (double value) async {
-                              await widget.configStore.setMusicVolume(value);
-                            },
-                          ),
-                        ),
-                        const Icon(Icons.volume_up,
-                            color: Color(kDefaultTextColorHex), size: 24),
-                      ],
-                    ),
-                    Padding(
-                      padding:
-                          const EdgeInsets.only(left: 32, bottom: 4),
-                      child: Text(
-                        '${(_musicVolume * 100).round()}%',
-                        style: const TextStyle(
-                          color: Color(0xFFAAAAAA),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 24),
               ],
 
@@ -999,6 +837,138 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildAudioControls() {
+    return <Widget>[
+      SwitchListTile(
+        title: const Text(
+          'Música de espera',
+          style: TextStyle(
+            color: Color(kDefaultTextColorHex),
+            fontSize: 16,
+          ),
+        ),
+        subtitle: const Text(
+          'Música de fondo en la pantalla de espera. '
+          'No afecta los efectos de juego.',
+          style: TextStyle(
+            color: Color(0xFFAAAAAA),
+            fontSize: 13,
+          ),
+        ),
+        value: _waitingMusicEnabled,
+        onChanged: (bool value) async {
+          setState(() {
+            _waitingMusicEnabled = value;
+          });
+          await widget.configStore.setWaitingMusicEnabled(value);
+          if (!value) {
+            widget.onStopWaitingMusic?.call();
+          }
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                value
+                    ? 'Música de espera activada'
+                    : 'Música de espera desactivada',
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        activeColor: const Color(kDefaultAccentColorHex),
+      ),
+      const SizedBox(height: 16),
+      SwitchListTile(
+        title: const Text(
+          'Música de juego',
+          style: TextStyle(
+            color: Color(kDefaultTextColorHex),
+            fontSize: 16,
+          ),
+        ),
+        subtitle: const Text(
+          'Música de acción durante los 10 segundos de juego. '
+          'No afecta los efectos.',
+          style: TextStyle(
+            color: Color(0xFFAAAAAA),
+            fontSize: 13,
+          ),
+        ),
+        value: _gameplayMusicEnabled,
+        onChanged: (bool value) async {
+          setState(() {
+            _gameplayMusicEnabled = value;
+          });
+          await widget.configStore.setGameplayMusicEnabled(value);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                value
+                    ? 'Música de juego activada'
+                    : 'Música de juego desactivada',
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        activeColor: const Color(kDefaultAccentColorHex),
+      ),
+      const SizedBox(height: 16),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Volumen de música',
+            style: TextStyle(
+              color: Color(kDefaultTextColorHex),
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: <Widget>[
+              const Icon(Icons.volume_down,
+                  color: Color(kDefaultTextColorHex), size: 24),
+              Expanded(
+                child: Slider(
+                  value: _musicVolume,
+                  min: 0.0,
+                  max: 1.0,
+                  activeColor: const Color(kDefaultAccentColorHex),
+                  onChanged: widget.onSetMusicVolume == null
+                      ? null
+                      : (double value) {
+                          setState(() {
+                            _musicVolume = value;
+                          });
+                          widget.onSetMusicVolume!.call(value);
+                        },
+                  onChangeEnd: (double value) async {
+                    await widget.configStore.setMusicVolume(value);
+                  },
+                ),
+              ),
+              const Icon(Icons.volume_up,
+                  color: Color(kDefaultTextColorHex), size: 24),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 32, bottom: 4),
+            child: Text(
+              '${(_musicVolume * 100).round()}%',
+              style: const TextStyle(
+                color: Color(0xFFAAAAAA),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
   }
 
   /// Theme picker dropdown. Lists every registered theme from
