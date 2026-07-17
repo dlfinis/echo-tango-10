@@ -320,6 +320,13 @@ class _PlayingScreenState extends State<PlayingScreen>
                             'DSEG7Modern-Bold',
                             'monospace',
                           ],
+                          shadows: const <Shadow>[
+                            Shadow(
+                              color: Color(0x660E1A4A),
+                              blurRadius: 8,
+                              offset: Offset(10, 10),
+                            ),
+                          ],
                         ),
                       ),
                       Text(
@@ -334,6 +341,13 @@ class _PlayingScreenState extends State<PlayingScreen>
                             'DSEG7Modern-Bold',
                             'monospace',
                           ],
+                          shadows: const <Shadow>[
+                            Shadow(
+                              color: Color(0x660E1A4A),
+                              blurRadius: 8,
+                              offset: Offset(10, 10),
+                            ),
+                          ],
                         ),
                       ),
                       Text(
@@ -347,6 +361,13 @@ class _PlayingScreenState extends State<PlayingScreen>
                           fontFamilyFallback: const <String>[
                             'DSEG7Modern-Bold',
                             'monospace',
+                          ],
+                          shadows: const <Shadow>[
+                            Shadow(
+                              color: Color(0x660E1A4A),
+                              blurRadius: 8,
+                              offset: Offset(10, 10),
+                            ),
                           ],
                         ),
                       ),
