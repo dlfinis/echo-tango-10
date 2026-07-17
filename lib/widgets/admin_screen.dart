@@ -97,7 +97,6 @@ class _AdminScreenState extends State<AdminScreen> {
   int _bgIndex = 0;
   int _textIndex = 0;
   int _accentIndex = 0;
-  bool _touchFallbackEnabled = true;
   bool _waitingMusicEnabled = true;
   bool _gameplayMusicEnabled = true;
   double _musicVolume = 1.0;
@@ -168,7 +167,6 @@ class _AdminScreenState extends State<AdminScreen> {
         _findClosest(widget.configStore.textColorArgb(), _textPalette);
     _accentIndex =
         _findClosest(widget.configStore.accentColorArgb(), _accentPalette);
-    _touchFallbackEnabled = widget.configStore.touchFallbackEnabled();
     _waitingMusicEnabled = widget.configStore.waitingMusicEnabled();
     _gameplayMusicEnabled = widget.configStore.gameplayMusicEnabled();
     _musicVolume = widget.configStore.musicVolume();
