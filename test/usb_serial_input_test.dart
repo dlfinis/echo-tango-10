@@ -35,6 +35,9 @@ void main() {
       expect(pulses, 1);
       expect(input.isConnected, isFalse,
           reason: 'feedBytesForTest must not flip isConnected');
+      expect(input.diagnostics.value.receivedByteCount, 1);
+      expect(input.diagnostics.value.lastByte, 0x01);
+      expect(input.diagnostics.value.acceptedPulseCount, 1);
     });
 
     test('non-0x01 bytes are ignored', () {
@@ -62,9 +65,8 @@ void main() {
         0x42, 0x99, 0x00, 0x01, 0x01, 0x01, 0xFF,
       ]));
 
-      // The dispatch loop returns on the first 0x01, so trailing
-      // bytes (even more 0x01) are not consumed from this chunk.
-      // The next call to feedBytesForTest would consume them.
+      // Every byte is observed for diagnostics, while the debounce gate
+      // suppresses the trailing pulse bytes from the same serial chunk.
       expect(pulses, 1);
     });
 

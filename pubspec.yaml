@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   audioplayers: ^6.0.0
-  flutter_libserialport: ^0.6.0
+  usb_serial: ^0.5.2
   wakelock_plus: ^1.2.0
   shared_preferences: ^2.2.0
 

@@ -16,6 +16,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'services/audio_service.dart';
 import 'services/config_store.dart';
@@ -83,6 +84,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
         DeviceOrientation.landscapeRight,
       ]);
       _applyAndroidFullscreen();
+      _keepKioskAwake();
     }
 
     widget.input.onPulse(_handlePulse);
@@ -120,10 +122,17 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
+  void _keepKioskAwake() {
+    // This is intentionally re-applied after resume because Android may
+    // release a screen wakelock while the app is backgrounded.
+    WakelockPlus.enable();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _applyAndroidFullscreen();
+      _keepKioskAwake();
     }
   }
 
@@ -287,6 +296,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     if (widget.input is UsbSerialInput) {
       final UsbSerialInput usb = widget.input as UsbSerialInput;
       await usb.connect();
+      if (mounted) setState(() {});
       return;
     }
     if (!kIsWeb) {
@@ -355,8 +365,8 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   /// Wraps the active screen in a transparent input layer.
   ///
   /// On Web this mounts the keyboard listener so Space keys reach the
-  /// [InputService]. On Android PR1 the layer is a no-op until PR3 wires
-  /// the USB serial listener.
+  /// [InputService]. On Android, USB events arrive directly through the
+  /// Android USB host service, so no visual input wrapper is required.
   bool get _showTouchFallback {
     if (kIsWeb) return false;
     if (_configStore == null) return false;
@@ -474,6 +484,9 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
               ? (widget.input as UsbSerialInput).isConnected
               : null,
           arduinoPulseCountNotifier: _pulseCountNotifier,
+          arduinoDiagnostics: (widget.input is UsbSerialInput)
+              ? (widget.input as UsbSerialInput).diagnostics
+              : null,
           onTestPulse: widget.input.triggerPulse,
           onStopWaitingMusic: () => widget.audio.stopMusic(),
           onSetMusicVolume: (double v) {

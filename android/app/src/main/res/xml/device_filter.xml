@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arduino LLC/SRL vendor ID. No PID is specified so every official Uno
+     USB firmware revision is eligible for the Android USB attach dialog. -->
+<resources>
+    <usb-device vendor-id="9025" />
+</resources>

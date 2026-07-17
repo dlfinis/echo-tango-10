@@ -16,6 +16,7 @@ import 'dart:ui' as ui;
 import 'package:arcade_timer_10s/models/leaderboard_entry.dart';
 import 'package:arcade_timer_10s/services/config_store.dart';
 import 'package:arcade_timer_10s/services/leaderboard.dart';
+import 'package:arcade_timer_10s/services/usb_connection_diagnostics.dart';
 import 'package:arcade_timer_10s/state/stopwatch_controller.dart';
 import 'package:arcade_timer_10s/utils/constants.dart';
 import 'package:arcade_timer_10s/widgets/playing_screen.dart';
@@ -518,6 +519,40 @@ void main() {
       await tester.tap(find.text('Salir'));
       await tester.pumpAndSettle();
       expect(exited, isTrue);
+    });
+
+    testWidgets('Arduino debug proves a received protocol pulse',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      final ValueNotifier<UsbConnectionDiagnostics> diagnostics =
+          ValueNotifier<UsbConnectionDiagnostics>(
+        const UsbConnectionDiagnostics(
+          status: UsbConnectionStatus.connected,
+          deviceLabel: 'ARDUINO UNO · 2341:0043',
+          lastByte: 0x01,
+          receivedByteCount: 1,
+          acceptedPulseCount: 1,
+        ),
+      );
+      addTearDown(diagnostics.dispose);
+
+      await tester.pumpWidget(_wrap(AdminScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+        onExit: () {},
+        arduinoConnected: true,
+        arduinoDiagnostics: diagnostics,
+      )));
+      await tester.pump();
+
+      expect(find.text('Conectado · 9600 8N1'), findsOneWidget);
+      expect(find.textContaining('Último byte: 0x01'), findsOneWidget);
+      expect(find.text('Pulsos Arduino aceptados: 1'), findsOneWidget);
     });
 
     testWidgets('changing rotation interval persists on submit',

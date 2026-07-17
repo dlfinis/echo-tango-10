@@ -2,6 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // usb_serial's Android driver is published through JitPack.
+        maven(url = "https://jitpack.io")
     }
 }
 

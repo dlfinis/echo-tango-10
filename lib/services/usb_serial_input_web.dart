@@ -1,10 +1,8 @@
 /// Web stub for the USB serial input.
 ///
-/// On Web we cannot use `dart:ffi` (the underlying libserialport
-/// library is native-only). The kiosk never runs on Web in
-/// production (it's an Android-only Fire HD 8 app), but we still
-/// keep a stub so `flutter build web` succeeds — useful for local
-/// development without the device.
+/// The Android USB host plugin is unavailable on Web. The kiosk never runs
+/// on Web in production (it's an Android-only Fire HD 8 app), but we keep a
+/// stub so `flutter build web` succeeds — useful for local development.
 ///
 /// The stub throws on [connect] so any code path that exercises
 /// the real connect path on Web will fail loudly instead of
@@ -17,6 +15,7 @@ import 'package:flutter/foundation.dart';
 
 import '../state/stopwatch_controller.dart';
 import 'input_service.dart';
+import 'usb_connection_diagnostics.dart';
 
 /// Web stub class. The Android implementation lives in
 /// usb_serial_input_android.dart; both have the same public surface
@@ -29,6 +28,9 @@ class UsbSerialInputImpl implements InputService {
 
   final StopwatchController _debounce;
   void Function()? _callback;
+  bool _isDisposed = false;
+  final ValueNotifier<UsbConnectionDiagnostics> diagnostics =
+      ValueNotifier<UsbConnectionDiagnostics>(const UsbConnectionDiagnostics());
 
   @override
   void onPulse(void Function() cb) {
@@ -37,6 +39,7 @@ class UsbSerialInputImpl implements InputService {
 
   @override
   void triggerPulse() {
+    if (_isDisposed) return;
     if (_debounce.tryPulse()) {
       _callback?.call();
     }
@@ -53,6 +56,7 @@ class UsbSerialInputImpl implements InputService {
 
   @override
   Future<void> dispose() async {
+    _isDisposed = true;
     _callback = null;
     _debounce.dispose();
   }
@@ -62,12 +66,19 @@ class UsbSerialInputImpl implements InputService {
   /// platforms.
   @visibleForTesting
   void feedBytesForTest(Uint8List data) {
+    if (_isDisposed || data.isEmpty) return;
+    diagnostics.value = diagnostics.value.copyWith(
+      lastByte: data.last,
+      receivedByteCount: diagnostics.value.receivedByteCount + data.length,
+    );
     for (final int byte in data) {
       if (byte == 0x01) {
         if (_debounce.tryPulse()) {
           _callback?.call();
+          diagnostics.value = diagnostics.value.copyWith(
+            acceptedPulseCount: diagnostics.value.acceptedPulseCount + 1,
+          );
         }
-        return;
       }
     }
   }

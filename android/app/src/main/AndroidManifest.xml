@@ -2,17 +2,15 @@
     <!-- Arcade Timer 10s kiosk manifest.
 
          Hardware / permissions:
-           * android.hardware.usb.host — required so the Fire HD 8
-             enumerates the connected Arduino over USB OTG. Without
-             this the tablet silently ignores the device.
-           * WAKE_LOCK — keeps the screen on indefinitely while the
-             kiosk is in use (paired with wakelock_plus at runtime).
+            * android.hardware.usb.host — required so the Fire HD 8
+              can act as the USB host for the connected Arduino.
+            * The USB attached intent plus @xml/device_filter make Android
+              offer this app when an official Arduino Uno is attached.
            * Landscape-only: enforced at the Flutter level in
              main.dart via SystemChrome.setPreferredOrientations, so
              we don't need screenOrientation here.
     -->
     <uses-feature android:name="android.hardware.usb.host" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="Arcade Timer 10s"
@@ -39,6 +37,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- USB attach filter — le dice a Android que esta app puede
+                 manejar dispositivos Arduino. Cuando se conecta un Arduino
+                 con los VID/PID de device_filter.xml, Android muestra un
+                 diálogo preguntando si el usuario quiere abrir la app. -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter"/>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

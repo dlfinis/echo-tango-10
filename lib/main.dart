@@ -7,9 +7,8 @@
 ///   * Android → `UsbSerialInput` reading bytes from the Arduino
 ///               (single-byte 0x01 protocol, 200ms debounce).
 ///
-/// WAKELOCK NOTE: PR1 does NOT call `WakelockPlus.enable()`. The Android
-/// branch is a TODO until PR3, which will also wire
-/// `SystemUiMode.immersiveSticky` and the touch-block layer.
+/// The root widget keeps the Android kiosk in immersive fullscreen and
+/// re-enables the screen wakelock whenever the app resumes.
 library;
 
 import 'package:flutter/foundation.dart';

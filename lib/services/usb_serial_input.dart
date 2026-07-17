@@ -1,10 +1,8 @@
 /// Source-agnostic facade for the USB serial input.
 ///
-/// Picks the right implementation per platform via conditional
-/// imports so `flutter build web` does not pull in the
-/// dart:ffi-dependent Android implementation:
-///   * Android (and any platform with dart:io + native serial)
-///     → usb_serial_input_android.dart (flutter_libserialport).
+/// Picks the right implementation per platform via conditional imports so
+/// `flutter build web` does not initialize the Android USB host plugin:
+///   * Android → usb_serial_input_android.dart (`usb_serial` / UsbManager).
 ///   * Web     → usb_serial_input_web.dart (no-op stub that
 ///     throws on connect; allows local dev builds).
 ///

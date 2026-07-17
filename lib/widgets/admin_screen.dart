@@ -28,6 +28,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/config_store.dart';
 import '../services/leaderboard.dart';
+import '../services/usb_connection_diagnostics.dart';
 import '../theme/kiosk_theme.dart';
 import '../theme/theme_registry.dart';
 import '../utils/constants.dart';
@@ -42,6 +43,7 @@ class AdminScreen extends StatefulWidget {
     this.onThemeChanged,
     this.arduinoConnected,
     this.arduinoPulseCountNotifier,
+    this.arduinoDiagnostics,
     this.onTestPulse,
     this.onStopWaitingMusic,
     this.onSetMusicVolume,
@@ -67,6 +69,9 @@ class AdminScreen extends StatefulWidget {
 
   /// Live pulse counter so the debug panel updates in real time.
   final ValueNotifier<int>? arduinoPulseCountNotifier;
+
+  /// Connection and protocol proof supplied by the Android USB host input.
+  final ValueListenable<UsbConnectionDiagnostics>? arduinoDiagnostics;
 
   /// Fires a test pulse through the InputService.
   final VoidCallback? onTestPulse;
@@ -448,6 +453,76 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Widget _buildArduinoConnectionStatus(bool connected) {
+    return Row(
+      children: <Widget>[
+        Icon(
+          connected ? Icons.check_circle : Icons.error,
+          color: connected ? const Color(0xFF4CAF50) : const Color(0xFFFF1744),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          connected ? 'Arduino conectado' : 'Arduino desconectado',
+          style: const TextStyle(
+            color: Color(kDefaultTextColorHex),
+            fontSize: 16,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArduinoDiagnostic(UsbConnectionDiagnostics diagnostic) {
+    final bool connected = diagnostic.isConnected;
+    final bool failed = diagnostic.status == UsbConnectionStatus.error ||
+        diagnostic.status == UsbConnectionStatus.disconnected;
+    final Color color = connected
+        ? const Color(0xFF4CAF50)
+        : failed
+            ? const Color(0xFFFF1744)
+            : const Color(kDefaultAccentColorHex);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Icon(connected ? Icons.check_circle : Icons.usb, color: color),
+            const SizedBox(width: 8),
+            Text(
+              diagnostic.statusLabel,
+              style: const TextStyle(
+                color: Color(kDefaultTextColorHex),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Dispositivo: ${diagnostic.deviceLabel ?? 'Sin detectar'}',
+          style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
+        ),
+        Text(
+          'Último byte: ${diagnostic.lastByteLabel} · '
+          'Bytes recibidos: ${diagnostic.receivedByteCount}',
+          style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
+        ),
+        Text(
+          'Pulsos Arduino aceptados: ${diagnostic.acceptedPulseCount}',
+          style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
+        ),
+        if (diagnostic.errorMessage != null) ...<Widget>[
+          const SizedBox(height: 4),
+          Text(
+            diagnostic.errorMessage!,
+            style: const TextStyle(color: Color(0xFFFF5252), fontSize: 13),
+          ),
+        ],
+      ],
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -642,30 +717,19 @@ class _AdminScreenState extends State<AdminScreen> {
               const SizedBox(height: 24),
 
               // Arduino Debug section — only when we have connection status
-              if (widget.arduinoConnected != null) ...<Widget>[
+              if (widget.arduinoConnected != null ||
+                  widget.arduinoDiagnostics != null) ...<Widget>[
                 _sectionHeader('Arduino Debug'),
-                Row(
-                  children: <Widget>[
-                    Icon(
-                      widget.arduinoConnected!
-                          ? Icons.check_circle
-                          : Icons.error,
-                      color: widget.arduinoConnected!
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFFF1744),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.arduinoConnected!
-                          ? 'Arduino conectado'
-                          : 'Arduino desconectado',
-                      style: const TextStyle(
-                        color: Color(kDefaultTextColorHex),
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+                if (widget.arduinoDiagnostics != null)
+                  ValueListenableBuilder<UsbConnectionDiagnostics>(
+                    valueListenable: widget.arduinoDiagnostics!,
+                    builder: (BuildContext context,
+                        UsbConnectionDiagnostics diagnostic, Widget? _) {
+                      return _buildArduinoDiagnostic(diagnostic);
+                    },
+                  )
+                else
+                  _buildArduinoConnectionStatus(widget.arduinoConnected!),
                 const SizedBox(height: 12),
                 if (widget.arduinoPulseCountNotifier != null)
                   ValueListenableBuilder<int>(
