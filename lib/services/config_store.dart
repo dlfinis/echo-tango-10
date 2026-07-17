@@ -80,6 +80,7 @@ class ConfigStore {
   static const String kKeyWaitingMusicEnabled = 'waiting_music_enabled';
   static const String kKeyGameplayMusicEnabled = 'gameplay_music_enabled';
   static const String kKeyMusicVolume = 'music_volume';
+  static const String kKeyIdleDimmingEnabled = 'idle_dimming_enabled';
 
   // ---------------------------------------------------------------------------
   // Active theme
@@ -282,8 +283,7 @@ class ConfigStore {
     await _prefs.setBool(kKeyTouchFallbackEnabled, value);
   }
 
-  bool waitingMusicEnabled() =>
-      _prefs.getBool(kKeyWaitingMusicEnabled) ?? true;
+  bool waitingMusicEnabled() => _prefs.getBool(kKeyWaitingMusicEnabled) ?? true;
 
   Future<void> setWaitingMusicEnabled(bool value) async {
     await _prefs.setBool(kKeyWaitingMusicEnabled, value);
@@ -296,8 +296,15 @@ class ConfigStore {
     await _prefs.setBool(kKeyGameplayMusicEnabled, value);
   }
 
-  double musicVolume() =>
-      _prefs.getDouble(kKeyMusicVolume) ?? 1.0;
+  /// Whether WAITING lowers application brightness after one minute.
+  /// Defaults to enabled so fresh kiosk installs conserve battery.
+  bool idleDimmingEnabled() => _prefs.getBool(kKeyIdleDimmingEnabled) ?? true;
+
+  Future<void> setIdleDimmingEnabled(bool value) async {
+    await _prefs.setBool(kKeyIdleDimmingEnabled, value);
+  }
+
+  double musicVolume() => _prefs.getDouble(kKeyMusicVolume) ?? 1.0;
 
   Future<void> setMusicVolume(double value) async {
     await _prefs.setDouble(kKeyMusicVolume, value.clamp(0.0, 1.0));
@@ -307,15 +314,13 @@ class ConfigStore {
   // Colors (ARGB ints — `Color(0xAARRGGBB)`-compatible)
   // ---------------------------------------------------------------------------
 
-  int bgColorArgb() =>
-      _prefs.getInt(kKeyBgColorArgb) ?? kDefaultBgColorHex;
+  int bgColorArgb() => _prefs.getInt(kKeyBgColorArgb) ?? kDefaultBgColorHex;
   int textColorArgb() =>
       _prefs.getInt(kKeyTextColorArgb) ?? kDefaultTextColorHex;
   int accentColorArgb() =>
       _prefs.getInt(kKeyAccentColorArgb) ?? kDefaultAccentColorHex;
 
-  Future<void> setBgColorArgb(int argb) =>
-      _prefs.setInt(kKeyBgColorArgb, argb);
+  Future<void> setBgColorArgb(int argb) => _prefs.setInt(kKeyBgColorArgb, argb);
   Future<void> setTextColorArgb(int argb) =>
       _prefs.setInt(kKeyTextColorArgb, argb);
   Future<void> setAccentColorArgb(int argb) =>
@@ -346,8 +351,7 @@ class ConfigStore {
           } else if (item is Map) {
             // `jsonDecode` returns `Map<String, dynamic>` on web but
             // may return `Map<dynamic, dynamic>` on some VMs — coerce.
-            out.add(LeaderboardEntry.fromJson(
-                item.cast<String, dynamic>()));
+            out.add(LeaderboardEntry.fromJson(item.cast<String, dynamic>()));
           }
         }
         return out;

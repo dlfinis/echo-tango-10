@@ -65,7 +65,8 @@ void main() {
   });
 
   group('WaitingScreen', () {
-    testWidgets('renders the first invitation message', (WidgetTester tester) async {
+    testWidgets('renders the first invitation message',
+        (WidgetTester tester) async {
       final pair = await _bootstrap();
       await tester.pumpWidget(_wrap(WaitingScreen(
         configStore: pair.store,
@@ -103,8 +104,8 @@ void main() {
       )));
       await tester.pump();
       // Simulate a held pointer on the gear icon.
-      final gesture =
-          await tester.startGesture(tester.getCenter(find.byIcon(Icons.settings)));
+      final gesture = await tester
+          .startGesture(tester.getCenter(find.byIcon(Icons.settings)));
       await tester.pump(const Duration(milliseconds: 500));
       expect(adminCalls, 0, reason: 'still under 3s');
       // Pump past the full admin long-press duration.
@@ -175,8 +176,10 @@ void main() {
       await pair.store.setMessageRotationSeconds(1);
       await pair.store.setLeaderboardRotationSeconds(15);
       // Two entries with known rawSeconds values.
-      await pair.lb.add(_entry(name: 'AAA', rawSeconds: 9.9982, delta: -0.0018));
-      await pair.lb.add(_entry(name: 'BBB', rawSeconds: 10.0017, delta: 0.0017));
+      await pair.lb
+          .add(_entry(name: 'AAA', rawSeconds: 9.9982, delta: -0.0018));
+      await pair.lb
+          .add(_entry(name: 'BBB', rawSeconds: 10.0017, delta: 0.0017));
 
       await tester.pumpWidget(_wrap(WaitingScreen(
         configStore: pair.store,
@@ -299,7 +302,8 @@ void main() {
       expect(pair.lb.top(1).first.delta, closeTo(0.0, 1e-9));
     });
 
-    testWidgets('typed name is persisted on Aceptar', (WidgetTester tester) async {
+    testWidgets('typed name is persisted on Aceptar',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -523,7 +527,7 @@ void main() {
 
     testWidgets('Arduino debug proves a received protocol pulse',
         (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.physicalSize = const Size(800, 3200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -570,7 +574,8 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pump();
-      final Finder field = find.widgetWithText(TextFormField, 'Rotación de mensajes');
+      final Finder field =
+          find.widgetWithText(TextFormField, 'Rotación de mensajes');
       expect(field, findsOneWidget);
       await tester.enterText(field, '45');
       await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -616,6 +621,28 @@ void main() {
       expect(pair.store.leaderboardRotationSeconds(), 3);
       await pair.store.setLeaderboardRotationSeconds(15);
       expect(pair.store.leaderboardRotationSeconds(), 15);
+    });
+
+    testWidgets('idle-dimming toggle persists its setting',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      await tester.pumpWidget(_wrap(AdminScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+        onExit: () {},
+      )));
+      await tester.pump();
+
+      expect(find.text('Ahorro de pantalla en espera'), findsOneWidget);
+      await tester.tap(find.text('Ahorro de pantalla en espera'));
+      await tester.pump();
+
+      expect(pair.store.idleDimmingEnabled(), isFalse);
     });
   });
 
@@ -915,8 +942,7 @@ void main() {
       );
     });
 
-    testWidgets(
-        'CASI branch sign uses BungeeInline at fontSize 44 in white',
+    testWidgets('CASI branch sign uses BungeeInline at fontSize 44 in white',
         (WidgetTester tester) async {
       // Pins the visual recipe: the sign Text widget must be
       // BungeeInline, fontSize 44, color white, weight 900. The
@@ -1127,8 +1153,7 @@ void main() {
         },
       );
       expect(dotMillisFinder, findsOneWidget,
-          reason:
-              'Expected a Text widget matching the .mmm block of the '
+          reason: 'Expected a Text widget matching the .mmm block of the '
               'chronograph (starts with a dot and has exactly 3 digits), '
               'but none was found. The format must be SS.mmmu with the '
               'three millis digits in their own Text widget.');
@@ -1156,8 +1181,7 @@ void main() {
           reason: 'the trailing u must be smaller than the .mmm block');
     });
 
-    testWidgets(
-        'chronograph natural fontSizes are 1800/720/320 at 1280x800',
+    testWidgets('chronograph natural fontSizes are 1800/720/320 at 1280x800',
         (WidgetTester tester) async {
       // Pins the Fix 1 scale-up: with the new padding
       // (vertical: 0, horizontal: 0, bottom: 64 for cheer
@@ -1253,12 +1277,13 @@ void main() {
       expect(find.text('TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!'),
           findsOneWidget);
       // Measure the empty-state SizedBox (5 * 60 = 300 px tall).
-      final Finder emptySizeBox = find.ancestor(
-        of: find.text('TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!'),
-        matching: find.byType(SizedBox),
-      ).first;
-      final RenderBox emptyBox =
-          tester.renderObject(emptySizeBox) as RenderBox;
+      final Finder emptySizeBox = find
+          .ancestor(
+            of: find.text('TODAVÍA NO HAY GANADORES. ¡SÉ EL PRIMERO!'),
+            matching: find.byType(SizedBox),
+          )
+          .first;
+      final RenderBox emptyBox = tester.renderObject(emptySizeBox) as RenderBox;
       final Size emptySize = emptyBox.size;
 
       // Second: 5-row leaderboard. Seed 5 entries, swap the
@@ -1279,8 +1304,7 @@ void main() {
             matching: find.byType(Padding),
           )
           .first;
-      final RenderBox rowBox =
-          tester.renderObject(rowPadding) as RenderBox;
+      final RenderBox rowBox = tester.renderObject(rowPadding) as RenderBox;
       final Size rowSize = rowBox.size;
 
       // Per-row height is variable (depends on viewport — the

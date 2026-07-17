@@ -104,6 +104,7 @@ class _AdminScreenState extends State<AdminScreen> {
   int _accentIndex = 0;
   bool _waitingMusicEnabled = true;
   bool _gameplayMusicEnabled = true;
+  bool _idleDimmingEnabled = true;
   double _musicVolume = 1.0;
 
   // Fixed, curated palette (PR2). Future PR may swap in a real picker.
@@ -168,12 +169,12 @@ class _AdminScreenState extends State<AdminScreen> {
       text: widget.configStore.victoryRangeEnd().toStringAsFixed(4),
     );
     _bgIndex = _findClosest(widget.configStore.bgColorArgb(), _bgPalette);
-    _textIndex =
-        _findClosest(widget.configStore.textColorArgb(), _textPalette);
+    _textIndex = _findClosest(widget.configStore.textColorArgb(), _textPalette);
     _accentIndex =
         _findClosest(widget.configStore.accentColorArgb(), _accentPalette);
     _waitingMusicEnabled = widget.configStore.waitingMusicEnabled();
     _gameplayMusicEnabled = widget.configStore.gameplayMusicEnabled();
+    _idleDimmingEnabled = widget.configStore.idleDimmingEnabled();
     _musicVolume = widget.configStore.musicVolume();
   }
 
@@ -237,8 +238,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _saveLeaderboardRotation() async {
-    final int? v =
-        int.tryParse(_leaderboardIntervalController.text.trim());
+    final int? v = int.tryParse(_leaderboardIntervalController.text.trim());
     if (v == null) return;
     if (v < kMinLeaderboardRotationSeconds ||
         v > kMaxLeaderboardRotationSeconds) {
@@ -296,11 +296,8 @@ class _AdminScreenState extends State<AdminScreen> {
     final double? start = double.tryParse(startRaw);
     final double? end = double.tryParse(endRaw);
 
-    final bool invalid = start == null ||
-        end == null ||
-        start <= 0 ||
-        end <= 0 ||
-        start >= end;
+    final bool invalid =
+        start == null || end == null || start <= 0 || end <= 0 || start >= end;
 
     if (!mounted) return;
     if (invalid) {
@@ -549,7 +546,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ],
       ),
-          body: SafeArea(
+      body: SafeArea(
         child: Form(
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -662,11 +659,39 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
               const SizedBox(height: 24),
 
+              _sectionHeader('Pantalla en espera'),
+              SwitchListTile(
+                title: const Text(
+                  'Ahorro de pantalla en espera',
+                  style: TextStyle(
+                    color: Color(kDefaultTextColorHex),
+                    fontSize: 16,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Después de un minuto sin jugar, baja el brillo al 40%. '
+                  'Se restaura al iniciar una partida.',
+                  style: TextStyle(
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 13,
+                  ),
+                ),
+                value: _idleDimmingEnabled,
+                onChanged: (bool value) async {
+                  setState(() {
+                    _idleDimmingEnabled = value;
+                  });
+                  await widget.configStore.setIdleDimmingEnabled(value);
+                },
+                activeThumbColor: const Color(kDefaultAccentColorHex),
+              ),
+              const SizedBox(height: 24),
+
               _sectionHeader('Zona peligrosa'),
               OutlinedButton.icon(
                 onPressed: _confirmWipe,
-                icon: const Icon(Icons.delete_forever,
-                    color: Color(0xFFFF1744)),
+                icon:
+                    const Icon(Icons.delete_forever, color: Color(0xFFFF1744)),
                 label: const Text(
                   'Borrar base de datos',
                   style: TextStyle(color: Color(0xFFFF1744)),
@@ -695,9 +720,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   icon: const Icon(Icons.usb,
                       color: Color(kDefaultAccentColorHex)),
                   label: Text(
-                    !kIsWeb
-                        ? 'Conectar Arduino'
-                        : 'Connect USB (Web Serial)',
+                    !kIsWeb ? 'Conectar Arduino' : 'Connect USB (Web Serial)',
                     style: TextStyle(
                       color: Color(kDefaultAccentColorHex),
                     ),
@@ -1045,8 +1068,7 @@ class _AdminScreenState extends State<AdminScreen> {
         initialValue: widget.configStore.activeThemeId() ?? kDefaultThemeId,
         decoration: const InputDecoration(
           labelText: 'Tema visual',
-          helperText:
-              'Cambia colores, copy y painters. Se aplica al instante.',
+          helperText: 'Cambia colores, copy y painters. Se aplica al instante.',
           border: OutlineInputBorder(),
         ),
         items: <DropdownMenuItem<String>>[
@@ -1082,8 +1104,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     isDense: true,
                     border: const OutlineInputBorder(),
                     labelText: 'Mensaje ${i + 1}',
-                    labelStyle:
-                        const TextStyle(color: Color(0xFFAAAAAA)),
+                    labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
                   ),
                   onChanged: (_) => _saveMessages(),
                 ),
@@ -1144,8 +1165,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     isDense: true,
                     border: const OutlineInputBorder(),
                     labelText: 'Sub-frase ${i + 1}',
-                    labelStyle:
-                        const TextStyle(color: Color(0xFFAAAAAA)),
+                    labelStyle: const TextStyle(color: Color(0xFFAAAAAA)),
                   ),
                   onChanged: (_) => _saveSubTaglines(),
                 ),

@@ -85,6 +85,7 @@ void main() {
       expect(store.bgColorArgb(), kDefaultBgColorHex);
       expect(store.textColorArgb(), kDefaultTextColorHex);
       expect(store.accentColorArgb(), kDefaultAccentColorHex);
+      expect(store.idleDimmingEnabled(), isTrue);
       expect(store.leaderboard(), isEmpty);
     });
   });
@@ -124,6 +125,14 @@ void main() {
       expect(store.bgColorArgb(), 0xFF203040);
       expect(store.textColorArgb(), 0xFFE0E0E0);
       expect(store.accentColorArgb(), 0xFFFF8800);
+    });
+
+    test('idle dimming setter persists and survives restart', () async {
+      final store = await ConfigStore.load();
+      await store.setIdleDimmingEnabled(false);
+      expect(store.idleDimmingEnabled(), isFalse);
+      final store2 = await ConfigStore.load();
+      expect(store2.idleDimmingEnabled(), isFalse);
     });
 
     test('leaderboard round-trips through JSON', () async {
@@ -179,7 +188,8 @@ void main() {
       await lb.add(_entry(name: 'Mid', delta: 0.05));
 
       final top3 = lb.top(3);
-      expect(top3.map((e) => e.name).toList(), <String>['Best', 'Mid', 'Worst']);
+      expect(
+          top3.map((e) => e.name).toList(), <String>['Best', 'Mid', 'Worst']);
     });
 
     test('add caps the leaderboard at kMaxLeaderboardEntries', () async {
@@ -253,8 +263,7 @@ void main() {
     // then re-instantiates ConfigStore (simulating a restart) and
     // asserts the value survives. Validation errors are also
     // asserted.
-    test('setResultAutoReturnSeconds persists and survives restart',
-        () async {
+    test('setResultAutoReturnSeconds persists and survives restart', () async {
       final store = await ConfigStore.load();
       await store.setResultAutoReturnSeconds(7);
       expect(store.resultAutoReturnSeconds(), 7);
@@ -262,8 +271,7 @@ void main() {
       expect(store2.resultAutoReturnSeconds(), 7);
     });
 
-    test('setSubTaglines + setSubTaglineRotationSeconds persist',
-        () async {
+    test('setSubTaglines + setSubTaglineRotationSeconds persist', () async {
       final store = await ConfigStore.load();
       await store.setSubTaglines(<String>['TAG A', 'TAG B']);
       await store.setSubTaglineRotationSeconds(4);

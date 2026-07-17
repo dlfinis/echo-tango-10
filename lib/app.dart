@@ -13,9 +13,12 @@
 /// screens are pure presentations of the data passed in.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'services/audio_service.dart';
@@ -51,11 +54,17 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot>
     with WidgetsBindingObserver, TickerProviderStateMixin {
+  static const Duration _idleDimmingDelay = Duration(minutes: 1);
+  static const double _idleBrightness = 0.4;
+
   AppState _state = AppState.waiting;
   final StopwatchController _stopwatch = StopwatchController();
   double _lastElapsedSeconds = 0.0;
   final ValueNotifier<int> _pulseCountNotifier = ValueNotifier<int>(0);
   late final AnimationController _touchPulseController;
+  Timer? _idleDimmingTimer;
+  bool _isIdleDimmed = false;
+  Future<void> _brightnessOperation = Future<void>.value();
 
   // Persistence — null until [ConfigStore.load] resolves on the first
   // post-frame callback. The build method renders a thin loader while
@@ -116,6 +125,7 @@ class _AppRootState extends State<AppRoot>
       });
       widget.audio.setMusicVolume(_configStore!.musicVolume());
       _maybeStartWaitingMusic();
+      _startWaitingIdleTimer();
     } on Object catch (e) {
       if (!mounted) return;
       setState(() {
@@ -141,6 +151,58 @@ class _AppRootState extends State<AppRoot>
     if (state == AppLifecycleState.resumed) {
       _applyAndroidFullscreen();
       _keepKioskAwake();
+      _restoreBrightness();
+      if (_state == AppState.waiting) _startWaitingIdleTimer();
+    }
+  }
+
+  void _startWaitingIdleTimer() {
+    _idleDimmingTimer?.cancel();
+    _idleDimmingTimer = null;
+    if (kIsWeb ||
+        _state != AppState.waiting ||
+        _configStore == null ||
+        !_configStore!.idleDimmingEnabled()) {
+      return;
+    }
+    _idleDimmingTimer = Timer(_idleDimmingDelay, _dimWaitingScreen);
+  }
+
+  void _dimWaitingScreen() {
+    _idleDimmingTimer = null;
+    if (!mounted || _state != AppState.waiting || _isIdleDimmed) return;
+    _isIdleDimmed = true;
+    _brightnessOperation = _brightnessOperation.then(
+      (_) => _setApplicationBrightness(_idleBrightness),
+    );
+    unawaited(_brightnessOperation);
+  }
+
+  void _restoreBrightness() {
+    _idleDimmingTimer?.cancel();
+    _idleDimmingTimer = null;
+    if (kIsWeb || !_isIdleDimmed) return;
+    _isIdleDimmed = false;
+    _brightnessOperation = _brightnessOperation.then(
+      (_) => _resetApplicationBrightness(),
+    );
+    unawaited(_brightnessOperation);
+  }
+
+  Future<void> _setApplicationBrightness(double brightness) async {
+    try {
+      await ScreenBrightness.instance
+          .setApplicationScreenBrightness(brightness);
+    } on Object catch (error) {
+      debugPrint('Unable to dim application brightness: $error');
+    }
+  }
+
+  Future<void> _resetApplicationBrightness() async {
+    try {
+      await ScreenBrightness.instance.resetApplicationScreenBrightness();
+    } on Object catch (error) {
+      debugPrint('Unable to restore application brightness: $error');
     }
   }
 
@@ -182,7 +244,8 @@ class _AppRootState extends State<AppRoot>
         // leaderboard is full and this score is worse than the
         // worst top-10 entry, the player is shown a single RESULT
         // screen and returned to WAITING.
-        final bool isVictory = rawVictory && _qualifiesForTop10(_lastElapsedSeconds);
+        final bool isVictory =
+            rawVictory && _qualifiesForTop10(_lastElapsedSeconds);
         nextState = next(_state, TimerEvent.pulse, isVictory: isVictory);
         break;
 
@@ -197,6 +260,9 @@ class _AppRootState extends State<AppRoot>
     if (!mounted) return;
     final AppState prevState = _state;
     setState(() => _state = nextState);
+    if (prevState == AppState.waiting) {
+      _restoreBrightness();
+    }
     // Start/stop gameplay music on state transitions.
     if (prevState == AppState.waiting && nextState == AppState.playing) {
       _maybeSwitchToGameplayMusic();
@@ -205,13 +271,15 @@ class _AppRootState extends State<AppRoot>
     }
     if (nextState == AppState.waiting) {
       _maybeStartWaitingMusic();
+      _startWaitingIdleTimer();
     }
     // Audio cue when transitioning INTO the result screen. We
     // classify against the same range passed to ResultScreen so the
     // sound matches the verdict label the player sees.
     if (prevState == AppState.playing && nextState == AppState.result) {
       final ConfigStore? store = _configStore;
-      final double start = store?.victoryRangeStart() ?? kDefaultVictoryRangeStart;
+      final double start =
+          store?.victoryRangeStart() ?? kDefaultVictoryRangeStart;
       final double end = store?.victoryRangeEnd() ?? kDefaultVictoryRangeEnd;
       final double elapsed = _lastElapsedSeconds;
       if (elapsed >= start && elapsed <= end) {
@@ -262,10 +330,12 @@ class _AppRootState extends State<AppRoot>
     if (!mounted) return;
     setState(() => _state = next(_state, TimerEvent.timeout));
     _maybeStartWaitingMusic();
+    _startWaitingIdleTimer();
   }
 
   void _openAdmin() {
     if (_state != AppState.waiting) return;
+    _restoreBrightness();
     setState(() => _state = next(_state, TimerEvent.adminGesture));
   }
 
@@ -273,12 +343,14 @@ class _AppRootState extends State<AppRoot>
     if (_state != AppState.admin) return;
     setState(() => _state = next(_state, TimerEvent.exitAdmin));
     _maybeStartWaitingMusic();
+    _startWaitingIdleTimer();
   }
 
   void _handleAcceptWinner() {
     if (_state != AppState.winnerName) return;
     setState(() => _state = next(_state, TimerEvent.acceptWinner));
     _maybeStartWaitingMusic();
+    _startWaitingIdleTimer();
   }
 
   /// Called by the admin theme picker after the operator
@@ -318,6 +390,9 @@ class _AppRootState extends State<AppRoot>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _idleDimmingTimer?.cancel();
+    _idleDimmingTimer = null;
+    _restoreBrightness();
     _pulseCountNotifier.dispose();
     _touchPulseController.dispose();
     widget.input.dispose();
