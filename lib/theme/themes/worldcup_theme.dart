@@ -48,15 +48,14 @@ const Color _kTextOnDark = Color(0xFFFFFFFF);
 /// regardless of theme.
 const Color _kPlayingBackground = Color(0xFFFFFFFF);
 
-/// Digit rotation for the chronograph. Starts at black so the
-/// initial frame matches classic, then drifts through the
-/// Selección palette.
+/// Digit rotation for the chronograph. The yellow is brighter than the
+/// goal frame, while the blue is intentionally pastel and lively.
 const List<Color> _kPlayingPalette = <Color>[
   Color(0xFF000000), // black (initial)
-  Color(0xFFFFCD00), // amarillo bandera
-  Color(0xFF00B0FF), // sky blue
+  Color(0xFFFFD600), // strong yellow
+  Color(0xFF4FC3F7), // lively pastel blue
   Color(0xFFCE1126), // rojo bandera
-  Color(0xFFFF8F00), // warm amber
+  Color(0xFF4FC3F7), // lively pastel blue
   Color(0xFF000000), // back to black
 ];
 

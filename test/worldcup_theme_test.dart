@@ -24,6 +24,7 @@ import 'package:arcade_timer_10s/theme/themes/worldcup_theme.dart';
 import 'package:arcade_timer_10s/widgets/admin_screen.dart';
 import 'package:arcade_timer_10s/widgets/football_march_painter.dart';
 import 'package:arcade_timer_10s/widgets/football_sprite_painter.dart';
+import 'package:arcade_timer_10s/widgets/goal_backdrop_painter.dart';
 import 'package:arcade_timer_10s/widgets/invader_sprite.dart';
 import 'package:arcade_timer_10s/widgets/waiting_screen.dart';
 import 'package:flutter/material.dart';
@@ -60,23 +61,33 @@ void main() {
       expect(theme.playingBackgroundColor, const Color(0xFFFFFFFF));
     });
 
-    test('playing palette cycles through Selección colors', () {
+    test('playing palette stays distinct from the yellow goal frame', () {
       expect(theme.playingColorPalette.first, const Color(0xFF000000));
-      expect(theme.playingColorPalette, contains(const Color(0xFFFFCD00)));
+      expect(theme.playingColorPalette, contains(const Color(0xFFFFD600)));
+      expect(theme.playingColorPalette, contains(const Color(0xFF4FC3F7)));
       expect(theme.playingColorPalette, contains(const Color(0xFFCE1126)));
+      expect(
+          theme.playingColorPalette, isNot(contains(const Color(0xFFFFCD00))));
+      expect(
+          theme.playingColorPalette, isNot(contains(const Color(0xFFFF8F00))));
+      expect(
+          theme.playingColorPalette, isNot(contains(const Color(0xFF00B0FF))));
+      expect(
+          theme.playingColorPalette, isNot(contains(const Color(0xFF003893))));
+      expect(
+          theme.playingColorPalette, isNot(contains(const Color(0xFFE65100))));
     });
 
     test('verdict palette uses Selección colors', () {
       // victoria: amarillo oscuro (gol)
       expect(theme.verdictBackground(VerdictKind.victoria),
           const Color(0xFF3A2E00));
-      expect(theme.verdictColor(VerdictKind.victoria),
-          const Color(0xFFFFCD00));
+      expect(theme.verdictColor(VerdictKind.victoria), const Color(0xFFFFCD00));
       // misses: rojo bandera family
-      expect(theme.verdictColor(VerdictKind.niPorAsomo),
-          const Color(0xFFFF6B6B));
-      expect(theme.verdictColor(VerdictKind.tePasaste),
-          const Color(0xFFCE1126));
+      expect(
+          theme.verdictColor(VerdictKind.niPorAsomo), const Color(0xFFFF6B6B));
+      expect(
+          theme.verdictColor(VerdictKind.tePasaste), const Color(0xFFCE1126));
     });
   });
 
@@ -91,7 +102,8 @@ void main() {
     test('invitation messages reference gol / penal', () {
       expect(theme.invitationMessages, hasLength(3));
       expect(
-        theme.invitationMessages.any((String m) => m.toLowerCase().contains('gol')),
+        theme.invitationMessages
+            .any((String m) => m.toLowerCase().contains('gol')),
         isTrue,
         reason: 'invitation copy must mention gol',
       );
@@ -132,6 +144,15 @@ void main() {
   group('WorldcupTheme — painter delegation', () {
     const KioskTheme theme = WorldcupTheme();
 
+    test('playing backdrop uses the full-field goal painter', () {
+      final CustomPainter painter = theme.playingBackdropPainter(t: 0.25);
+      expect(painter, isA<GoalBackdropPainter>());
+
+      final GoalBackdropPainter goalPainter = painter as GoalBackdropPainter;
+      expect(goalPainter.mode, BackdropMode.idle);
+      expect(goalPainter.showField, isTrue);
+    });
+
     test('backgroundMarchPainter returns a FootballMarchPainter', () {
       final AnimationController c = AnimationController(
         vsync: const TestVSync(),
@@ -166,8 +187,7 @@ void main() {
           reason: 'worldcup and classic must produce distinct painters');
     });
 
-    test('resultSpritePainter maps VerdictKind -> FootballExpression 1:1',
-        () {
+    test('resultSpritePainter maps VerdictKind -> FootballExpression 1:1', () {
       CustomPainter pick(VerdictKind k) => theme.resultSpritePainter(
             verdict: k,
             pixelSize: 8.0,

@@ -65,37 +65,39 @@ class GoalBackdropPainter extends CustomPainter {
   static const Color _kAmarilloBandera = Color(0xFFFFCD00);
   static const Color _kAmarilloOscuro = Color(0xFFE8B400);
   static const Color _kSkinTone = Color(0xFFE0AC77);
-  static const Color _kAzulBandera = Color(0xFF0E1A4A);
+  static const Color _kSpainKeeperRed = Color(0xFFC8102E);
+  static const Color _kSpainKeeperDeepRed = Color(0xFF741321);
+  static const Color _kSpainKeeperGold = Color(0xFFFFD600);
   static const Color _kBallBlack = Color(0xFF111111);
-  static const Color _kGloveRed = Color(0xFFE04040);
 
-  // -- Goalkeeper sprite (10×12, tall athletic proportions) ------
-  //    Head 2/12 rows (17%), body 4/12 (33%), shorts 2/12 (17%),
-  //    legs 3/12 (25%), boots 1/12 (8%). Clean athletic figure.
+  // -- Goalkeeper sprite (10×12, lean athletic proportions) -------
+  //    Four-cell torso and narrow shoulders avoid the blocky,
+  //    oversized silhouette. Gloves stay close to the body at idle.
   static const List<List<int>> _sprite = <List<int>>[
-    <int>[0, 0, 0, 7, 7, 7, 7, 0, 0, 0], // 0: hair (4 wide)
-    <int>[0, 0, 1, 1, 1, 1, 1, 0, 0, 0], // 1: head (6 wide)
-    <int>[0, 0, 1, 1, 1, 1, 1, 0, 0, 0], // 2: head
-    <int>[1, 2, 2, 2, 2, 2, 2, 2, 1, 0], // 3: gloves out + shoulders (body 5 wide)
-    <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 4: arms + jersey
-    <int>[3, 0, 2, 2, 2, 2, 2, 0, 3, 0], // 5: chest
-    <int>[0, 0, 2, 2, 2, 2, 2, 0, 0, 0], // 6: lower chest
-    <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 7: shorts (5 wide)
-    <int>[0, 0, 4, 4, 4, 4, 4, 0, 0, 0], // 8: shorts
-    <int>[0, 0, 1, 0, 0, 0, 1, 0, 0, 0], // 9: legs (3 columns!)
-    <int>[0, 0, 5, 0, 0, 0, 5, 0, 0, 0], // 10: legs
-    <int>[0, 0, 6, 0, 0, 0, 6, 0, 0, 0], // 11: boots
+    <int>[0, 0, 0, 0, 7, 7, 7, 0, 0, 0], // 0: hair (4 wide)
+    <int>[0, 0, 0, 1, 1, 1, 1, 0, 0, 0], // 1: head (4 wide)
+    <int>[0, 0, 0, 1, 1, 1, 1, 0, 0, 0], // 2: head
+    <int>[0, 1, 6, 6, 2, 2, 6, 6, 1, 0], // 3: close gloves + trim
+    <int>[0, 1, 0, 2, 2, 2, 2, 0, 1, 0], // 4: narrow jersey
+    <int>[0, 8, 0, 5, 5, 5, 5, 0, 8, 0], // 5: sleeves + chest stripe
+    <int>[0, 0, 0, 2, 2, 2, 2, 0, 0, 0], // 6: narrow waist
+    <int>[0, 0, 0, 4, 4, 4, 4, 0, 0, 0], // 7: shorts
+    <int>[0, 0, 0, 4, 4, 4, 4, 0, 0, 0], // 8: gold shorts trim
+    <int>[0, 0, 0, 1, 0, 0, 1, 0, 0, 0], // 9: legs
+    <int>[0, 0, 0, 2, 0, 0, 2, 0, 0, 0], // 10: gold socks
+    <int>[0, 0, 6, 6, 0, 0, 6, 0, 0, 0], // 11: boots
   ];
 
   static const List<Color> _palette = <Color>[
     Color(0x00000000), // 0: transparent
     _kSkinTone, // 1: skin
-    _kAmarilloBandera, // 2: jersey
-    _kGloveRed, // 3: gloves (red, like real keeper gloves)
-    _kAzulBandera, // 4: shorts
-    Color(0xFF222222), // 5: legs
+    _kSpainKeeperRed, // 2: Spanish red jersey
+    _kSpainKeeperGold, // 3: goalkeeper gloves
+    _kSpainKeeperDeepRed, // 4: dark-red shorts
+    _kSpainKeeperGold, // 5: gold socks
     Color(0xFF111111), // 6: boots
     Color(0xFF1A1A1A), // 7: hair
+    _kSpainKeeperGold, // 8: gold jersey trim
   ];
 
   // -- Layout fractions ------------------------------------------------
@@ -106,13 +108,16 @@ class GoalBackdropPainter extends CustomPainter {
   static const double _crossbarThickness = 0.035;
   static const double _postBottom = 0.79;
 
-  static const double _keeperY = 0.62;
+  // The sprite is 12 rows × 0.034h = 0.408h tall. Centering it at
+  // 0.586h places its boots on the 0.79h goal line instead of below it.
+  static const double _keeperY = 0.586;
 
   static const double _ballRestY = 0.45;
   static const double _penaltySpotX = 0.45;
-  static const double _grassTop = 0.90;
-  static const double _netAlpha = 0.13;
-  static const double _netCell = 25.0;
+  // Grass and the front goal frame share one ground plane.
+  static const double _grassTop = _postBottom;
+  static const double _netAlpha = 0.09;
+  static const double _netCell = 44.0;
   static const double _ballRadius = 35.0;
 
   // =====================================================================
@@ -143,8 +148,8 @@ class GoalBackdropPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0xFFA8D572),
-            Color(0xFF5B9931),
+            Color(0xFFA8D572), // vivid grass highlight
+            Color(0xFF5B9931), // deep field green
           ],
         ).createShader(grass),
     );
@@ -158,6 +163,100 @@ class GoalBackdropPainter extends CustomPainter {
         stripe,
       );
     }
+
+    // Regulation-based penalty-area projection. Measurements use
+    // metres: area depth 16.5, spot 11, arc radius 9.15 and area
+    // width 40.32 on a standard 68 m pitch. The visible strip models
+    // 22 m of depth and widens toward the viewer.
+    const double visibleDepthMetres = 22.0;
+    const double penaltyAreaDepthMetres = 16.5;
+    const double penaltySpotMetres = 11.0;
+    const double penaltyArcRadiusMetres = 9.15;
+    const double penaltyAreaWidthMetres = 40.32;
+    const double standardPitchWidthMetres = 68.0;
+    final double fieldHeight = size.height - y;
+    const double boxFrontT = penaltyAreaDepthMetres / visibleDepthMetres;
+    const double spotT = penaltySpotMetres / visibleDepthMetres;
+    final double boxFrontY = y + fieldHeight * boxFrontT;
+    final double farHalfWidth =
+        size.width * (penaltyAreaWidthMetres / standardPitchWidthMetres) / 2;
+    final double nearHalfWidth = farHalfWidth * 1.32;
+    final double centerX = size.width * 0.5;
+    final double leftTopX = centerX - farHalfWidth;
+    final double leftBottomX = centerX - nearHalfWidth;
+    final double rightTopX = centerX + farHalfWidth;
+    final double rightBottomX = centerX + nearHalfWidth;
+    final double leftFrontX = leftTopX + (leftBottomX - leftTopX) * boxFrontT;
+    final double rightFrontX =
+        rightTopX + (rightBottomX - rightTopX) * boxFrontT;
+    final Paint fieldMarking = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.48)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.square;
+    canvas.drawLine(
+      Offset(leftTopX, y),
+      Offset(leftBottomX, size.height),
+      fieldMarking,
+    );
+    canvas.drawLine(
+      Offset(rightTopX, y),
+      Offset(rightBottomX, size.height),
+      fieldMarking,
+    );
+    canvas.drawLine(
+      Offset(leftFrontX, boxFrontY),
+      Offset(rightFrontX, boxFrontY),
+      fieldMarking,
+    );
+
+    // Penalty spot and only the regulation arc segment outside the box.
+    final Offset penaltySpot = Offset(
+      centerX,
+      y + fieldHeight * spotT,
+    );
+    canvas.drawCircle(
+      penaltySpot,
+      3.5,
+      Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.62),
+    );
+    final double boxWidthAtSpot =
+        2 * (farHalfWidth + (nearHalfWidth - farHalfWidth) * spotT);
+    final double arcWidth =
+        boxWidthAtSpot * (2 * penaltyArcRadiusMetres / penaltyAreaWidthMetres);
+    final double arcHeight =
+        fieldHeight * (2 * penaltyArcRadiusMetres / visibleDepthMetres);
+    final double arcStart = math.asin(
+      (penaltyAreaDepthMetres - penaltySpotMetres) / penaltyArcRadiusMetres,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: penaltySpot,
+        width: arcWidth,
+        height: arcHeight,
+      ),
+      arcStart,
+      math.pi - arcStart * 2,
+      false,
+      fieldMarking,
+    );
+
+    // Goal line: anchors the posts, goalkeeper and grass to the
+    // same plane. The dark under-stroke preserves it under CRT lines.
+    canvas.drawLine(
+      Offset(0, y),
+      Offset(size.width, y),
+      Paint()
+        ..color = const Color(0xFF1F5F25).withValues(alpha: 0.55)
+        ..strokeWidth = 5.0,
+    );
+    canvas.drawLine(
+      Offset(0, y),
+      Offset(size.width, y),
+      Paint()
+        ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.82)
+        ..strokeWidth = 2.5,
+    );
   }
 
   void _drawNet(Canvas canvas, Size size) {
@@ -166,7 +265,7 @@ class GoalBackdropPainter extends CustomPainter {
     final double top = size.height * (_crossbarTop + _crossbarThickness);
     final double bottom = size.height * _postBottom;
     final Rect area = Rect.fromLTRB(left, top, right, bottom);
-    final double cell = _netCell;
+    const double cell = _netCell;
 
     final Paint strand = Paint()
       ..color = const Color(0xFF111111).withValues(alpha: _netAlpha)
@@ -224,6 +323,9 @@ class GoalBackdropPainter extends CustomPainter {
   }
 
   void _drawGoalFrame(Canvas canvas, Size size) {
+    // Keep the front of the goal rectangular: a trapezoid here
+    // distorts the posts. Perspective belongs to the back of the
+    // net, represented by a small recessed frame behind it.
     final double l = size.width * _postLeft;
     final double r = size.width * _postRight;
     final double t = size.height * _crossbarTop;
@@ -234,32 +336,58 @@ class GoalBackdropPainter extends CustomPainter {
     final Paint postPaint = Paint()..color = _kAmarilloBandera;
     final Paint postShadow = Paint()..color = _kAmarilloOscuro;
 
-    // Left post.
+    // Front frame — stable and recognisable at kiosk distance.
     canvas.drawRect(Rect.fromLTRB(l, t, l + postW, b), postPaint);
-    canvas.drawRect(Rect.fromLTRB(l + postW * 0.55, t + crossH * 0.55,
-            l + postW, b),
-        postShadow);
-
-    // Right post.
+    canvas.drawRect(
+      Rect.fromLTRB(l + postW * 0.55, t + crossH * 0.55, l + postW, b),
+      postShadow,
+    );
     canvas.drawRect(Rect.fromLTRB(r, t, r + postW, b), postPaint);
-    canvas.drawRect(Rect.fromLTRB(r, t + crossH * 0.55,
-            r + postW * 0.45, b),
-        postShadow);
-
-    // Crossbar.
+    canvas.drawRect(
+      Rect.fromLTRB(r, t + crossH * 0.55, r + postW * 0.45, b),
+      postShadow,
+    );
     canvas.drawRect(Rect.fromLTRB(l, t, r + postW, t + crossH), postPaint);
-    canvas.drawRect(Rect.fromLTRB(l + postW * 0.55, t + crossH * 0.55,
-            r + postW, t + crossH),
-        postShadow);
+    canvas.drawRect(
+      Rect.fromLTRB(l + postW * 0.55, t + crossH * 0.55, r + postW, t + crossH),
+      postShadow,
+    );
 
-    // Thin black outline on the inner edges.
+    // Recessed back edge of the net. Its small inward/downward offset
+    // gives depth without skewing the visible goalposts.
+    final double depth = math.min(size.width * 0.018, size.height * 0.026);
+    final Offset frontTopLeft = Offset(l + postW, t + crossH);
+    final Offset frontTopRight = Offset(r, t + crossH);
+    final Offset frontBottomLeft = Offset(l + postW, b);
+    final Offset frontBottomRight = Offset(r, b);
+    final Offset backTopLeft =
+        Offset(frontTopLeft.dx + depth, frontTopLeft.dy + depth * 0.55);
+    final Offset backTopRight =
+        Offset(frontTopRight.dx - depth, frontTopRight.dy + depth * 0.55);
+    final Offset backBottomLeft =
+        Offset(frontBottomLeft.dx + depth, frontBottomLeft.dy - depth * 0.35);
+    final Offset backBottomRight =
+        Offset(frontBottomRight.dx - depth, frontBottomRight.dy - depth * 0.35);
+
+    final Paint depthPaint = Paint()
+      ..color = _kAmarilloOscuro.withValues(alpha: 0.65)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(frontTopLeft, backTopLeft, depthPaint);
+    canvas.drawLine(frontTopRight, backTopRight, depthPaint);
+    canvas.drawLine(frontBottomLeft, backBottomLeft, depthPaint);
+    canvas.drawLine(frontBottomRight, backBottomRight, depthPaint);
+    canvas.drawLine(backTopLeft, backTopRight, depthPaint);
+
+    // Thin black outline on the front inner edges.
     final Paint inner = Paint()
       ..color = const Color(0xFF111111)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
-    final Rect innerRect =
-        Rect.fromLTRB(l + postW - 1, t + crossH - 1, r + 1, b + 1);
-    canvas.drawRect(innerRect, inner);
+    canvas.drawRect(
+      Rect.fromLTRB(l + postW - 1, t + crossH - 1, r + 1, b + 1),
+      inner,
+    );
   }
 
   void _drawGoalkeeper(Canvas canvas, Size size) {
@@ -272,8 +400,19 @@ class GoalBackdropPainter extends CustomPainter {
     final int cols = _sprite[0].length;
 
     // Horizontal sway only — wider amplitude.
-    final double swayX =
-        math.sin(t * 2 * math.pi) * pixelSize * 1.5;
+    final double swayX = math.sin(t * 2 * math.pi) * pixelSize * 1.5;
+
+    // Ground shadow — deliberately blocky and subtle so the keeper
+    // reads as standing on the goal line without breaking pixel style.
+    final double feetY = cy + rows * pixelSize / 2;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx + swayX, feetY - pixelSize * 0.08),
+        width: pixelSize * 5.2,
+        height: pixelSize * 0.75,
+      ),
+      Paint()..color = const Color(0xFF111111).withValues(alpha: 0.18),
+    );
 
     canvas.save();
     canvas.translate(cx + swayX, cy);
@@ -296,8 +435,7 @@ class GoalBackdropPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawHeartbeatBall(
-      Canvas canvas, Offset pos, double r, double scale) {
+  void _drawHeartbeatBall(Canvas canvas, Offset pos, double r, double scale) {
     // Scaled ball body + pentagon. The scale breathes 0.7-1.25
     // so the ball visibly 'thumps'. At peak expansion the ball
     // is 25% larger — reads as "now is the moment".
@@ -314,8 +452,8 @@ class GoalBackdropPainter extends CustomPainter {
     canvas.drawOval(
       ballRect,
       Paint()
-        ..shader = RadialGradient(
-          colors: const <Color>[
+        ..shader = const RadialGradient(
+          colors: <Color>[
             Color(0xFFFFFFFF),
             Color(0xFFE0E0E0),
           ],
@@ -374,8 +512,8 @@ class GoalBackdropPainter extends CustomPainter {
     // grows outward and fades. Creates a "heartbeat" visual.
     for (int i = 0; i < 3; i++) {
       final double phase = (beat + i / 3.0) % 1.0; // 0..1
-      final double expand = 1.2 + phase * 4.0; // ring radius in ball-radii
-      final double alpha = (1.0 - phase) * 0.55;
+      final double expand = 1.2 + phase * 2.6; // restrained CRT pulse
+      final double alpha = (1.0 - phase) * 0.38;
       canvas.drawCircle(
         pos,
         r * expand,
@@ -388,9 +526,9 @@ class GoalBackdropPainter extends CustomPainter {
     // Ball glow ring — pulses with beat.
     canvas.drawCircle(
       pos,
-      r * (1.5 + beat * 1.2),
+      r * (1.4 + beat * 0.8),
       Paint()
-        ..color = _kAmarilloBandera.withValues(alpha: 0.20 + beat * 0.25)
+        ..color = _kAmarilloBandera.withValues(alpha: 0.15 + beat * 0.18)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
   }
@@ -404,55 +542,52 @@ class GoalBackdropPainter extends CustomPainter {
         Offset(pos.dx - i * r * 0.5, pos.dy),
         r * 0.3 * (4 - i) / 4,
         Paint()
-          ..color =
-              _kAmarilloBandera.withValues(alpha: alpha)
+          ..color = _kAmarilloBandera.withValues(alpha: alpha)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
     }
   }
 
   void _drawBall(Canvas canvas, Size size) {
-    final double r = _ballRadius;
+    const double r = _ballRadius;
     double x = size.width * _penaltySpotX;
     double y = size.height * _ballRestY - r;
     double rotation = 0;
     double alpha = 1.0;
 
     switch (mode) {
-      case BackdropMode.idle: {
-        // Smooth sinusoidal wave — no flicker at loop reset
-        // because ALL frequencies are INTEGERS (2π·freq·t
-        // always returns to sin(0)=cos(1) at t=1).
-        final double goalW =
-            size.width * (_postRight - _postLeft - _postWidth);
-        final double goalH = size.height *
-            (_postBottom - _crossbarTop - _crossbarThickness);
+      case BackdropMode.idle:
+        {
+          // Smooth sinusoidal wave — no flicker at loop reset
+          // because ALL frequencies are INTEGERS (2π·freq·t
+          // always returns to sin(0)=cos(1) at t=1).
+          final double goalW =
+              size.width * (_postRight - _postLeft - _postWidth);
+          final double goalH =
+              size.height * (_postBottom - _crossbarTop - _crossbarThickness);
 
-        // Heartbeat pulse (2 Hz, integer → seamless).
-        final double beat =
-            (math.sin(t * 2 * math.pi * 2) + 1) / 2;
-        final double scale = 0.65 + beat * 0.55;
+          // Heartbeat pulse (2 Hz, integer → seamless).
+          final double beat = (math.sin(t * 2 * math.pi * 2) + 1) / 2;
+          final double scale = 0.65 + beat * 0.55;
 
-        // Undulating horizontal wave (1 Hz) — smooth,
-        // visible sweep from post to post.
-        final double waveX =
-            math.sin(t * 2 * math.pi * 1) * goalW * 0.501;
+          // Undulating horizontal wave (1 Hz) — smooth,
+          // visible sweep from post to post.
+          final double waveX = math.sin(t * 2 * math.pi * 1) * goalW * 0.501;
 
-        // Gentle vertical bob (3 Hz) — keeps the ball
-        // 'alive' without distracting.
-        final double bobY =
-            math.cos(t * 2 * math.pi * 3) * goalH * 0.175;
+          // Gentle vertical bob (3 Hz) — keeps the ball
+          // 'alive' without distracting.
+          final double bobY = math.cos(t * 2 * math.pi * 3) * goalH * 0.175;
 
-        x += waveX;
-        y += bobY;
-        rotation = t * 2 * math.pi * 0.5;
+          x += waveX;
+          y += bobY;
+          rotation = t * 2 * math.pi * 0.5;
 
-        _drawHeartbeatBall(canvas, Offset(x, y), r, scale);
-        _drawSonarRings(canvas, Offset(x, y), r, beat);
-        _drawBallTrailSimple(canvas, Offset(x, y), r);
+          _drawHeartbeatBall(canvas, Offset(x, y), r, scale);
+          _drawSonarRings(canvas, Offset(x, y), r, beat);
+          _drawBallTrailSimple(canvas, Offset(x, y), r);
 
-        break;
-      }
+          break;
+        }
 
       case BackdropMode.goal:
         final Offset end = Offset(
@@ -538,7 +673,7 @@ class GoalBackdropPainter extends CustomPainter {
     // The pentagon is centered and sized at ~40% of the
     // ball radius so the white hexagons around it are
     // implied by the white ball body.
-    final double pentR = r * 0.42;
+    const double pentR = r * 0.42;
     final Path pent = Path();
     pent.moveTo(0, -pentR);
     for (int i = 0; i < 5; i++) {
@@ -569,8 +704,10 @@ class GoalBackdropPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     for (int i = 0; i < 5; i++) {
       final double a = (i * 2 + 1) * math.pi / 5 - math.pi / 2;
-      final Offset v = Offset(math.cos(a) * (pentR + 0.5), math.sin(a) * (pentR + 0.5));
-      final Offset out = Offset(math.cos(a) * (r * 0.65), math.sin(a) * (r * 0.65));
+      final Offset v =
+          Offset(math.cos(a) * (pentR + 0.5), math.sin(a) * (pentR + 0.5));
+      final Offset out =
+          Offset(math.cos(a) * (r * 0.65), math.sin(a) * (r * 0.65));
       canvas.drawLine(v, out, seam);
     }
 
