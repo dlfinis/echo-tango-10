@@ -89,10 +89,10 @@ jobs:
       - name: flutter pub get
         run: flutter pub get
 
-      - name: Patch flutter_libserialport for AGP 9 compatibility
-        # The 0.6.0 plugin still uses jcenter() and does NOT declare
-        # com.android.library. Both break AGP 9. The script rewrites
-        # the pub-cache copy in-place before the Gradle build runs.
+      - name: Patch usb_serial for AGP 9 compatibility
+        # usb_serial uses the Android UsbManager API but still ships a
+        # legacy Gradle build. The script rewrites the pub-cache copy
+        # before the Gradle build runs.
         # Idempotent — re-runs are a no-op.
         run: bash scripts/patch_usb_serial.sh
 

@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# Patch flutter_libserialport's android/build.gradle so it
-# builds against AGP 9 + Gradle 9.
-#
-# The plugin (0.6.0) ships a build.gradle that:
-#   1. Calls jcenter() — removed in Gradle 8, breaks the build.
-#   2. Does NOT declare the com.android.library plugin that AGP
-#      9 requires for subproject evaluation.
+# Patch usb_serial's legacy android/build.gradle so it builds against
+# AGP 9 + Gradle 9. The plugin's runtime API uses Android UsbManager,
+# which is required for USB-OTG permission handling.
 #
 # This script runs in CI right after `flutter pub get` so the
 # Android release APK can compile. It's a no-op if the patch has
@@ -14,35 +10,56 @@
 # Triggered by: .github/workflows/build.yml (build-apk job).
 set -euo pipefail
 
-PLUGIN_BUILD="$HOME/.pub-cache/hosted/pub.dev/flutter_libserialport-0.6.0/android/build.gradle"
+PLUGIN_BUILD="$HOME/.pub-cache/hosted/pub.dev/usb_serial-0.5.2/android/build.gradle"
 
 if [ ! -f "$PLUGIN_BUILD" ]; then
-  echo "flutter_libserialport plugin build.gradle not found at $PLUGIN_BUILD — skipping patch."
+  echo "usb_serial plugin build.gradle not found at $PLUGIN_BUILD — skipping patch."
   exit 0
 fi
 
 # Idempotency guard: only patch once.
 if grep -q '# PATCHED BY CI' "$PLUGIN_BUILD"; then
-  echo "flutter_libserialport android/build.gradle already patched — skipping."
+  echo "usb_serial android/build.gradle already patched — skipping."
   exit 0
 fi
 
-# Apply the patch:
-#   * replace jcenter() with mavenCentral()
-#   * append `apply plugin: 'com.android.library'` if missing
+# The plugin still declares AGP 4.1 and old Android Gradle DSL. The host
+# project already supplies AGP 9, so the legacy buildscript must be removed
+# rather than letting it resolve a conflicting Android Gradle Plugin.
 python3 <<'PY'
-import re, pathlib
-p = pathlib.Path.home() / ".pub-cache/hosted/pub.dev/flutter_libserialport-0.6.0/android/build.gradle"
+import pathlib
+
+p = pathlib.Path.home() / ".pub-cache/hosted/pub.dev/usb_serial-0.5.2/android/build.gradle"
 src = p.read_text()
-# 1. jcenter() -> mavenCentral()
+
+def remove_block(text, prefix):
+    start = text.find(prefix)
+    if start == -1:
+        return text
+    brace = text.find("{", start)
+    if brace == -1:
+        return text
+    depth = 0
+    for index in range(brace, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[:start] + text[index + 1:]
+    raise RuntimeError(f"Unclosed Gradle block: {prefix}")
+
+src = remove_block(src, "buildscript")
+src = remove_block(src, "rootProject.allprojects")
+src = src.replace("compileSdkVersion 33", "compileSdk 35")
+src = src.replace("minSdkVersion 16", "minSdk 16")
+src = src.replace("lintOptions {", "lint {")
 src = src.replace("jcenter()", "mavenCentral()")
-# 2. Ensure com.android.library plugin is applied
-if "com.android.library" not in src:
+if "apply plugin: 'com.android.library'" not in src:
     src = "apply plugin: 'com.android.library'\n" + src
-# 3. Mark the patch
 src = "// PATCHED BY CI — see scripts/patch_usb_serial.sh\n" + src
 p.write_text(src)
 print("patched", p)
 PY
 
-echo "OK — flutter_libserialport android/build.gradle patched."
+echo "OK — usb_serial android/build.gradle patched."
