@@ -49,11 +49,13 @@ class AppRoot extends StatefulWidget {
   State<AppRoot> createState() => _AppRootState();
 }
 
-class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
+class _AppRootState extends State<AppRoot>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   AppState _state = AppState.waiting;
   final StopwatchController _stopwatch = StopwatchController();
   double _lastElapsedSeconds = 0.0;
   final ValueNotifier<int> _pulseCountNotifier = ValueNotifier<int>(0);
+  late final AnimationController _touchPulseController;
 
   // Persistence — null until [ConfigStore.load] resolves on the first
   // post-frame callback. The build method renders a thin loader while
@@ -88,6 +90,12 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     }
 
     widget.input.onPulse(_handlePulse);
+
+    // Touch fallback button pulse animation (breathing effect for waiting).
+    _touchPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
 
     // Async init — SharedPreferences is async, so we can't await it in
     // initState. Defer to the first post-frame callback.
@@ -311,6 +319,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pulseCountNotifier.dispose();
+    _touchPulseController.dispose();
     widget.input.dispose();
     _stopwatch.dispose();
     super.dispose();
@@ -386,40 +395,79 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
       );
     }
 
-    if (_showTouchFallback) {
+    // Touch fallback button — only visible when:
+    //   1. User opted in via admin (touchFallbackEnabled),
+    //   2. Arduino is NOT connected (_showTouchFallback gate),
+    //   3. App state is waiting or playing.
+    if (_showTouchFallback &&
+        (_state == AppState.waiting || _state == AppState.playing)) {
+      final bool isWaiting = _state == AppState.waiting;
       return Stack(
         children: <Widget>[
           child,
           Positioned(
-            left: 16,
-            bottom: 24,
-            child: GestureDetector(
-              onTap: () => widget.input.triggerPulse(),
-              child: Container(
-                width: 64,
-                height: 64,
-                  decoration: BoxDecoration(
-                    color: Colors.red.withAlpha(153),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: Colors.white.withAlpha(76),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.touch_app,
-                      color: Colors.white, size: 32),
-                ),
+            left: 24,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () => widget.input.triggerPulse(),
+                child: isWaiting
+                    ? _buildPulsingTouchButton()
+                    : _buildStaticTouchButton(),
               ),
             ),
+          ),
         ],
       );
     }
 
     return child;
+  }
+
+  /// Big red button with a breathing pulse animation — shown on the
+  /// waiting screen to invite players to tap.
+  Widget _buildPulsingTouchButton() {
+    return AnimatedBuilder(
+      animation: _touchPulseController,
+      builder: (BuildContext context, Widget? child) {
+        final double t = _touchPulseController.value;
+        final double scale = 0.88 + (t * 0.27);
+        return Transform.scale(
+          scale: scale,
+          child: Opacity(opacity: 0.75 + (t * 0.25), child: child),
+        );
+      },
+      child: _touchButtonCore(),
+    );
+  }
+
+  /// Same button, fully opaque, no animation — shown on the
+  /// playing screen so the button stays out of the way.
+  Widget _buildStaticTouchButton() {
+    return _touchButtonCore();
+  }
+
+  /// The visual core of the touch fallback button: a large red
+  /// circle with a white glow border and a play-arrow icon.
+  Widget _touchButtonCore() {
+    return Container(
+      width: 130,
+      height: 130,
+      decoration: BoxDecoration(
+        color: Colors.red.withAlpha(179),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 4),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.white.withAlpha(89),
+            blurRadius: 18,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: const Icon(Icons.play_arrow, color: Colors.white, size: 72),
+    );
   }
 
   Widget _buildScreen() {
