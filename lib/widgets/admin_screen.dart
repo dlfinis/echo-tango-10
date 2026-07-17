@@ -97,6 +97,10 @@ class _AdminScreenState extends State<AdminScreen> {
   int _bgIndex = 0;
   int _textIndex = 0;
   int _accentIndex = 0;
+  bool _touchFallbackEnabled = true;
+  bool _waitingMusicEnabled = true;
+  bool _gameplayMusicEnabled = true;
+  double _musicVolume = 1.0;
 
   // Fixed, curated palette (PR2). Future PR may swap in a real picker.
   static const List<Color> _bgPalette = <Color>[
@@ -164,6 +168,10 @@ class _AdminScreenState extends State<AdminScreen> {
         _findClosest(widget.configStore.textColorArgb(), _textPalette);
     _accentIndex =
         _findClosest(widget.configStore.accentColorArgb(), _accentPalette);
+    _touchFallbackEnabled = widget.configStore.touchFallbackEnabled();
+    _waitingMusicEnabled = widget.configStore.waitingMusicEnabled();
+    _gameplayMusicEnabled = widget.configStore.gameplayMusicEnabled();
+    _musicVolume = widget.configStore.musicVolume();
   }
 
   int _findClosest(int targetArgb, List<Color> palette) {
@@ -714,8 +722,11 @@ class _AdminScreenState extends State<AdminScreen> {
                       fontSize: 13,
                     ),
                   ),
-                  value: widget.configStore.touchFallbackEnabled(),
+                  value: _touchFallbackEnabled,
                   onChanged: (bool value) async {
+                    setState(() {
+                      _touchFallbackEnabled = value;
+                    });
                     await widget.configStore.setTouchFallbackEnabled(value);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -748,8 +759,11 @@ class _AdminScreenState extends State<AdminScreen> {
                       fontSize: 13,
                     ),
                   ),
-                  value: widget.configStore.waitingMusicEnabled(),
+                  value: _waitingMusicEnabled,
                   onChanged: (bool value) async {
+                    setState(() {
+                      _waitingMusicEnabled = value;
+                    });
                     await widget.configStore.setWaitingMusicEnabled(value);
                     if (!value) {
                       widget.onStopWaitingMusic?.call();
@@ -785,8 +799,11 @@ class _AdminScreenState extends State<AdminScreen> {
                       fontSize: 13,
                     ),
                   ),
-                  value: widget.configStore.gameplayMusicEnabled(),
+                  value: _gameplayMusicEnabled,
                   onChanged: (bool value) async {
+                    setState(() {
+                      _gameplayMusicEnabled = value;
+                    });
                     await widget.configStore.setGameplayMusicEnabled(value);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -820,15 +837,18 @@ class _AdminScreenState extends State<AdminScreen> {
                             color: Color(kDefaultTextColorHex), size: 24),
                         Expanded(
                           child: Slider(
-                            value: widget.configStore.musicVolume(),
+                            value: _musicVolume,
                             min: 0.0,
                             max: 1.0,
                             activeColor: const Color(kDefaultAccentColorHex),
                             onChanged: widget.onSetMusicVolume == null
                                 ? null
-                                : (double value) {
-                                    widget.onSetMusicVolume!.call(value);
-                                  },
+                                  : (double value) {
+                                      setState(() {
+                                        _musicVolume = value;
+                                      });
+                                      widget.onSetMusicVolume!.call(value);
+                                    },
                             onChangeEnd: (double value) async {
                               await widget.configStore.setMusicVolume(value);
                             },
@@ -842,7 +862,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       padding:
                           const EdgeInsets.only(left: 32, bottom: 4),
                       child: Text(
-                        '${(widget.configStore.musicVolume() * 100).round()}%',
+                        '${(_musicVolume * 100).round()}%',
                         style: const TextStyle(
                           color: Color(0xFFAAAAAA),
                           fontSize: 13,

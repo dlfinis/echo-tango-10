@@ -48,7 +48,7 @@ class AppRoot extends StatefulWidget {
   State<AppRoot> createState() => _AppRootState();
 }
 
-class _AppRootState extends State<AppRoot> {
+class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   AppState _state = AppState.waiting;
   final StopwatchController _stopwatch = StopwatchController();
   double _lastElapsedSeconds = 0.0;
@@ -72,6 +72,7 @@ class _AppRootState extends State<AppRoot> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Force landscape (no-op on Web, real on Android). Doing it here keeps
     // the kIsWeb fork centralized in the app root for PR1; main.dart can
@@ -81,6 +82,7 @@ class _AppRootState extends State<AppRoot> {
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
+      _applyAndroidFullscreen();
     }
 
     widget.input.onPulse(_handlePulse);
@@ -103,12 +105,25 @@ class _AppRootState extends State<AppRoot> {
         _bootStatus = _BootStatus.ready;
       });
       widget.audio.setMusicVolume(_configStore!.musicVolume());
+      _maybeStartWaitingMusic();
     } on Object catch (e) {
       if (!mounted) return;
       setState(() {
         _bootError = e.toString();
         _bootStatus = _BootStatus.error;
       });
+    }
+  }
+
+  void _applyAndroidFullscreen() {
+    if (kIsWeb) return;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _applyAndroidFullscreen();
     }
   }
 
@@ -284,6 +299,7 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseCountNotifier.dispose();
     widget.input.dispose();
     _stopwatch.dispose();
