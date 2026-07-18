@@ -123,8 +123,11 @@ class _AppRootState extends State<AppRoot>
         _theme = themeFor(store.activeThemeId());
         _bootStatus = _BootStatus.ready;
       });
-      widget.audio.setMusicVolume(_configStore!.musicVolume());
+      await widget.audio.setMusicVolume(_configStore!.musicVolume());
       _maybeStartWaitingMusic();
+      if (_configStore!.gameplayMusicEnabled()) {
+        await widget.audio.warmGameplayMusic();
+      }
       _startWaitingIdleTimer();
     } on Object catch (e) {
       if (!mounted) return;
@@ -612,6 +615,7 @@ class _AppRootState extends State<AppRoot>
               : null,
           onTestPulse: widget.input.triggerPulse,
           onStopWaitingMusic: () => widget.audio.stopMusic(),
+          onGameplayMusicEnabled: () => widget.audio.warmGameplayMusic(),
           onSetMusicVolume: (double v) {
             widget.audio.setMusicVolume(v);
           },

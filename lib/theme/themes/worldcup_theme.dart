@@ -98,18 +98,24 @@ class WorldcupTheme implements KioskTheme {
 
   @override
   List<String> get invitationMessages => const <String>[
-        '¡Gol, en 10s exactos!',
+        '¡En 10s exactos!',
+        'Podés?',
+        'Con TODO',
         '¡10s, penal!',
+        '10s, será?',
+        'Patea, al arco!',
         '¡Demostrá tu pegada!',
       ];
 
   @override
   List<String> get subTaglines => const <String>[
-        '¡GOOOOL!',
+        '¡Vamos al GOOOOL!',
         '¡ERES EL CRACK!',
         '¡METÉ ESE GOL!',
         '¡DALE CON FE!',
         '¡TIRÁ EL PENAL!',
+        '¡INTENTA!',
+        '¡Confiamos en ti!',
       ];
 
   @override

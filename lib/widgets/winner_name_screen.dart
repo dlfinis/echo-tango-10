@@ -88,9 +88,8 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
       if (mounted) _nameFocus.requestFocus();
     });
 
-    // 15s auto-skip: if the user does not press ACEPTAR or SALTAR
-    // within the window, treat it as Saltar (return to WAITING
-    // without saving). Cancelled by Aceptar/Saltar or dispose.
+    // The mandatory entry screen only exits through Aceptar or this
+    // existing 15s timeout. The timeout returns to WAITING without saving.
     _autoSkipTimer = Timer(_autoSkipTimeout, () {
       if (!mounted) return;
       widget.onAccept();
@@ -141,12 +140,6 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
       delta: delta,
     );
     await widget.leaderboard.add(entry);
-    if (!mounted) return;
-    widget.onAccept();
-  }
-
-  void _handleSkip() {
-    _autoSkipTimer?.cancel();
     if (!mounted) return;
     widget.onAccept();
   }
@@ -358,53 +351,23 @@ class _WinnerNameScreenState extends State<WinnerNameScreen>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        ElevatedButton(
-                          onPressed: _handleAccept,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                const Color(kDefaultAccentColorHex),
-                            foregroundColor:
-                                const Color(kDefaultBgColorHex),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'BungeeInline',
-                              fontFamilyFallback: <String>['Bungee'],
-                            ),
-                          ),
-                          child: const Text('Aceptar'),
+                    ElevatedButton(
+                      onPressed: _handleAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(kDefaultAccentColorHex),
+                        foregroundColor: const Color(kDefaultBgColorHex),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
                         ),
-                        const SizedBox(width: 16),
-                        OutlinedButton(
-                          onPressed: _handleSkip,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor:
-                                const Color(kDefaultTextColorHex),
-                            side: const BorderSide(
-                              color: Color(kDefaultTextColorHex),
-                              width: 2,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'BungeeInline',
-                              fontFamilyFallback: <String>['Bungee'],
-                            ),
-                          ),
-                          child: const Text('SALTAR'),
+                        textStyle: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'BungeeInline',
+                          fontFamilyFallback: <String>['Bungee'],
                         ),
-                      ],
+                      ),
+                      child: const Text('Aceptar'),
                     ),
                   ],
                 ),

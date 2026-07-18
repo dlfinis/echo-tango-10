@@ -54,6 +54,18 @@ void main() {
       );
     });
 
+    test('WINNER_NAME ignores every physical input event except acceptWinner',
+        () {
+      for (final TimerEvent event in TimerEvent.values) {
+        if (event == TimerEvent.acceptWinner) continue;
+        expect(
+          next(AppState.winnerName, event, isVictory: true),
+          AppState.winnerName,
+          reason: '$event must not bypass mandatory name entry',
+        );
+      }
+    });
+
     test('unrelated events do not change state', () {
       expect(
         next(AppState.playing, TimerEvent.adminGesture),

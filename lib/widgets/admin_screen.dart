@@ -46,6 +46,7 @@ class AdminScreen extends StatefulWidget {
     this.arduinoDiagnostics,
     this.onTestPulse,
     this.onStopWaitingMusic,
+    this.onGameplayMusicEnabled,
     this.onSetMusicVolume,
   });
 
@@ -78,6 +79,9 @@ class AdminScreen extends StatefulWidget {
 
   /// Called when waiting music is disabled from admin.
   final VoidCallback? onStopWaitingMusic;
+
+  /// Called when gameplay music is enabled from admin.
+  final VoidCallback? onGameplayMusicEnabled;
 
   /// Called when the music volume slider changes.
   final ValueChanged<double>? onSetMusicVolume;
@@ -988,6 +992,9 @@ class _AdminScreenState extends State<AdminScreen> {
             _gameplayMusicEnabled = value;
           });
           await widget.configStore.setGameplayMusicEnabled(value);
+          if (value) {
+            widget.onGameplayMusicEnabled?.call();
+          }
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

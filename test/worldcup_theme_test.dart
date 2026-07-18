@@ -99,24 +99,25 @@ void main() {
       expect(theme.materialAppTitle, 'Penal Perfecto');
     });
 
-    test('invitation messages reference gol / penal', () {
-      expect(theme.invitationMessages, hasLength(3));
+    test('invitation messages reference penal / the 10s challenge', () {
+      expect(theme.invitationMessages, hasLength(7));
       expect(
         theme.invitationMessages
-            .any((String m) => m.toLowerCase().contains('gol')),
+            .any((String m) => m.toLowerCase().contains('10s')),
         isTrue,
-        reason: 'invitation copy must mention gol',
+        reason: 'invitation copy must reference the 10-second challenge',
       );
       expect(
-        theme.invitationMessages.any((String m) => m.contains('penal')),
+        theme.invitationMessages
+            .any((String m) => m.toLowerCase().contains('penal')),
         isTrue,
         reason: 'invitation copy must mention penal',
       );
     });
 
     test('sub-taglines are football exclamations', () {
-      expect(theme.subTaglines, hasLength(5));
-      expect(theme.subTaglines, contains('¡GOOOOL!'));
+      expect(theme.subTaglines, hasLength(7));
+      expect(theme.subTaglines, contains('¡Vamos al GOOOOL!'));
       expect(
         theme.subTaglines.any((String m) => m.contains('GOL')),
         isTrue,

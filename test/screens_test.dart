@@ -361,7 +361,7 @@ void main() {
       // we just verify the wiring is in place.
     });
 
-    testWidgets('SALTAR button is rendered and skips without saving',
+    testWidgets('has no touch bypass before Aceptar or timeout',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
@@ -376,12 +376,12 @@ void main() {
         onAccept: () => accepted = true,
       )));
       await tester.pump();
-      expect(find.text('SALTAR'), findsOneWidget);
-      await tester.tap(find.text('SALTAR'));
+      expect(find.text('SALTAR'), findsNothing);
+      await tester.tap(find.text('VICTORIA'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(accepted, isTrue);
-      expect(pair.lb.length, 0, reason: 'skip must not write an entry');
+      expect(accepted, isFalse);
+      expect(pair.lb.length, 0,
+          reason: 'touches outside Aceptar must not exit');
     });
 
     testWidgets('auto-skips to onAccept after the 15s timeout',
@@ -643,6 +643,35 @@ void main() {
       await tester.pump();
 
       expect(pair.store.idleDimmingEnabled(), isFalse);
+    });
+
+    testWidgets('enabling gameplay music requests a muted warmup',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final pair = await _bootstrap();
+      await pair.store.setGameplayMusicEnabled(false);
+      int warmupRequests = 0;
+      await tester.pumpWidget(_wrap(AdminScreen(
+        configStore: pair.store,
+        leaderboard: pair.lb,
+        onExit: () {},
+        onGameplayMusicEnabled: () => warmupRequests++,
+      )));
+      await tester.pump();
+
+      await tester.tap(find.text('Música de juego'));
+      await tester.pump();
+      expect(pair.store.gameplayMusicEnabled(), isTrue);
+      expect(warmupRequests, 1);
+
+      await tester.tap(find.text('Música de juego'));
+      await tester.pump();
+      expect(pair.store.gameplayMusicEnabled(), isFalse);
+      expect(warmupRequests, 1);
     });
   });
 

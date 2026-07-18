@@ -271,8 +271,8 @@ class _PlayingScreenState extends State<PlayingScreen>
         // have much sense". During the urgency phase the
         // color is the accent (green) so it really pops.
         Positioned(
-          right: 25,
-          top: 7,
+          right: 24,
+          top: 12,
           child: IgnorePointer(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 350),
@@ -283,7 +283,7 @@ class _PlayingScreenState extends State<PlayingScreen>
                   color: urgency
                       ? widget.theme.accentColor
                       : baseColor.withValues(alpha: 0.55),
-                  fontSize: 59,
+                  fontSize: 70,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 4,
                   fontFamily: 'BungeeInline',
